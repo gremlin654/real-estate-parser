@@ -1,0 +1,77 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: kufar_monitor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db_test:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: kufar_monitor_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5433:5432"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+      db_test:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:secret@db/kufar_monitor
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:secret@db_test/kufar_monitor_test
+      SCAN_INTERVAL_MINUTES: 30
+      KUFAR_CITY: mogilev
+    volumes:
+      - ./backend:/app  # Монтирование кода для hot reload
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app  # Монтирование кода для hot reload
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    command: >
+      sh -c "npm install && npm run dev -- --host"
+
+volumes:
+  pgdata:

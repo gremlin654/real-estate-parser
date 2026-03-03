@@ -1,0 +1,49 @@
+codecov:
+  require_ci_to_pass: true
+  allow_coverage_offsets: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: 40%
+        threshold: 5%
+        base: auto
+        if_no_uploads: error
+        if_not_found: success
+        if_ci_failed: error
+    patch:
+      default:
+        target: 60%
+        threshold: 10%
+        base: auto
+        if_no_uploads: warning
+        if_not_found: success
+        if_ci_failed: warning
+
+  # Ignore specific paths
+  ignore:
+    - "backend/tests/**"
+    - "frontend/src/**/*.test.ts"
+    - "frontend/src/**/*.test.tsx"
+    - "frontend/src/**/*.spec.ts"
+    - "frontend/src/**/*.spec.tsx"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
+
+# Flags for different test suites
+flags:
+  backend:
+    paths:
+      - backend/app/
+    carryforward: true
+  frontend-unit:
+    paths:
+      - frontend/src/
+    carryforward: true

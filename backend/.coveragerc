@@ -1,0 +1,20 @@
+[run]
+source = app
+omit =
+    */kufar_http_scraper.py
+    */kufar_json_scraper.py
+    */kufar_scraper.py
+    */kufar_client_mock.py
+    */main.py
+    */scraper/scheduler.py
+    */scraper/parser.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if typing.TYPE_CHECKING:
