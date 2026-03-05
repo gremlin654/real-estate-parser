@@ -1,332 +1,258 @@
-"""Kufar scraper using Playwright to parse HTML pages directly."""
+"""Kufar scraper using aiohttp with cursor pagination."""
 
 import asyncio
-from typing import Optional
-from playwright.async_api import async_playwright, Page
+from typing import Optional, List, Dict, Any
+import aiohttp
 from loguru import logger
+import json
 import re
+from datetime import datetime
 
 
 class KufarScraper:
-    """Scraper for Kufar.by that parses HTML pages directly."""
+    """Scraper for Kufar.by that extracts data from __NEXT_DATA__ using HTTP requests."""
 
     def __init__(
         self,
-        headless: bool = True,
-        timeout: int = 60000,
-        scroll_delay: int = 2000,
-        scroll_count: int = 5,
+        timeout: int = 30,
     ):
-        self.headless = headless
         self.timeout = timeout
-        self.scroll_delay = scroll_delay
-        self.scroll_count = scroll_count
+        self.session: Optional[aiohttp.ClientSession] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create aiohttp session with browser-like headers."""
+        if self.session is None or self.session.closed:
+            self.session = aiohttp.ClientSession(
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                    "Referer": "https://re.kufar.by/",
+                    "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120"',
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": '"Windows"',
+                    "Upgrade-Insecure-Requests": "1",
+                }
+            )
+        return self.session
+
+    async def close(self):
+        """Close aiohttp session."""
+        if self.session and not self.session.closed:
+            await self.session.close()
+
+    def _extract_next_data(self, html: str) -> Optional[dict]:
+        """Extract __NEXT_DATA__ from HTML."""
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+        if not match:
+            return None
+        
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            logger.error("Failed to parse __NEXT_DATA__ JSON")
+            return None
+
+    def _parse_ad(self, ad: dict) -> Optional[dict]:
+        """Parse ad data into listing dict."""
+        try:
+            # Extract price - Kufar returns price_byn and price_usd directly
+            price_byn = ad.get("price_byn", 0)
+            price_usd = ad.get("price_usd", 0)
+            currency = ad.get("currency", "BYN")
+            
+            # Extract location
+            location = ad.get("location", {})
+            address = location.get("geography", {}).get("displayName", "") if location else ""
+            
+            # Extract parameters - can be dict or list of dicts
+            ad_params_raw = ad.get("ad_parameters", {})
+            ad_params = {}
+            if isinstance(ad_params_raw, dict):
+                ad_params = ad_params_raw
+            elif isinstance(ad_params_raw, list):
+                # Convert list of dicts to single dict
+                for param in ad_params_raw:
+                    if isinstance(param, dict):
+                        name = param.get("name", "")
+                        value = param.get("value", "")
+                        if name:
+                            ad_params[name] = value
+            
+            # Extract rooms
+            rooms_raw = ad_params.get("РўРѕР»СЊРєРѕ РєРѕРјРЅР°С‚", "")
+            try:
+                rooms = int(rooms_raw) if rooms_raw and str(rooms_raw).isdigit() else 0
+            except ValueError:
+                rooms = 0
+            
+            # Extract area
+            area_raw = ad_params.get("РћР±С‰Р°СЏ РїР»РѕС‰Р°РґСЊ", "")
+            try:
+                area = float(str(area_raw).replace(",", ".")) if area_raw else 0.0
+            except ValueError:
+                area = 0.0
+            
+            # Extract floor
+            floor_raw = ad_params.get("Р­С‚Р°Р¶", "")
+            floor = int(floor_raw) if floor_raw and str(floor_raw).isdigit() else 0
+            
+            # Extract images
+            images = ad.get("images", [])
+            image_urls = []
+            for img in images:
+                if isinstance(img, dict):
+                    path = img.get("path", "")
+                    if path:
+                        image_urls.append(f"https://static.kufar.by/{path}")
+            
+            # Create listing
+            listing = {
+                "kufar_id": str(ad.get("ad_id", "")),
+                "url": f"https://re.kufar.by/ad/{ad.get('ad_id', '')}",
+                "title": ad.get("subject", ""),
+                "price": int(price_byn) if price_byn else 0,
+                "price_usd": int(price_usd) if price_usd else 0,
+                "currency": currency,
+                "address": address,
+                "rooms": rooms,
+                "area": area,
+                "floor": floor,
+                "images": image_urls,
+                "raw_data": ad,
+            }
+            
+            return listing
+        except Exception as e:
+            logger.error(f"Error parsing ad: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     async def scrape_page(
         self,
         url: str,
+        city: str = "",
         max_listings: Optional[int] = None,
-    ) -> list[dict]:
+    ) -> tuple[list[dict], Optional[str]]:
         """
-        Scrape listings from a Kufar page.
+        Scrape listings from a Kufar page using HTTP request.
 
         Args:
             url: URL of the Kufar page to scrape.
-            max_listings: Maximum number of listings to return (None for all).
+            city: City code to associate with listings.
+            max_listings: Maximum number of listings to return.
 
         Returns:
-            List of parsed listing dictionaries.
+            Tuple of (listings list, next_cursor or None)
         """
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=self.headless,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-gpu",
-                    "--disable-dev-shm-usage",
-                    "--disable-software-rasterizer",
-                    "--disable-features=VizDisplayCompositor",
-                ],
-            )
+        try:
+            session = await self._get_session()
+            
+            logger.info(f"Fetching via HTTP: {url}")
+            async with session.get(url, timeout=self.timeout) as response:
+                html = await response.text()
+            
+            logger.info(f"HTTP HTML size: {len(html)} bytes")
+            
+            # Extract __NEXT_DATA__
+            next_data = self._extract_next_data(html)
+            if not next_data:
+                logger.warning("__NEXT_DATA__ not found in HTML")
+                return [], None
+            
+            # Extract ads from props.initialState.listing.ads
+            ads = next_data.get("props", {}).get("initialState", {}).get("listing", {}).get("ads", [])
+            
+            # Extract cursor from pagination
+            next_cursor = None
+            pagination = next_data.get("props", {}).get("initialState", {}).get("listing", {}).get("pagination", [])
+            if isinstance(pagination, list):
+                for item in pagination:
+                    if isinstance(item, dict) and item.get("label") == "next":
+                        next_cursor = item.get("token")
+                        break
+            
+            logger.info(f"Found {len(ads)} ads in __NEXT_DATA__")
+            logger.info(f"Pagination items: {len(pagination) if isinstance(pagination, list) else 0}")
+            logger.info(f"Next cursor: {next_cursor[:50] if next_cursor else None}...")
+            
+            if not ads:
+                logger.warning("No ads found in __NEXT_DATA__")
+                return [], None
+            
+            # Parse ads
+            listings = []
+            for ad in ads:
+                try:
+                    listing = self._parse_ad(ad)
+                    if listing:
+                        listing["city"] = city
+                        listings.append(listing)
+                except Exception as e:
+                    logger.error(f"Error parsing ad: {e}")
+                    continue
+            
+            logger.info(f"Successfully parsed {len(listings)} listings")
+            
+            if max_listings and len(listings) > max_listings:
+                listings = listings[:max_listings]
+            
+            return listings, next_cursor
 
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                viewport={"width": 1920, "height": 1080},
-            )
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout fetching {url}")
+            return [], None
+        except Exception as e:
+            logger.error(f"Error scraping page: {e}")
+            import traceback
+            traceback.print_exc()
+            return [], None
 
-            page = await context.new_page()
-
-            try:
-                logger.info(f"Navigating to {url}...")
-                await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout)
-
-                # Wait for initial content to load
-                await page.wait_for_timeout(5000)
-
-                # Scroll to trigger lazy loading
-                logger.info("Scrolling to load lazy content...")
-                await self._scroll_page(page)
-
-                # Extract listings
-                logger.info("Extracting listings...")
-                listings = await self._extract_listings(page)
-
-                logger.info(f"Extracted {len(listings)} listings")
-
-                if max_listings and len(listings) > max_listings:
-                    listings = listings[:max_listings]
-
-                return listings
-
-            except Exception as e:
-                logger.error(f"Error scraping page: {e}")
-                import traceback
-                traceback.print_exc()
-                return []
-            finally:
-                await browser.close()
-
-    async def _scroll_page(self, page: Page):
-        """Scroll page to trigger lazy loading of content."""
-        for i in range(self.scroll_count):
-            await page.evaluate(f"window.scrollTo(0, {1000 * (i + 1)})")
-            await page.wait_for_timeout(self.scroll_delay)
-
-        # Scroll back to top
-        await page.evaluate("window.scrollTo(0, 0)")
-        await page.wait_for_timeout(1000)
-
-    async def _extract_listings(self, page: Page) -> list[dict]:
-        """Extract all listings from the page."""
-        listings_data = await page.evaluate("""
-            () => {
-                const listings = [];
-                
-                // Find all listing cards - try multiple selectors
-                const cardSelectors = [
-                    '[data-testid="advert"]',
-                    '[class*="ListingCard"]',
-                    '[class*="AdvertCard"]',
-                    'article[class*="card"]',
-                    'div[class*="listing"]',
-                    'div[class*="advert"]',
-                ];
-                
-                let cards = [];
-                for (const selector of cardSelectors) {
-                    const found = document.querySelectorAll(selector);
-                    if (found.length > 0) {
-                        cards = Array.from(found);
-                        break;
-                    }
-                }
-                
-                // If no cards found, try to find any div with price and location
-                if (cards.length === 0) {
-                    const allDivs = document.querySelectorAll('div');
-                    cards = Array.from(allDivs).filter(div => {
-                        const text = div.textContent || '';
-                        return text.includes('р.') && (text.includes('комн.') || text.includes('м²'));
-                    });
-                }
-                
-                cards.forEach((card, index) => {
-                    try {
-                        // Extract price
-                        let price = '';
-                        const priceSelectors = [
-                            '[data-testid="advert-price"]',
-                            '[class*="price"]',
-                            '[class*="Price"]',
-                        ];
-                        for (const selector of priceSelectors) {
-                            const el = card.querySelector(selector);
-                            if (el) {
-                                price = el.textContent?.trim() || '';
-                                break;
-                            }
-                        }
-                        
-                        // Extract rooms
-                        let rooms = '';
-                        const roomsMatch = card.textContent?.match(/(\\d+)\\s*комн\\.?/);
-                        if (roomsMatch) {
-                            rooms = roomsMatch[1];
-                        }
-                        
-                        // Extract area
-                        let area = '';
-                        const areaMatch = card.textContent?.match(/(\\d+[.,]?\\d*)\\s*м²/);
-                        if (areaMatch) {
-                            area = areaMatch[1];
-                        }
-                        
-                        // Extract floor
-                        let floor = '';
-                        const floorMatch = card.textContent?.match(/этаж\\s*(\\d+)/);
-                        if (floorMatch) {
-                            floor = floorMatch[1];
-                        }
-                        
-                        // Extract address/location
-                        let address = '';
-                        const addressSelectors = [
-                            '[data-testid="advert-location"]',
-                            '[class*="location"]',
-                            '[class*="Location"]',
-                            '[class*="address"]',
-                        ];
-                        for (const selector of addressSelectors) {
-                            const el = card.querySelector(selector);
-                            if (el) {
-                                address = el.textContent?.trim() || '';
-                                break;
-                            }
-                        }
-                        
-                        // Extract title/description
-                        let title = '';
-                        const titleSelectors = [
-                            '[data-testid="advert-title"]',
-                            '[class*="title"]',
-                            '[class*="Title"]',
-                        ];
-                        for (const selector of titleSelectors) {
-                            const el = card.querySelector(selector);
-                            if (el) {
-                                title = el.textContent?.trim() || '';
-                                break;
-                            }
-                        }
-                        
-                        // Extract URL
-                        let url = '';
-                        const linkEl = card.querySelector('a[href*="/l/"]');
-                        if (linkEl) {
-                            url = linkEl.getAttribute('href') || '';
-                            if (!url.startsWith('http')) {
-                                url = 'https://re.kufar.by' + url;
-                            }
-                        }
-                        
-                        // Extract kufar_id from URL
-                        let kufar_id = '';
-                        const idMatch = url.match(/\\/l\\/(\\d+)/);
-                        if (idMatch) {
-                            kufar_id = idMatch[1];
-                        }
-                        
-                        // Only add if we have at least price or title
-                        if (price || title || kufar_id) {
-                            listings.push({
-                                kufar_id: kufar_id || `unknown_${index}`,
-                                url: url || '',
-                                title: title || 'Без названия',
-                                price: price,
-                                rooms: rooms,
-                                area: area,
-                                floor: floor,
-                                address: address,
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Error extracting card:', e);
-                    }
-                });
-                
-                return listings;
-            }
-        """)
-
-        return listings_data
-
-    async def scrape_with_pagination(
+    async def scrape_all_pages(
         self,
         base_url: str,
-        max_pages: Optional[int] = None,
-        max_listings_total: Optional[int] = None,
+        city: str,
+        max_pages: int = 10,
     ) -> list[dict]:
         """
-        Scrape multiple pages of listings.
+        Scrape all pages using cursor pagination.
 
         Args:
-            base_url: Base URL of the Kufar search page.
-            max_pages: Maximum number of pages to scrape (None for unlimited).
-            max_listings_total: Maximum total listings to return.
+            base_url: Base URL without cursor parameter.
+            city: City code.
+            max_pages: Maximum number of pages to scrape.
 
         Returns:
-            List of parsed listing dictionaries.
+            List of all listings.
         """
         all_listings = []
-        page_num = 1
-
-        while True:
-            # Check max_pages limit
-            if max_pages and page_num > max_pages:
-                logger.info(f"Reached max pages limit: {max_pages}")
-                break
-
-            # Build URL with page parameter
-            if page_num == 1:
-                url = base_url
-            else:
-                # Add page parameter to URL
-                separator = "&" if "?" in base_url else "?"
-                url = f"{base_url}{separator}page={page_num}"
-
-            logger.info(f"Scraping page {page_num}: {url}")
-            listings = await self.scrape_page(url)
-
+        cursor = None
+        page_num = 0
+        
+        while page_num < max_pages:
+            # Build URL with cursor
+            url = f"{base_url}&cursor={cursor}" if cursor else base_url
+            logger.info(f"Scraping page {page_num + 1}: {url}")
+            
+            listings, next_cursor = await self.scrape_page(url, city=city)
+            
             if not listings:
-                logger.info(f"No more listings found on page {page_num}")
+                logger.info(f"No more listings found on page {page_num + 1}")
                 break
-
+            
             all_listings.extend(listings)
-            logger.info(f"Page {page_num}: found {len(listings)} listings, total: {len(all_listings)}")
-
-            if max_listings_total and len(all_listings) >= max_listings_total:
-                all_listings = all_listings[:max_listings_total]
+            logger.info(f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}")
+            
+            # Check if there's a next cursor
+            if not next_cursor or next_cursor == cursor:
+                logger.info("No more pages")
                 break
-
-            # Wait between pages to avoid rate limiting
-            await asyncio.sleep(2)
+            
+            cursor = next_cursor
             page_num += 1
-
-        logger.info(f"Scraping completed. Total listings: {len(all_listings)}")
+            
+            # Wait between pages to avoid rate limiting
+            await asyncio.sleep(1)
+        
         return all_listings
-
-
-async def scrape_kufar_listings(
-    url: str = "https://re.kufar.by/l/belarus/kupit/kvartiru",
-    max_pages: int = 2,
-    max_listings: int = 50,
-) -> list[dict]:
-    """
-    Convenience function to scrape Kufar listings.
-
-    Args:
-        url: URL to scrape.
-        max_pages: Maximum pages to scrape (default 2 for speed).
-        max_listings: Maximum listings to return.
-
-    Returns:
-        List of listing dictionaries.
-    """
-    scraper = KufarScraper(headless=True)
-    listings = await scraper.scrape_with_pagination(
-        base_url=url,
-        max_pages=max_pages,
-        max_listings_total=max_listings,
-    )
-    return listings
-
-
-if __name__ == "__main__":
-    logger.info("Starting Kufar scraper...")
-    result = asyncio.run(scrape_kufar_listings())
-    logger.info(f"Scraping completed. Found {len(result)} listings.")
-    
-    # Print first few listings
-    for i, listing in enumerate(result[:5]):
-        logger.info(f"{i+1}. {listing.get('title', 'N/A')[:50]} - {listing.get('price', 'N/A')} ({listing.get('address', 'N/A')})")

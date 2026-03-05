@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { City } from '@/shared/types';
 
 interface FilterState {
   city: string;
@@ -8,7 +9,8 @@ interface FilterState {
   priceFrom: number | null;
   priceTo: number | null;
   rooms: number[];
-  sortOrder: string;
+  sort: string;
+  size: number;
   page: number;
   isManualScanning: boolean;
   setCity: (city: string) => void;
@@ -16,7 +18,7 @@ interface FilterState {
   setCurrency: (currency: 'BYN' | 'USD') => void;
   setPriceRange: (from: number | null, to: number | null) => void;
   setRooms: (rooms: number[]) => void;
-  setSortOrder: (order: string) => void;
+  setFilters: (filters: Partial<FilterState>) => void;
   setPage: (page: number) => void;
   setManualScanning: (scanning: boolean) => void;
   reset: () => void;
@@ -24,35 +26,38 @@ interface FilterState {
 
 export const useFilterStore = create<FilterState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       city: 'mogilev',
-      status: '',
-      currency: 'BYN',
+      status: 'all',
+      currency: 'USD',
       priceFrom: null,
       priceTo: null,
       rooms: [],
-      sortOrder: '',
+      sort: 'newest',
+      size: 20,
       page: 1,
       isManualScanning: false,
 
       setCity: (city) => set({ city, page: 1 }),
       setStatus: (status) => set({ status, page: 1 }),
       setCurrency: (currency) => set({ currency }),
-      setPriceRange: (from, to) => set({ priceFrom: from, priceTo: to }),
-      setRooms: (rooms) => set({ rooms }),
-      setSortOrder: (order) => set({ sortOrder: order }),
+      setPriceRange: (from, to) => set({ priceFrom: from, priceTo: to, page: 1 }),
+      setRooms: (rooms) => set({ rooms, page: 1 }),
+      setFilters: (filters) => set({ ...filters, page: 1 }),
       setPage: (page) => set({ page }),
       setManualScanning: (scanning) => set({ isManualScanning: scanning }),
-      reset: () => set({
-        city: 'mogilev',
-        status: '',
-        currency: 'BYN',
-        priceFrom: null,
-        priceTo: null,
-        rooms: [],
-        sortOrder: '',
-        page: 1,
-      }),
+      reset: () =>
+        set({
+          city: 'mogilev',
+          status: 'all',
+          currency: 'USD',
+          priceFrom: null,
+          priceTo: null,
+          rooms: [],
+          sort: 'newest',
+          size: 20,
+          page: 1,
+        }),
     }),
     {
       name: 'filter-storage',

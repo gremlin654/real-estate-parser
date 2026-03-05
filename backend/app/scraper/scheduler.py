@@ -24,6 +24,7 @@ class ScraperScheduler:
             "listings_fetched": 0,
             "listings_processed": 0,
             "elapsed_seconds": 0,
+            "is_stable": True,
         }
 
     async def start(self) -> None:

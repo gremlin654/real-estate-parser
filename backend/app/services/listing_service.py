@@ -3,6 +3,7 @@ from sqlalchemy import select, and_
 from app.models.listing import Listing, ListingStatus, EventType, ListingHistory
 from datetime import datetime, timedelta
 from loguru import logger
+from typing import Optional
 
 
 class ListingService:
@@ -33,6 +34,38 @@ class ListingService:
             await self.db.commit()
             await self.db.refresh(new_listing)
             return new_listing, 'created'
+
+    async def upsert_listings(self, listings_data: list[dict], city: str) -> dict:
+        """Массовое обновление/создание объявлений"""
+        stats = {
+            "created": 0,
+            "updated": 0,
+            "deleted": 0,
+            "processed": 0,
+        }
+        
+        kufar_ids = set()
+        
+        for listing_data in listings_data:
+            try:
+                listing, action = await self.upsert(listing_data)
+                kufar_ids.add(listing.kufar_id)
+                
+                if action == 'created':
+                    stats["created"] += 1
+                else:
+                    stats["updated"] += 1
+                    
+                stats["processed"] += 1
+            except Exception as e:
+                logger.error(f"Error upserting listing: {e}")
+        
+        # Помечаем удалённые объявления
+        if kufar_ids:
+            deleted_count = await self.mark_deleted(kufar_ids, city)
+            stats["deleted"] = deleted_count
+        
+        return stats
 
     async def mark_deleted(self, kufar_ids: set[str], city: str) -> int:
         result = await self.db.execute(

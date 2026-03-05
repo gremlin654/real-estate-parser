@@ -1,18 +1,15 @@
 import pytest
-import asyncio
 from httpx import AsyncClient
 from app.main import app
 from app.config import settings
 
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    """Create async client for testing API endpoints (no DB operations)."""
+    from httpx import ASGITransport
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
 
