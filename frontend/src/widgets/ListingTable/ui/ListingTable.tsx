@@ -14,6 +14,7 @@ import {
 } from '@/shared/ui/table';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Home, MapPin } from 'lucide-react';
+import { useFilterStore } from '@/store/filterStore';
 
 interface ListingTableProps {
   listings: Listing[];
@@ -21,6 +22,7 @@ interface ListingTableProps {
 }
 
 export function ListingTable({ listings, isLoading }: ListingTableProps) {
+  const { currency } = useFilterStore();
   if (isLoading) {
     return (
       <Card className="p-0 overflow-hidden">
@@ -124,9 +126,12 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
               </TableCell>
               <TableCell className="text-center">
                 <div className="font-semibold">
-                  {listing.price_usd?.toLocaleString() || listing.price?.toLocaleString()}
+                  {currency === 'USD' 
+                    ? (listing.price_usd ?? listing.price).toLocaleString()
+                    : listing.price.toLocaleString()
+                  }
                   <span className="text-sm text-muted-foreground ml-1">
-                    {listing.currency || 'USD'}
+                    {currency}
                   </span>
                 </div>
               </TableCell>

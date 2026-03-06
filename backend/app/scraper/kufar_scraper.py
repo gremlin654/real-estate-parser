@@ -53,7 +53,7 @@ class KufarScraper:
             logger.error("Failed to parse __NEXT_DATA__ JSON")
             return None
 
-    def _parse_ad(self, ad: dict) -> Optional[dict]:
+    def _parse_ad(self, ad: dict, city: str = "") -> Optional[dict]:
         """Parse ad data into listing dict."""
         try:
             # Extract price - Kufar returns price_byn and price_usd directly
@@ -104,16 +104,25 @@ class KufarScraper:
                 if isinstance(img, dict):
                     path = img.get("path", "")
                     if path:
-                        image_urls.append(f"https://static.kufar.by/{path}")
-            
+                        # Используем rms{kufar.by формат для картинок
+                        image_urls.append(f"https://rms.kufar.by/v1/gallery/{path}")
+
             # Create listing
+            # Kufar возвращает цены в копейках/центах (умноженные на 100)
+            # Поэтому делим на 100 для получения целой цены
+            price_byn_int = int(price_byn) if price_byn else 0
+            price_usd_int = int(price_usd) if price_usd else 0
+            
+            ad_id = str(ad.get("ad_id", ""))
+            
             listing = {
-                "kufar_id": str(ad.get("ad_id", "")),
-                "url": f"https://re.kufar.by/ad/{ad.get('ad_id', '')}",
+                "kufar_id": ad_id,
+                "url": f"https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}" if city else f"https://re.kufar.by/vi/{ad_id}",
                 "title": ad.get("subject", ""),
-                "price": int(price_byn) if price_byn else 0,
-                "price_usd": int(price_usd) if price_usd else 0,
+                "price": price_byn_int // 100 if price_byn_int > 0 else 0,
+                "price_usd": price_usd_int // 100 if price_usd_int > 0 else 0,
                 "currency": currency,
+                "city": city,
                 "address": address,
                 "rooms": rooms,
                 "area": area,
@@ -185,9 +194,8 @@ class KufarScraper:
             listings = []
             for ad in ads:
                 try:
-                    listing = self._parse_ad(ad)
+                    listing = self._parse_ad(ad, city=city)
                     if listing:
-                        listing["city"] = city
                         listings.append(listing)
                 except Exception as e:
                     logger.error(f"Error parsing ad: {e}")

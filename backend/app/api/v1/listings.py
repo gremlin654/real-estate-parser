@@ -23,6 +23,7 @@ async def get_listings(
     rooms: Optional[list[int]] = Query(None, description="Room counts to filter"),
     rooms_other: Optional[bool] = Query(None, description="Include listings with rooms outside 1-4 range"),
     sort_order: Optional[str] = Query(None, description="Sort by price: 'asc' or 'desc'"),
+    currency: Optional[str] = Query(None, description="Filter by currency: USD or BYN"),
     db: AsyncSession = Depends(get_db),
 ):
     conditions = []
@@ -39,6 +40,9 @@ async def get_listings(
     if city:
         conditions.append(Listing.city == city)
 
+    # Фильтр currency НЕ фильтрует объявления, а только влияет на отображение
+    # Поэтому убираем эту логику
+
     if price_from:
         conditions.append(or_(Listing.price >= price_from, Listing.price_usd >= price_from))
 
@@ -47,10 +51,29 @@ async def get_listings(
 
     query = select(Listing).where(and_(*conditions))
 
+    # Сортировка
     if sort_order == "asc":
-        query = query.order_by(Listing.price.asc())
+        # По возрастанию цены (0 в начале, потом price_usd или price)
+        query = query.order_by(
+            case(
+                (Listing.price_usd.isnot(None), Listing.price_usd),
+                else_=Listing.price
+            ).asc()
+        )
     elif sort_order == "desc":
-        query = query.order_by(Listing.price.desc())
+        # По убыванию цены (0 в конце, потом price_usd или price)
+        query = query.order_by(
+            case(
+                (Listing.price_usd.isnot(None), Listing.price_usd),
+                else_=Listing.price
+            ).desc()
+        )
+    elif sort_order == "newest":
+        # Сначала новые (по дате создания)
+        query = query.order_by(Listing.first_seen_at.desc())
+    elif sort_order == "oldest":
+        # Сначала старые (по дате создания)
+        query = query.order_by(Listing.first_seen_at.asc())
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar()

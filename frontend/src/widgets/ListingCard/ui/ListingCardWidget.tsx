@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/button';
 import { CITIES, STATUS_LABELS } from '@/shared/config';
 import type { Listing } from '@/shared/types';
 import { useNavigate } from 'react-router-dom';
+import { useFilterStore } from '@/store/filterStore';
 
 interface ListingCardProps {
   listing: Listing;
@@ -13,8 +14,8 @@ interface ListingCardProps {
 
 export function ListingCardWidget({ listing }: ListingCardProps) {
   const navigate = useNavigate();
-  const price = listing.price_usd || listing.price;
-  const currency = listing.price_usd ? 'USD' : listing.currency;
+  const { currency } = useFilterStore();
+  const price = currency === 'USD' ? (listing.price_usd ?? listing.price) : listing.price;
   const city = listing.city ? CITIES[listing.city as keyof typeof CITIES] : null;
   const statusLabel = STATUS_LABELS[listing.status as keyof typeof STATUS_LABELS];
   const firstImage = listing.images?.[0];

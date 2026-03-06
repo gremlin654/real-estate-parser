@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.db.database import engine, async_session_maker
 from app.models import Listing, ListingHistory, ScanHistory
-from app.api.v1 import listings_router, history_router, stats_router, scan_router, export_router
+from app.api.v1 import listings_router, history_router, stats_router, scan_router, export_router, ws_router
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
 
@@ -70,6 +70,7 @@ app.include_router(history_router, prefix=settings.API_PREFIX)
 app.include_router(stats_router, prefix=settings.API_PREFIX)
 app.include_router(scan_router, prefix=settings.API_PREFIX)
 app.include_router(export_router, prefix=settings.API_PREFIX)
+app.include_router(ws_router)  # WebSocket без префикса
 
 
 @app.get("/health")

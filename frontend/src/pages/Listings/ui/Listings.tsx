@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useListings, useManualScan, useScanProgress } from '@/api/listings';
+import { useListings, useManualScan } from '@/api/listings';
 import { useFilterStore } from '@/store/filterStore';
 import { Card } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
@@ -26,6 +26,7 @@ import { FilterByCity } from '@/features/listings/filter-by-city';
 import { FilterByStatus } from '@/features/listings/filter-by-status';
 import { FilterByPrice } from '@/features/listings/filter-by-price';
 import { FilterByRooms } from '@/features/listings/filter-by-rooms';
+import { FilterByCurrency } from '@/features/listings/filter-by-currency';
 import { SortListings } from '@/features/listings/sort-listings';
 import { ExportListings } from '@/features/listings/export-listings';
 import { TriggerManualScan } from '@/features/scanning/trigger-manual';
@@ -42,11 +43,11 @@ export function Listings() {
     priceTo,
     rooms,
     sort,
+    currency,
     setPage,
     setFilters,
   } = useFilterStore();
 
-  const [manualScanCity, setManualScanCity] = useState(city);
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: listingsData, isLoading } = useListings({
@@ -57,6 +58,8 @@ export function Listings() {
     priceFrom,
     priceTo,
     rooms,
+    currency,
+    sort,
   });
 
   const totalPages = Math.ceil((listingsData?.total || 0) / size);
@@ -70,7 +73,9 @@ export function Listings() {
     setPage(1);
   };
 
-  const currency = 'USD';
+  const handleCurrencyChange = (value: 'USD' | 'BYN') => {
+    setFilters({ currency: value });
+  };
 
   return (
     <div className="space-y-6">
@@ -86,7 +91,7 @@ export function Listings() {
         </div>
 
         <div className="flex items-center gap-2">
-          <TriggerManualScan city={manualScanCity} />
+          <TriggerManualScan city={city === 'all' ? 'minsk' : city} />
           <ExportListings city={city !== 'all' ? city : undefined} status={status !== 'all' ? status : undefined} />
         </div>
       </div>
@@ -101,6 +106,10 @@ export function Listings() {
             <FilterByCity
               value={city}
               onChange={(value) => handleFilterChange('city', value)}
+            />
+            <FilterByCurrency
+              value={currency}
+              onChange={handleCurrencyChange}
             />
             <FilterByStatus
               value={status}

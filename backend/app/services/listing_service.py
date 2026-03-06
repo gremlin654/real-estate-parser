@@ -19,11 +19,31 @@ class ListingService:
         existing = await self.get_by_kufar_id(kufar_id)
 
         if existing:
+            # Сохраняем статус и цену до обновления
+            was_deleted = existing.status == ListingStatus.deleted
+            old_price_usd = existing.price_usd
+            
             # Update existing
             for key, value in listing_data.items():
                 if key != 'kufar_id':
                     setattr(existing, key, value)
             existing.last_seen_at = datetime.utcnow()
+            
+            # Восстанавливаем если было удалённым
+            if was_deleted:
+                existing.status = ListingStatus.active
+                existing.deleted_at = None
+                existing._was_deleted = True
+            # Устанавливаем статус updated если изменилась цена USD
+            elif old_price_usd is not None and existing.price_usd is not None and old_price_usd != existing.price_usd:
+                existing.status = ListingStatus.updated
+                existing._was_deleted = False
+            else:
+                # Оставляем статус active если цена не изменилась
+                if existing.status not in [ListingStatus.updated, ListingStatus.new]:
+                    existing.status = ListingStatus.active
+                existing._was_deleted = False
+            
             await self.db.commit()
             await self.db.refresh(existing)
             return existing, 'updated'
@@ -41,30 +61,34 @@ class ListingService:
             "created": 0,
             "updated": 0,
             "deleted": 0,
+            "restored": 0,
             "processed": 0,
         }
-        
+
         kufar_ids = set()
-        
+
         for listing_data in listings_data:
             try:
                 listing, action = await self.upsert(listing_data)
                 kufar_ids.add(listing.kufar_id)
-                
+
                 if action == 'created':
                     stats["created"] += 1
-                else:
+                elif action == 'updated':
                     stats["updated"] += 1
-                    
+                    # Проверяем не было ли объявление удалённым
+                    if hasattr(listing, '_was_deleted') and listing._was_deleted:
+                        stats["restored"] += 1
+
                 stats["processed"] += 1
             except Exception as e:
                 logger.error(f"Error upserting listing: {e}")
-        
+
         # Помечаем удалённые объявления
         if kufar_ids:
             deleted_count = await self.mark_deleted(kufar_ids, city)
             stats["deleted"] = deleted_count
-        
+
         return stats
 
     async def mark_deleted(self, kufar_ids: set[str], city: str) -> int:

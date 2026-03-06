@@ -38,10 +38,12 @@ import {
 } from 'lucide-react';
 import { CITIES, STATUS_LABELS } from '@/shared/config';
 import { ListingInfo } from '@/entities/listing';
+import { useFilterStore } from '@/store/filterStore';
 
 export function ListingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { currency } = useFilterStore();
   const { data: listing, isLoading } = useListing(id || '');
   const { data: history } = useListingHistory(id || '');
 
@@ -78,8 +80,7 @@ export function ListingDetail() {
     );
   }
 
-  const price = listing.price_usd || listing.price;
-  const currency = listing.price_usd ? 'USD' : listing.currency;
+  const price = currency === 'USD' ? (listing.price_usd ?? listing.price) : listing.price;
   const city = listing.city ? CITIES[listing.city as keyof typeof CITIES] : null;
 
   return (

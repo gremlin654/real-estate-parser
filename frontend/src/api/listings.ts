@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   Listing,
   PaginatedResponse,
@@ -11,8 +12,99 @@ import type {
   ScanSchedule,
   CityComparisonData,
 } from '@/shared/types';
+import { useFilterStore } from '@/store/filterStore';
 
 const API_BASE = '/api/v1';
+
+/**
+ * WebSocket hook для real-time прогресса сканирования.
+ * Автоматически подключается к WebSocket при монтировании и отключается при размонтировании.
+ */
+export const useScanProgressWebSocket = () => {
+  const [progress, setProgress] = useState<ScanProgress>({
+    is_scanning: false,
+    city: null,
+    city_name: undefined,
+    stage: 'idle',
+    pages_scraped: 0,
+    listings_fetched: 0,
+    listings_processed: 0,
+    elapsed_seconds: 0,
+    is_stable: true,
+  });
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { setManualScanning } = useFilterStore();
+
+  const connect = useCallback(() => {
+    // Используем относительный URL для WebSocket
+    // Vite dev server проксирует /ws на backend:8000
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/scan/progress`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('WebSocket connected to', wsUrl);
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setProgress((prev) => {
+            // Если сканирование завершилось, сбрасываем флаг
+            if (prev.is_scanning && !data.is_scanning) {
+              setManualScanning(false);
+            }
+            return data;
+          });
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        setIsConnected(false);
+        
+        // Попытка переподключения через 3 секунды
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 3000);
+      };
+
+      wsRef.current = ws;
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error);
+    }
+  }, [setManualScanning]);
+
+  const disconnect = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setIsConnected(false);
+  }, []);
+
+  useEffect(() => {
+    connect();
+    return () => disconnect();
+  }, [connect, disconnect]);
+
+  return { progress, isConnected };
+};
 
 export const useListings = (filters: {
   city?: string;
@@ -22,6 +114,8 @@ export const useListings = (filters: {
   priceFrom?: number | null;
   priceTo?: number | null;
   rooms?: number[];
+  currency?: string;
+  sort?: string;
 }) => {
   return useQuery<PaginatedResponse>({
     queryKey: ['listings', filters],
@@ -35,6 +129,18 @@ export const useListings = (filters: {
       if (filters.priceTo) params.set('price_to', String(filters.priceTo));
       if (filters.rooms && filters.rooms.length > 0) {
         filters.rooms.forEach((room) => params.append('rooms', String(room)));
+      }
+      // currency используется только для отображения на frontend, не передаём на backend
+      
+      // Маппинг значений сортировки
+      if (filters.sort) {
+        const sortMap: Record<string, string> = {
+          'newest': 'newest',
+          'oldest': 'oldest',
+          'price_asc': 'asc',
+          'price_desc': 'desc',
+        };
+        params.set('sort_order', sortMap[filters.sort] || filters.sort);
       }
 
       const response = await fetch(`${API_BASE}/listings?${params}`);
@@ -97,18 +203,6 @@ export const useListingHistory = (listingId: string) => {
       return response.json();
     },
     enabled: !!listingId,
-  });
-};
-
-export const useScanProgress = () => {
-  return useQuery<ScanProgress>({
-    queryKey: ['scanProgress'],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE}/scan/progress`);
-      if (!response.ok) throw new Error('Failed to fetch progress');
-      return response.json();
-    },
-    refetchInterval: 2000,
   });
 };
 

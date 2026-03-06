@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.db.database import async_session_maker
 from app.config import settings, CITY_NAMES
 from app.services.scan_settings_service import ScanSettingsService
+from app.api.v1.ws import get_scan_manager
 
 
 class ScraperScheduler:
@@ -26,6 +27,18 @@ class ScraperScheduler:
             "elapsed_seconds": 0,
             "is_stable": True,
         }
+        self._ws_manager = None
+    
+    async def _broadcast_progress(self):
+        """Отправить текущий прогресс всем WebSocket клиентам."""
+        if self._ws_manager is None:
+            self._ws_manager = get_scan_manager()
+
+        try:
+            logger.info(f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}")
+            await self._ws_manager.broadcast_progress(self.scan_progress)
+        except Exception as e:
+            logger.warning(f"Failed to broadcast WebSocket progress: {e}")
 
     async def start(self) -> None:
         if self.scheduler and self.scheduler.running:
