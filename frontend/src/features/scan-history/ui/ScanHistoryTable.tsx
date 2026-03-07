@@ -10,7 +10,7 @@ import {
 import { Skeleton } from '@/shared/ui/skeleton';
 import type { ScanHistoryItem } from '@/shared/types';
 import { CITIES } from '@/shared/config';
-import { CheckCircle, AlertCircle, Clock, FileText, Home, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, FileText, Home, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 
 interface ScanHistoryTableProps {
   data?: ScanHistoryItem[];
@@ -108,8 +108,8 @@ const ListingsStats = ({ item }: { item: ScanHistoryItem }) => {
       )}
       {item.listings_updated > 0 && (
         <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-          <DollarSign className="w-3 h-3" />
-          <span>{item.listings_updated}</span>
+          <RefreshCw className="w-3 h-3" />
+          <span>~{item.listings_updated}</span>
         </div>
       )}
       {item.listings_deleted > 0 && (
