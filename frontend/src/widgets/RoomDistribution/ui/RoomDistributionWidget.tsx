@@ -10,7 +10,7 @@ interface RoomDistributionWidgetProps {
   isLoading?: boolean;
 }
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F'];
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE'];
 
 const formatPrice = (value: number | undefined): string => {
   if (value === undefined || value === null) return '—';
@@ -58,9 +58,9 @@ export function RoomDistributionWidget({
     );
   }
 
-  // Группируем 4+ комнатные в одну категорию
+  // Группируем 5+ комнатные в одну категорию
   const groupedData = data.reduce((acc, item) => {
-    const rooms = item.rooms >= 4 ? '4+' : `${item.rooms}`;
+    const rooms = item.rooms >= 5 ? '5+' : `${item.rooms}`;
     const existing = acc.find((a) => a.rooms === rooms);
     if (existing) {
       existing.count += item.count;
@@ -76,7 +76,7 @@ export function RoomDistributionWidget({
   }, [] as Array<{rooms: string; count: number; avg_price: number}>);
 
   const chartData = groupedData.map((item, index) => ({
-    name: item.rooms === '4+' ? '4+ комн.' : `${item.rooms}-комн.`,
+    name: item.rooms === '5+' ? '5+ комн.' : `${item.rooms}-комн.`,
     value: item.count,
     avgPrice: item.avg_price,
     rooms: item.rooms,
