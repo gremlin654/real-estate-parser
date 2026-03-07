@@ -2,13 +2,15 @@
 
 import { Button } from '@/shared/ui/button';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFilterStore } from '@/store/filterStore';
 import { useScanProgressWebSocket } from '@/api/listings';
 import { Alert, AlertDescription } from '@/shared/ui/alert';
 import { CITIES } from '@/shared/config';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip';
+import { useState } from 'react';
+import { ScanProgressModal } from '@/features/scanning/active-scanning/ui/ScanProgressModal';
 
 interface TriggerManualScanProps {
   city: string;
@@ -16,8 +18,9 @@ interface TriggerManualScanProps {
 }
 
 export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
+  const [showProgressModal, setShowProgressModal] = useState(false);
   const queryClient = useQueryClient();
-  const { isManualScanning, isCityScanning, getScanningCities } = useFilterStore();
+  const { setManualScanning, isManualScanning, isCityScanning, getScanningCities } = useFilterStore();
   const { progress } = useScanProgressWebSocket();
 
   const mutation = useMutation({
@@ -53,38 +56,53 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
 
   const cityName = CITIES[city as keyof typeof CITIES] || city;
   const isCityCurrentlyScanning = isCityScanning(city);
-  
-  // Кнопка заблокирована если:
+  const scanningCities = getScanningCities();
+  const hasAnyScanning = scanningCities.length > 0;
+
+  // Кнопка "Сканировать" заблокирована если:
   // 1. Мутация в процессе (mutation.isPending)
-  // 2. Глобальное флаг сканирования установлен (isManualScanning)
-  // 3. WebSocket показывает что сканирование идёт (progress.is_scanning)
-  // 4. Этот конкретный город уже сканируется
-  const isDisabled = mutation.isPending || isManualScanning || progress.is_scanning || isCityCurrentlyScanning;
+  // 2. Этот конкретный город уже сканируется
+  const isScanDisabled = mutation.isPending || isCityCurrentlyScanning;
 
   // Получаем список других сканирующихся городов для информирования
   const otherScanningCities = getScanningCities().filter((s) => s.city !== city);
 
   return (
     <div className="space-y-2">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              onClick={() => mutation.mutate()} 
-              disabled={isDisabled}
-              className="w-full"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isDisabled ? 'animate-spin' : ''}`} />
-              {isCityCurrentlyScanning ? 'Город сканируется...' : isDisabled ? 'Сканирование...' : 'Сканировать'}
-            </Button>
-          </TooltipTrigger>
-          {isCityCurrentlyScanning && (
-            <TooltipContent>
-              <p>Сканирование этого города уже выполняется</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>
+      {/* Кнопки управления */}
+      <div className="flex gap-2">
+        {/* Кнопка "Сканировать" */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={() => mutation.mutate()}
+                disabled={isScanDisabled}
+                className="flex-1"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
+                {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
+              </Button>
+            </TooltipTrigger>
+            {isCityCurrentlyScanning && (
+              <TooltipContent>
+                <p>Сканирование этого города уже выполняется</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Кнопка "Посмотреть прогресс" */}
+        <Button
+          variant="outline"
+          onClick={() => setShowProgressModal(true)}
+          disabled={!hasAnyScanning}
+          className="flex items-center gap-2"
+        >
+          <Eye className="w-4 h-4" />
+          <span className="hidden sm:inline">Прогресс</span>
+        </Button>
+      </div>
 
       {/* Информация о других активных сканированиях */}
       {otherScanningCities.length > 0 && !isCityCurrentlyScanning && (
@@ -95,6 +113,9 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Модальное окно просмотра прогресса */}
+      <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />
     </div>
   );
 }

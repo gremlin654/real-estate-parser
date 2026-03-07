@@ -28,7 +28,9 @@ import {
 import { StatCard } from '@/entities/stats';
 import { CITIES, SCAN_HISTORY_PAGE_SIZE } from '@/shared/config';
 import { ScanHistoryTable } from '@/features/scan-history';
-import { ActiveScanningWidget } from '@/features/scanning/active-scanning';
+import { ActiveScanningWidget, ScanProgressModal } from '@/features/scanning/active-scanning';
+import { Button } from '@/shared/ui/button';
+import { Eye } from 'lucide-react';
 
 function StatCardWrapper({
   title,
@@ -78,6 +80,10 @@ function StatCardWrapper({
 }
 
 export function Dashboard() {
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const { getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
+  const hasAnyScanning = scanningCities.length > 0;
   const { city, setCity } = useFilterStore();
   const { data: summary, isLoading: summaryLoading } = useSummary(city);
   
@@ -128,7 +134,27 @@ export function Dashboard() {
       </div>
 
       {/* Active Scanning Widget */}
-      <ActiveScanningWidget />
+      {hasAnyScanning && (
+        <div className="space-y-2">
+          <ActiveScanningWidget />
+        </div>
+      )}
+
+      {/* Кнопка "Посмотреть прогресс" */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          onClick={() => setShowProgressModal(true)}
+          disabled={!hasAnyScanning}
+          className="flex items-center gap-2"
+        >
+          <Eye className="w-4 h-4" />
+          Посмотреть прогресс сканирования
+        </Button>
+      </div>
+
+      {/* Модальное окно просмотра прогресса */}
+      <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />
 
       {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
