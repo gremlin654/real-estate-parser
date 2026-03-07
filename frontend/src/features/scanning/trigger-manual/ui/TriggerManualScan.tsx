@@ -64,7 +64,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
   const otherScanningCities = scanningCities.filter((s) => s.city !== city);
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2 min-w-[140px]">
       {/* Кнопка "Сканировать" */}
       <TooltipProvider>
         <Tooltip>
@@ -72,7 +72,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
             <Button
               onClick={() => mutation.mutate()}
               disabled={isScanDisabled}
-              className="min-w-[140px]"
+              className="w-full"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
               {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
@@ -87,8 +87,8 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
       </TooltipProvider>
 
       {/* Информация о других активных сканированиях */}
-      {otherScanningCities.length > 0 && !isCityCurrentlyScanning && (
-        <Alert className="mt-2">
+      {otherScanningCities.length > 0 && (
+        <Alert>
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <AlertDescription className="text-sm">
