@@ -253,9 +253,15 @@ class ScraperScheduler:
                 await self._broadcast_progress()
 
                 # Завершение записи сканирования
+                end_time = datetime.now(timezone.utc).replace(tzinfo=None)
                 await scan_history_service.complete_scan_record(
                     scan_id=str(scan_record.id),
                     status="completed",
+                    listings_created=stats.get("created", 0),
+                    listings_updated=stats.get("updated", 0),
+                    listings_deleted=stats.get("deleted", 0),
+                    pages_scraped=pages_scraped,
+                    duration_seconds=int((end_time - start_time).total_seconds())
                 )
 
                 logger.info(f"Scheduled scan completed: {stats}")

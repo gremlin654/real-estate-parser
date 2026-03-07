@@ -491,9 +491,15 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
             await scheduler._broadcast_progress()
 
             # Завершение записи сканирования
+            end_time = datetime.now(timezone.utc).replace(tzinfo=None)
             await scan_history_service.complete_scan_record(
                 scan_id=scan_id,
                 status="completed",
+                listings_created=stats.get("created", 0),
+                listings_updated=stats.get("updated", 0),
+                listings_deleted=stats.get("deleted", 0),
+                pages_scraped=pages_scraped,
+                duration_seconds=int((end_time - start_time).total_seconds())
             )
 
             logger.info(f"Manual scan completed: {stats}")
