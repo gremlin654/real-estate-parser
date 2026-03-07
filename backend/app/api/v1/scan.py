@@ -2,7 +2,7 @@ import asyncio
 import math
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
@@ -26,6 +26,24 @@ class ScanHistoryStatus(str, Enum):
 
 
 # ============== Pydantic Models ==============
+
+class CitySettingsResponse(BaseModel):
+    """Настройки сканирования для конкретного города."""
+    enabled: bool
+    scan_interval_minutes: int
+    updated_at: Optional[str] = None
+
+
+class CitySettingsUpdateRequest(BaseModel):
+    """Запрос на обновление настроек сканирования для города."""
+    enabled: Optional[bool] = None
+    scan_interval_minutes: Optional[int] = Field(None, ge=5, le=1440, description="Интервал сканирования в минутах (5-1440)")
+
+
+class AllScanSettingsResponse(BaseModel):
+    """Настройки сканирования для всех городов."""
+    cities: Dict[str, CitySettingsResponse]
+
 
 class ScanScheduleResponse(BaseModel):
     scan_interval_minutes: int
@@ -116,76 +134,126 @@ class ScanHistoryResponse(BaseModel):
 
 @router.get("/cities", response_model=list[CityResponse])
 async def get_cities():
+    """Получить список всех доступных городов."""
     return [
         {"city": code, "city_name": name}
         for code, name in CITY_NAMES.items()
     ]
 
 
-@router.get("/schedule", response_model=ScanScheduleResponse)
-async def get_schedule():
+@router.get("/settings", response_model=AllScanSettingsResponse)
+async def get_all_settings():
+    """Получить настройки сканирования для всех городов."""
     async with async_session_maker() as db:
         scan_settings_service = ScanSettingsService(db)
-        scan_settings = await scan_settings_service.get_settings()
+        all_settings = await scan_settings_service.get_all_settings()
     
-    return {
-        "scan_interval_minutes": scan_settings.scan_interval_minutes,
-        "enabled": scan_settings.enabled,
-        "updated_at": scan_settings.updated_at.isoformat() if scan_settings.updated_at else None,
-    }
+    # Конвертировать в response формат
+    cities = {}
+    for city, settings in all_settings.items():
+        cities[city] = CitySettingsResponse(
+            enabled=settings.enabled,
+            scan_interval_minutes=settings.scan_interval_minutes,
+            updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
+        )
+    
+    return {"cities": cities}
+
+
+@router.get("/settings/{city}", response_model=CitySettingsResponse)
+async def get_city_settings(city: str):
+    """Получить настройки сканирования для конкретного города."""
+    if city not in CITY_NAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}"
+        )
+    
+    async with async_session_maker() as db:
+        scan_settings_service = ScanSettingsService(db)
+        settings = await scan_settings_service.get_or_create_city_settings(city)
+    
+    return CitySettingsResponse(
+        enabled=settings.enabled,
+        scan_interval_minutes=settings.scan_interval_minutes,
+        updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
+    )
+
+
+@router.put("/settings/{city}", response_model=CitySettingsResponse)
+async def update_city_settings(city: str, request: CitySettingsUpdateRequest):
+    """Обновить настройки сканирования для конкретного города.
+    
+    - **enabled**: Включить/выключить автосканирование для города
+    - **scan_interval_minutes**: Интервал сканирования в минутах (5-1440)
+    """
+    if city not in CITY_NAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}"
+        )
+    
+    async with async_session_maker() as db:
+        scan_settings_service = ScanSettingsService(db)
+        
+        try:
+            settings = await scan_settings_service.update_city_settings(
+                city=city,
+                enabled=request.enabled,
+                interval=request.scan_interval_minutes
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        
+        # Перезапуск scheduler с новыми настройками
+        scheduler = get_scheduler()
+        await scheduler.restart_with_settings(
+            city=city,
+            enabled=settings.enabled,
+            interval_minutes=settings.scan_interval_minutes
+        )
+    
+    return CitySettingsResponse(
+        enabled=settings.enabled,
+        scan_interval_minutes=settings.scan_interval_minutes,
+        updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
+    )
+
+
+@router.get("/schedule", response_model=ScanScheduleResponse)
+async def get_schedule():
+    """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /settings/{city} instead."
+    )
 
 
 @router.put("/schedule", response_model=ScanScheduleResponse)
 async def update_schedule(request: ScanScheduleUpdateRequest):
-    """Обновление настроек расписания сканирования"""
-    async with async_session_maker() as db:
-        scan_settings_service = ScanSettingsService(db)
-        scan_settings = await scan_settings_service.update_settings(
-            scan_interval_minutes=request.scan_interval_minutes,
-            enabled=request.enabled
-        )
-
-        # Перезапуск scheduler с новыми настройками
-        scheduler = get_scheduler()
-        await scheduler.restart_with_settings(request.enabled, scan_settings.scan_interval_minutes)
-
-    return {
-        "scan_interval_minutes": scan_settings.scan_interval_minutes,
-        "enabled": scan_settings.enabled,
-        "updated_at": scan_settings.updated_at.isoformat() if scan_settings.updated_at else None,
-    }
+    """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /settings/{city} instead."
+    )
 
 
 @router.get("/city", response_model=CityResponse)
 async def get_city():
-    async with async_session_maker() as db:
-        scan_settings_service = ScanSettingsService(db)
-        scan_settings = await scan_settings_service.get_settings()
-    
-    return {
-        "city": scan_settings.city,
-        "city_name": CITY_NAMES.get(scan_settings.city, scan_settings.city),
-    }
+    """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /settings/{city} instead."
+    )
 
 
 @router.post("/city", response_model=CityUpdateResponse)
 async def update_city(request: CityUpdateRequest):
-    """Обновление текущего города сканирования"""
-    if request.city not in CITY_NAMES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid city: {request.city}. Must be one of: {', '.join(CITY_NAMES.keys())}"
-        )
-    
-    async with async_session_maker() as db:
-        scan_settings_service = ScanSettingsService(db)
-        scan_settings = await scan_settings_service.update_settings(city=request.city)
-    
-    return {
-        "city": scan_settings.city,
-        "city_name": CITY_NAMES.get(scan_settings.city, scan_settings.city),
-        "message": "City updated successfully",
-    }
+    """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /settings/{city} instead."
+    )
 
 
 @router.get("/status")

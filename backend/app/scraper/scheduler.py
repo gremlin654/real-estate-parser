@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
+from functools import partial
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
@@ -41,41 +42,43 @@ class ScraperScheduler:
             logger.warning(f"Failed to broadcast WebSocket progress: {e}")
 
     async def start(self) -> None:
+        """Запуск scheduler с проверкой включённых городов."""
         if self.scheduler and self.scheduler.running:
             return
 
         async with async_session_maker() as db:
             settings_service = ScanSettingsService(db)
-            scan_settings = await settings_service.get_settings()
-
-        if scan_settings.enabled:
-            self.scheduler = AsyncIOScheduler()
+            enabled_cities = await settings_service.get_enabled_cities()
+        
+        if not enabled_cities:
+            logger.info("No cities enabled for auto-scan")
+            return
+        
+        self.scheduler = AsyncIOScheduler()
+        
+        # Для каждого включённого города добавить job
+        for city in enabled_cities:
+            city_settings = await settings_service.get_city_settings(city)
             self.scheduler.add_job(
-                self._run_scan_scheduled,
-                trigger=IntervalTrigger(minutes=scan_settings.scan_interval_minutes),
-                id="scheduled_scan",
+                partial(self._run_scan_scheduled, city),
+                trigger=IntervalTrigger(minutes=city_settings.scan_interval_minutes),
+                id=f"scheduled_scan_{city}",
                 replace_existing=True,
             )
-            self.scheduler.start()
-            logger.info(f"Scheduler started with interval {scan_settings.scan_interval_minutes} min")
-        else:
-            logger.info("Scheduler disabled in settings")
+        
+        self.scheduler.start()
+        logger.info(f"Scheduled scan started for cities: {enabled_cities}")
 
-    async def _run_scan_scheduled(self):
-        """Запуск планового сканирования по расписанию."""
+    async def _run_scan_scheduled(self, city: str):
+        """Запуск планового сканирования по расписанию для конкретного города."""
         from app.scraper.kufar_scraper import KufarScraper
         from app.services.listing_service import ListingService
+        from app.services.scan_history_service import ScanHistoryService
 
-        logger.info("Starting scheduled scan")
+        logger.info(f"Starting scheduled scan for {city}")
 
         self.is_running = True
         start_time = datetime.now(timezone.utc).replace(tzinfo=None)
-
-        # Получить текущий город из настроек
-        async with async_session_maker() as db:
-            settings_service = ScanSettingsService(db)
-            scan_settings = await settings_service.get_settings()
-            city = scan_settings.city
 
         # Создать запись истории сканирования
         async with async_session_maker() as db:
@@ -227,34 +230,30 @@ class ScraperScheduler:
             self.is_running = False
             logger.info("Scheduler stopped")
 
-    def update_interval(self, interval_minutes: int):
-        if self.scheduler and self.scheduler.running:
-            self.scheduler.remove_job("scheduled_scan")
-            self.scheduler.add_job(
-                self._run_scan_scheduled,
-                trigger=IntervalTrigger(minutes=interval_minutes),
-                id="scheduled_scan",
-                replace_existing=True,
-            )
-            logger.info(f"Scheduler interval updated to {interval_minutes} min")
-
-    async def restart_with_settings(self, enabled: bool, interval_minutes: int):
-        """Перезапуск scheduler с новыми настройками."""
-        if self.scheduler and self.scheduler.running:
-            self.scheduler.shutdown()
+    async def restart_with_settings(self, city: str, enabled: bool, interval_minutes: int):
+        """Перезапуск scheduler для конкретного города."""
+        if not self.scheduler or not self.scheduler.running:
+            # Scheduler не запущен - ничего не делаем
+            logger.info(f"Scheduler not running, skipping restart for {city}")
+            return
         
+        job_id = f"scheduled_scan_{city}"
+        
+        # Удалить существующий job для этого города
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+        
+        # Добавить новый job если город включён
         if enabled:
-            self.scheduler = AsyncIOScheduler()
             self.scheduler.add_job(
-                self._run_scan_scheduled,
+                partial(self._run_scan_scheduled, city),
                 trigger=IntervalTrigger(minutes=interval_minutes),
-                id="scheduled_scan",
+                id=job_id,
                 replace_existing=True,
             )
-            self.scheduler.start()
-            logger.info(f"Scheduler restarted with interval {interval_minutes} min, enabled={enabled}")
+            logger.info(f"Scheduled scan enabled for {city} with interval {interval_minutes} min")
         else:
-            logger.info("Scheduler disabled")
+            logger.info(f"Scheduled scan disabled for {city}")
 
 
 _scheduler_instance: Optional[ScraperScheduler] = None

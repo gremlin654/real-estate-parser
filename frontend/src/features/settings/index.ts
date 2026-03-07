@@ -1,3 +1,1 @@
-export * from './change-interval';
-export * from './toggle-auto-scan';
-export * from './change-city';
+export { CityScanSettings } from './city-scan-settings';
