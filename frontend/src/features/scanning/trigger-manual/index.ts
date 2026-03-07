@@ -1,1 +1,1 @@
-export { TriggerManualScan } from './ui/TriggerManualScan';
+export { TriggerManualScan, TriggerManualScanAlert } from './ui/TriggerManualScan';

@@ -29,7 +29,7 @@ import { FilterByRooms } from '@/features/listings/filter-by-rooms';
 import { FilterByCurrency } from '@/features/listings/filter-by-currency';
 import { SortListings } from '@/features/listings/sort-listings';
 import { ExportListings } from '@/features/listings/export-listings';
-import { TriggerManualScan } from '@/features/scanning/trigger-manual';
+import { TriggerManualScan, TriggerManualScanAlert } from '@/features/scanning/trigger-manual';
 import { ViewProgress } from '@/features/scanning/view-progress';
 import { ScanProgressModal } from '@/features/scanning/active-scanning';
 import { Eye } from 'lucide-react';
@@ -115,6 +115,9 @@ export function Listings() {
           </Button>
           <ExportListings city={city !== 'all' ? city : undefined} status={status !== 'all' ? status : undefined} />
         </div>
+
+        {/* Алерт о сканировании других городов */}
+        <TriggerManualScanAlert city={city === 'all' ? 'minsk' : city} />
 
         {/* Модальное окно просмотра прогресса */}
         <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />

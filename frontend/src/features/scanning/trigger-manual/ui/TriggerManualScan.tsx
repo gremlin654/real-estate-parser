@@ -64,7 +64,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
   const otherScanningCities = scanningCities.filter((s) => s.city !== city);
 
   return (
-    <div className="flex flex-col gap-2 min-w-[140px]">
+    <>
       {/* Кнопка "Сканировать" */}
       <TooltipProvider>
         <Tooltip>
@@ -72,7 +72,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
             <Button
               onClick={() => mutation.mutate()}
               disabled={isScanDisabled}
-              className="w-full"
+              className="min-w-[140px]"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
               {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
@@ -85,18 +85,27 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
           )}
         </Tooltip>
       </TooltipProvider>
+    </>
+  );
+}
 
-      {/* Информация о других активных сканированиях */}
-      {otherScanningCities.length > 0 && (
-        <Alert>
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <AlertDescription className="text-sm">
-              Сканируются: {otherScanningCities.map((s) => s.city_name).join(', ')}
-            </AlertDescription>
-          </div>
-        </Alert>
-      )}
-    </div>
+export function TriggerManualScanAlert({ city }: { city: string }) {
+  const { getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
+  
+  // Получаем список других сканирующихся городов для информирования
+  const otherScanningCities = scanningCities.filter((s) => s.city !== city);
+
+  if (otherScanningCities.length === 0) return null;
+
+  return (
+    <Alert className="mt-2">
+      <div className="flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <AlertDescription className="text-sm">
+          Сканируются: {otherScanningCities.map((s) => s.city_name).join(', ')}
+        </AlertDescription>
+      </div>
+    </Alert>
   );
 }
