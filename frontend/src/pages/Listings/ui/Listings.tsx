@@ -32,7 +32,6 @@ import { ExportListings } from '@/features/listings/export-listings';
 import { TriggerManualScan } from '@/features/scanning/trigger-manual';
 import { ViewProgress } from '@/features/scanning/view-progress';
 import { ScanProgressModal } from '@/features/scanning/active-scanning';
-import { Button } from '@/shared/ui/button';
 import { Eye } from 'lucide-react';
 import { CITIES } from '@/shared/config';
 
