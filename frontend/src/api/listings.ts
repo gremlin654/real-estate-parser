@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import type {
   Listing,
   PaginatedResponse,
@@ -42,12 +42,16 @@ export const useScanProgressWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Кэшируем store reference чтобы избежать пересоздания
-  const storeRef = useRef<ReturnType<typeof useFilterStore> | null>(null);
-  if (!storeRef.current) {
-    storeRef.current = useFilterStore();
-  }
   const queryClient = useQueryClient();
+  
+  // Получаем store и кэшируем методы через useMemo
+  const store = useFilterStore();
+  const storeMethods = useMemo(() => ({
+    getScanningCities: store.getScanningCities,
+    addScanningCity: store.addScanningCity,
+    removeScanningCity: store.removeScanningCity,
+    updateScanningCity: store.updateScanningCity,
+  }), [store]);
 
   const connect = useCallback(() => {
     // Используем относительный URL для WebSocket
@@ -70,7 +74,7 @@ export const useScanProgressWebSocket = () => {
           // Поддержка параллельных сканирований (v3.1)
           if (data.scanning_cities) {
             const activeCities = data.scanning_cities.map((s: any) => s.city);
-            const currentScanningCities = storeRef.current!.getScanningCities();
+            const currentScanningCities = storeMethods.getScanningCities();
 
             // Обновить или добавить активные сканирования
             data.scanning_cities.forEach((scan: any) => {
@@ -78,7 +82,7 @@ export const useScanProgressWebSocket = () => {
               const existing = currentScanningCities.find((s) => s.city === scan.city);
 
               if (existing) {
-                storeRef.current!.updateScanningCity(scan.city, {
+                storeMethods.updateScanningCity(scan.city, {
                   progress: progressPercent,
                   stage: scan.stage,
                   elapsed_seconds: scan.elapsed_seconds,
@@ -87,7 +91,7 @@ export const useScanProgressWebSocket = () => {
                   listings_processed: scan.listings_processed,
                 });
               } else {
-                storeRef.current!.addScanningCity({
+                storeMethods.addScanningCity({
                   city: scan.city,
                   city_name: scan.city_name,
                   trigger_type: scan.trigger_type,
@@ -105,7 +109,7 @@ export const useScanProgressWebSocket = () => {
             // Удалить завершённые сканирования
             currentScanningCities.forEach((s) => {
               if (!activeCities.includes(s.city)) {
-                storeRef.current!.removeScanningCity(s.city);
+                storeMethods.removeScanningCity(s.city);
                 // Инвалидировать кэш после завершения
                 queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
                 queryClient.invalidateQueries({ queryKey: ['listings'] });
@@ -145,7 +149,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [queryClient]);
+  }, [queryClient, storeMethods]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
