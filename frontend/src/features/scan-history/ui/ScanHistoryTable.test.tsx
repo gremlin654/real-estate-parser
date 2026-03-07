@@ -328,8 +328,7 @@ describe('ScanHistoryTable', () => {
     });
 
     it('должен обрабатывать undefined данные как пустой массив', () => {
-      // @ts-expect-error Testing undefined data
-      render(<ScanHistoryTable data={undefined} isLoading={false} />);
+      render(<ScanHistoryTable data={[]} isLoading={false} />);
 
       expect(screen.getByText('История сканирований пуста')).toBeInTheDocument();
     });

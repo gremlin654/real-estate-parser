@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
 // Mock для ResizeObserver (нужен для Radix UI компонентов)
 global.ResizeObserver = class ResizeObserver {
@@ -11,7 +12,7 @@ global.ResizeObserver = class ResizeObserver {
 // Mock для matchMedia (нужен для use-mobile hook)
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,

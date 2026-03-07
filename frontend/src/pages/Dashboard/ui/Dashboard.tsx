@@ -29,6 +29,7 @@ import { StatCard } from '@/entities/stats';
 import { CITIES, SCAN_HISTORY_PAGE_SIZE } from '@/shared/config';
 import { ScanHistoryTable } from '@/features/scan-history';
 import { ActiveScanningWidget, ScanProgressModal } from '@/features/scanning/active-scanning';
+import type { ScanHistoryResponse } from '@/shared/types/listing';
 import { Eye } from 'lucide-react';
 
 function StatCardWrapper({
@@ -91,13 +92,15 @@ export function Dashboard() {
   const [historyTriggerType, setHistoryTriggerType] = useState<string>('all');
 
   // Hook для истории сканирований
-  const { data: scanHistory, isLoading: historyLoading } = useScanHistory({
+  const { data: scanHistoryData, isLoading: historyLoading } = useScanHistory({
     page: historyPage,
     size: SCAN_HISTORY_PAGE_SIZE,
     city: city !== 'all' ? city : undefined,
     status: historyStatus !== 'all' ? historyStatus as 'running' | 'completed' | 'error' : undefined,
     trigger_type: historyTriggerType !== 'all' ? historyTriggerType as 'manual' | 'scheduled' : undefined,
   });
+
+  const scanHistory = scanHistoryData as ScanHistoryResponse | undefined;
 
   return (
     <div className="space-y-8">

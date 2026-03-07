@@ -191,8 +191,7 @@ describe('CityScanSettings', () => {
       expect(sliderThumb).toHaveAttribute('aria-valuenow', '30');
 
       // Изменяем значение slider через keyboard
-      sliderThumb?.focus();
-      fireEvent.keyDown(sliderThumb!, { key: 'ArrowRight', code: 'ArrowRight' });
+      sliderThumb && fireEvent.keyDown(sliderThumb, { key: 'ArrowRight', code: 'ArrowRight' });
 
       // Проверяем, что значение обновилось
       expect(screen.getByText('35 мин')).toBeInTheDocument();
@@ -204,10 +203,9 @@ describe('CityScanSettings', () => {
       });
 
       const sliderThumb = container.querySelector('[role="slider"]');
-      
+
       // Изменяем значение slider через keyboard
-      sliderThumb?.focus();
-      fireEvent.keyDown(sliderThumb!, { key: 'ArrowRight', code: 'ArrowRight' });
+      sliderThumb && fireEvent.keyDown(sliderThumb, { key: 'ArrowRight', code: 'ArrowRight' });
 
       // Кнопка сохранения должна стать активной
       const saveButton = screen.getByText('Сохранить изменения');
