@@ -20,7 +20,8 @@ interface TriggerManualScanProps {
 export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
   const [showProgressModal, setShowProgressModal] = useState(false);
   const queryClient = useQueryClient();
-  const { setManualScanning, isManualScanning, isCityScanning, getScanningCities } = useFilterStore();
+  const { setManualScanning, isCityScanning } = useFilterStore();
+  const scanningCities = useFilterStore((state) => state.getScanningCities());
   const { progress } = useScanProgressWebSocket();
 
   const mutation = useMutation({
@@ -65,7 +66,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
   const isScanDisabled = mutation.isPending || isCityCurrentlyScanning;
 
   // Получаем список других сканирующихся городов для информирования
-  const otherScanningCities = getScanningCities().filter((s) => s.city !== city);
+  const otherScanningCities = scanningCities.filter((s) => s.city !== city);
 
   return (
     <div className="space-y-2">
