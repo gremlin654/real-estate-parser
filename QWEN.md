@@ -339,7 +339,8 @@ GET /api/v1/export/summary?format=xlsx
 ### scan_history
 
 - `id`, `started_at`, `completed_at`, `city`, `status`, `trigger_type`
-- `listings_fetched/created/updated/deleted`, `pages_scraped`, `duration_seconds`
+- `listings_fetched/created/updated/changed_byn/deleted/restored/unchanged`
+- `pages_scraped`, `duration_seconds`
 
 ### scan_settings (1 запись, id=1)
 
@@ -370,6 +371,14 @@ GET /api/v1/export/summary?format=xlsx
 **Автоматическая архивация:** перед сканированием `deleted` → `archived` (если >30 дней)
 
 **Восстановление (v3.0):** если `deleted` объявление появилось в API → статус `active`
+
+**Действия upsert (v3.1):**
+
+- `created` — новое объявление
+- `updated` — изменена цена USD
+- `changed_byn` — изменена цена BYН
+- `restored` — восстановлено после удаления
+- `unchanged` — без изменений
 
 ## Тестирование
 
@@ -501,7 +510,15 @@ docker-compose logs backend
 
 ## Версии
 
-### v3.0 (текущая)
+### v3.1 (текущая)
+
+- **Исправлена статистика сканирования** — точный подсчёт created/updated/changed_byn/deleted/restored/unchanged
+- **График распределения по комнатам 1, 2, 3, 4, 5+** — группировка 5+ комнатных, яркие цвета, белый текст
+- **Бэкенд отдаёт все комнаты** — API `/stats/room-distribution` возвращает комнаты от 1 и больше
+- **TriggerManualScanAlert** — алерт под кнопками на всю ширину
+- **Анимация кнопки** — плавная анимация при сканировании
+
+### v3.0
 
 - WebSocket real-time прогресс
 - Исправление цен (деление на 100)
