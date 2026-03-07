@@ -10,7 +10,7 @@ interface RoomDistributionWidgetProps {
   isLoading?: boolean;
 }
 
-const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F'];
 
 const formatPrice = (value: number | undefined): string => {
   if (value === undefined || value === null) return '—';
@@ -22,7 +22,7 @@ const CustomTooltip = ({ active, payload }: any) => {
     const data = payload[0].payload;
     return (
       <div className="p-3 rounded-lg border bg-card/95 backdrop-blur-sm shadow-lg">
-        <p className="font-semibold text-foreground mb-1">
+        <p className="font-semibold text-white mb-1">
           {data.rooms}-комнатные
         </p>
         <p className="text-sm text-muted-foreground">
@@ -58,8 +58,25 @@ export function RoomDistributionWidget({
     );
   }
 
-  const chartData = data.map((item, index) => ({
-    name: `${item.rooms}-комн.`,
+  // Группируем 4+ комнатные в одну категорию
+  const groupedData = data.reduce((acc, item) => {
+    const rooms = item.rooms >= 4 ? '4+' : `${item.rooms}`;
+    const existing = acc.find((a) => a.rooms === rooms);
+    if (existing) {
+      existing.count += item.count;
+      existing.avg_price = ((existing.avg_price * (existing.count - item.count)) + (item.avg_price * item.count)) / existing.count;
+    } else {
+      acc.push({
+        rooms,
+        count: item.count,
+        avg_price: item.avg_price,
+      });
+    }
+    return acc;
+  }, [] as Array<{rooms: string; count: number; avg_price: number}>);
+
+  const chartData = groupedData.map((item, index) => ({
+    name: item.rooms === '4+' ? '4+ комн.' : `${item.rooms}-комн.`,
     value: item.count,
     avgPrice: item.avg_price,
     rooms: item.rooms,
@@ -84,12 +101,24 @@ export function RoomDistributionWidget({
               outerRadius={80}
               fill="#8884d8"
               dataKey="value"
+              style={{ outline: 'none' }}
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={COLORS[index % COLORS.length]}
+                  stroke="#1a1a1a"
+                  strokeWidth={2}
+                />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
+            <Legend 
+              wrapperStyle={{ 
+                color: 'white',
+                fontSize: '14px'
+              }} 
+            />
           </PieChart>
         </ResponsiveContainer>
       </CardContent>
@@ -100,11 +129,17 @@ export function RoomDistributionWidget({
         .recharts-pie path,
         .recharts-sector,
         .recharts-sector path,
-        .recharts-active-sector {
+        .recharts-active-sector,
+        .recharts-text {
           outline: none !important;
           outline-width: 0 !important;
           outline-color: transparent !important;
           box-shadow: none !important;
+        }
+        .recharts-text {
+          fill: white !important;
+          font-weight: 600 !important;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.8) !important;
         }
         .recharts-surface:focus,
         .recharts-surface:focus-visible,
