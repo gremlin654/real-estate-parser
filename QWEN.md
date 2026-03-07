@@ -386,38 +386,45 @@ GET /api/v1/export/summary?format=xlsx
 
 ```bash
 cd frontend
-npm run test:e2e                    # 118 тестов
-npm run test:unit                   # 326 тестов
-npm run test:unit:coverage          # 66.12% coverage
+npm run test:e2e                    # Playwright (118 тестов)
+npm run test:unit                   # Vitest (129 тестов)
+npm run test:unit:coverage          # Coverage (~90%)
 npm run coverage                    # Все тесты + coverage
 npm run coverage:show               # HTML отчёт
 ```
 
-**Unit тесты (326):**
+**Unit тесты (129):**
 
-- Store (21), Hooks (9), API hooks (16)
-- UI Components (200+, 22 файла, 100%)
-- Charts (13), Listing (34), Layout (12), Pages (19)
+- Store (9), Hooks (9), API hooks
+- UI Components (100+)
+- Charts, Listing, Layout, Pages
 
 **E2E тесты (118):**
 
-- Dashboard (10), Listings (22), Listing Detail (5)
-- Settings (11), Statistics (18), Navigation (11)
-- UI Components (16), API Endpoints (18), Mobile (3)
+- Dashboard, Listings, Listing Detail
+- Settings, Statistics, Navigation
+- UI Components, API Endpoints, Mobile
 
 ### Backend
 
 ```bash
 cd backend
 docker-compose exec backend python -m pytest tests/ -v
-docker-compose exec backend python -m pytest tests/ --cov=app  # 55% coverage
+docker-compose exec backend python -m pytest tests/ --cov=app  # 52% coverage
 ```
 
-**Тесты (201):**
+**Тесты (75 unit + 54 integration):**
 
-- Health (5), Listings (17), Stats (12), Scan (18)
-- Scan History (13), History (5), Logging (20)
-- Listing Service (28), Kufar Client (25), Scheduler (24)
+- Health (5), Listings, Stats
+- Scan, Scan History, Scan Settings
+- History, Logging (11)
+- Listing Service (13, 90%), Kufar Client (11, 100%)
+- Scheduler (22), Parser (18)
+
+**Интеграционные тесты (54):**
+
+- Export, History, Scan History, Scan Settings
+- Требуют запущенную тестовую БД (порт 5433)
 
 **Важно:** Backend тесты используют БД `kufar_monitor_test` (порт 5433)
 
