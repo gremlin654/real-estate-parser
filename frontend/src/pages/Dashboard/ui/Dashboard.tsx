@@ -80,9 +80,9 @@ function StatCardWrapper({
 
 export function Dashboard() {
   const [showProgressModal, setShowProgressModal] = useState(false);
-  const scanningCities = useFilterStore((state) => state.getScanningCities());
+  const { city, setCity, getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
   const hasAnyScanning = scanningCities.length > 0;
-  const { city, setCity } = useFilterStore();
   const { data: summary, isLoading: summaryLoading } = useSummary(city);
   
   // Состояние для фильтров истории сканирований

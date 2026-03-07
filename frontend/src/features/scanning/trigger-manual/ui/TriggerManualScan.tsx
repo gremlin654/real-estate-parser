@@ -20,8 +20,8 @@ interface TriggerManualScanProps {
 export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
   const [showProgressModal, setShowProgressModal] = useState(false);
   const queryClient = useQueryClient();
-  const { setManualScanning, isCityScanning } = useFilterStore();
-  const scanningCities = useFilterStore((state) => state.getScanningCities());
+  const { setManualScanning, isCityScanning, getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
   const { progress } = useScanProgressWebSocket();
 
   const mutation = useMutation({
