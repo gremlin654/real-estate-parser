@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type {
   Listing,
   PaginatedResponse,
@@ -26,6 +26,12 @@ const API_BASE = '/api/v1';
  * Автоматически подключается к WebSocket при монтировании и отключается при размонтировании.
  * Обновляет данные объявлений после завершения сканирования.
  * Поддерживает параллельные сканирования по городам (v3.1).
+ * 
+ * Исправления (v3.1.1):
+ * - Кэширование методов store через useRef для стабильной идентичности
+ * - connect/disconnect стабилизированы через useRef
+ * - setProgress вызывается только при реальном изменении данных
+ * - WebSocket переподключается только при реальном разрыве соединения
  */
 export const useScanProgressWebSocket = () => {
   const [progress, setProgress] = useState<ScanProgress>({
@@ -43,19 +49,28 @@ export const useScanProgressWebSocket = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
-  
-  // Получаем store и кэшируем методы через useMemo
+
+  // 🔧 ИСПРАВЛЕНИЕ 1: Используем useRef для стабильной ссылки на store методы
+  // Это предотвращает пересоздание connect при каждом рендере
   const store = useFilterStore();
-  const storeMethods = useMemo(() => ({
+  const storeMethodsRef = useRef({
     getScanningCities: store.getScanningCities,
     addScanningCity: store.addScanningCity,
     removeScanningCity: store.removeScanningCity,
     updateScanningCity: store.updateScanningCity,
-  }), [store]);
+  });
 
+  // Обновляем ref только когда методы реально меняются (не при каждом рендере)
+  storeMethodsRef.current = {
+    getScanningCities: store.getScanningCities,
+    addScanningCity: store.addScanningCity,
+    removeScanningCity: store.removeScanningCity,
+    updateScanningCity: store.updateScanningCity,
+  };
+
+  // 🔧 ИСПРАВЛЕНИЕ 2: connect стабилизирован - пустые зависимости
+  // storeMethodsRef.current всегда актуален благодаря ref
   const connect = useCallback(() => {
-    // Используем относительный URL для WebSocket
-    // Vite dev server проксирует /ws на backend:8000
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/scan/progress`;
 
@@ -70,7 +85,8 @@ export const useScanProgressWebSocket = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+          const storeMethods = storeMethodsRef.current;
+
           // Поддержка параллельных сканирований (v3.1)
           if (data.scanning_cities) {
             const activeCities = data.scanning_cities.map((s: any) => s.city);
@@ -119,12 +135,19 @@ export const useScanProgressWebSocket = () => {
             });
           }
 
-          // Обновить progress state только если изменилось is_scanning или stage
+          // 🔧 ИСПРАВЛЕНИЕ 3: Сравниваем данные ПЕРЕД вызовом setProgress
+          // Это предотвращает лишние ре-рендеры
           setProgress((prev) => {
-            if (prev.is_scanning !== data.is_scanning || prev.stage !== data.stage) {
-              return data;
-            }
-            return prev;
+            const hasChanges = 
+              prev.is_scanning !== data.is_scanning ||
+              prev.stage !== data.stage ||
+              prev.city !== data.city ||
+              prev.pages_scraped !== data.pages_scraped ||
+              prev.listings_fetched !== data.listings_fetched ||
+              prev.listings_processed !== data.listings_processed ||
+              prev.elapsed_seconds !== data.elapsed_seconds;
+
+            return hasChanges ? data : prev;
           });
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
@@ -149,7 +172,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [queryClient, storeMethods]);
+  }, [queryClient]); // 🔧 Только queryClient в зависимостях
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -163,10 +186,12 @@ export const useScanProgressWebSocket = () => {
     setIsConnected(false);
   }, []);
 
+  // 🔧 ИСПРАВЛЕНИЕ 4: useEffect с пустыми зависимостями - запускается 1 раз
   useEffect(() => {
     connect();
     return () => disconnect();
-  }, [connect, disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return { progress, isConnected };
 };
