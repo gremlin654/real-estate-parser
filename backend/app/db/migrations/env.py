@@ -8,7 +8,8 @@ from os.path import abspath, dirname
 sys.path.insert(0, abspath(dirname(dirname(dirname(__file__)))))
 
 from app.db.database import Base
-from app.models import Listing, ListingHistory, ScanHistory, ScanSettings
+# Не импортируем модели напрямую - они используют create_type=False
+# и типы должны быть созданы через миграции
 from app.config import settings
 
 config = context.config

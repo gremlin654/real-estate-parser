@@ -64,7 +64,7 @@ class Listing(Base):
     house_year = Column(Integer)
     images = Column(JSONB, default=list)
     raw_data = Column(JSONB)
-    status = Column(SQLEnum(ListingStatus), default=ListingStatus.active)
+    status = Column(SQLEnum(ListingStatus, create_type=False), default=ListingStatus.active)
     first_seen_at = Column(DateTime, default=utc_now)
     last_seen_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime)
@@ -77,7 +77,7 @@ class ListingHistory(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     listing_id = Column(UUID(as_uuid=True), ForeignKey("listings.id"), nullable=False)
-    event_type = Column(SQLEnum(EventType), nullable=False)
+    event_type = Column(SQLEnum(EventType, create_type=False), nullable=False)
     price_before = Column(Integer)
     price_after = Column(Integer)
     changed_fields = Column(JSONB)
@@ -111,8 +111,8 @@ class ScanHistory(Base):
 class ScanSettings(Base):
     __tablename__ = "scan_settings"
 
-    id = Column(Integer, primary_key=True, autoincrement=False)
-    scan_interval_minutes = Column(Integer, nullable=False, default=30)
-    enabled = Column(Boolean, nullable=False, default=True)
-    city = Column(String, nullable=False, default="mogilev")
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    city = Column(String, unique=True, nullable=False, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    scan_interval_minutes = Column(Integer, default=30, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

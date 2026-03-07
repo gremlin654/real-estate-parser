@@ -12,8 +12,11 @@ import type {
   ScanSchedule,
   CityComparisonData,
   ScanHistoryResponse,
+  CitySettingsResponse,
+  CitySettingsUpdateRequest,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
+import { toast } from 'sonner';
 
 const API_BASE = '/api/v1';
 
@@ -379,6 +382,64 @@ export const useScanHistory = (filters?: {
     retryDelay: 1000,
     onError: (error) => {
       console.error('Failed to fetch scan history:', error);
+    },
+  });
+};
+
+/**
+ * Hook для получения настроек сканирования для конкретного города
+ */
+export const useCityScanSettings = (city: string) => {
+  return useQuery<CitySettingsResponse>({
+    queryKey: ['scanSettings', city],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE}/scan/settings/${city}`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      return response.json();
+    },
+    enabled: !!city,
+    staleTime: 60 * 1000, // 1 минута
+  });
+};
+
+/**
+ * Hook для получения всех настроек сканирования
+ */
+export const useAllScanSettings = () => {
+  return useQuery<Record<string, CitySettingsResponse>>({
+    queryKey: ['allScanSettings'],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE}/scan/settings`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
+      return response.json();
+    },
+    staleTime: 60 * 1000,
+  });
+};
+
+/**
+ * Hook для обновления настроек сканирования города
+ */
+export const useUpdateCityScanSettings = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ city, data }: { city: string; data: CitySettingsUpdateRequest }) => {
+      const response = await fetch(`${API_BASE}/scan/settings/${city}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update settings');
+      return response.json();
+    },
+    onSuccess: (data, { city }) => {
+      queryClient.invalidateQueries({ queryKey: ['scanSettings', city] });
+      queryClient.invalidateQueries({ queryKey: ['allScanSettings'] });
+      toast.success('Настройки сохранены');
+    },
+    onError: (error) => {
+      toast.error('Ошибка сохранения: ' + error.message);
     },
   });
 };

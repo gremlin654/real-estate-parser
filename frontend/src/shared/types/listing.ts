@@ -142,5 +142,22 @@ export interface ScanHistoryResponse {
 
 export type City = 'minsk' | 'mogilev' | 'grodno' | 'brest' | 'gomel' | 'vitebsk';
 
+/**
+ * Настройки сканирования для конкретного города
+ */
+export interface CitySettingsResponse {
+  enabled: boolean;
+  scan_interval_minutes: number;
+  updated_at: string | null;
+}
+
+/**
+ * Запрос на обновление настроек города
+ */
+export interface CitySettingsUpdateRequest {
+  enabled?: boolean;
+  scan_interval_minutes?: number;
+}
+
 // Re-export из constants для устранения дублирования
 export { CITIES } from '../config/constants';
