@@ -102,6 +102,8 @@ class ScanHistory(Base):
     listings_updated = Column(Integer, default=0)
     listings_changed_byn = Column(Integer, default=0)
     listings_deleted = Column(Integer, default=0)
+    listings_restored = Column(Integer, default=0)
+    listings_unchanged = Column(Integer, default=0)
     pages_scraped = Column(Integer, default=0)
     errors = Column(JSONB, default=list)
     duration_seconds = Column(Integer, nullable=True)

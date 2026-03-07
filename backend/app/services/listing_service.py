@@ -67,6 +67,9 @@ class ListingService:
                     snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
                 )
                 logger.info(f"Listing {kufar_id} restored after deletion")
+                await self.db.commit()
+                await self.db.refresh(existing)
+                return existing, 'restored'
             # Устанавливаем статус updated только если изменилась цена USD
             elif old_price_usd is not None and existing.price_usd is not None and old_price_usd != existing.price_usd:
                 existing.status = ListingStatus.updated
@@ -80,6 +83,9 @@ class ListingService:
                     snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
                 )
                 logger.info(f"Price USD changed for {kufar_id}: {old_price_usd} -> {existing.price_usd}")
+                await self.db.commit()
+                await self.db.refresh(existing)
+                return existing, 'updated'
             # Изменилась цена BYN но не USD
             elif old_price_byn is not None and existing.price is not None and old_price_byn != existing.price:
                 existing.status = ListingStatus.price_changed_byn
@@ -93,21 +99,23 @@ class ListingService:
                     snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
                 )
                 logger.info(f"Price BYN changed for {kufar_id}: {old_price_byn} -> {existing.price} (USD unchanged)")
+                await self.db.commit()
+                await self.db.refresh(existing)
+                return existing, 'changed_byn'
             else:
                 # Оставляем статус active - никаких значимых изменений
                 existing.status = ListingStatus.active
                 # НЕ создаём событие истории для обычных изменений
-
-            await self.db.commit()
-            await self.db.refresh(existing)
-            return existing, 'updated'
+                await self.db.commit()
+                await self.db.refresh(existing)
+                return existing, 'unchanged'
         else:
             # Create new
             new_listing = Listing(**listing_data)
             self.db.add(new_listing)
             await self.db.commit()
             await self.db.refresh(new_listing)
-            
+
             # Создаём событие создания
             await self._create_history_event(
                 listing_id=new_listing.id,
@@ -115,7 +123,7 @@ class ListingService:
                 snapshot=json.loads(json.dumps(new_listing.__dict__, default=str, skipkeys=True)),
             )
             logger.info(f"New listing created: {kufar_id}")
-            
+
             return new_listing, 'created'
 
     async def upsert_listings(self, listings_data: list[dict], city: str) -> dict:
@@ -123,8 +131,10 @@ class ListingService:
         stats = {
             "created": 0,
             "updated": 0,
+            "changed_byn": 0,
             "deleted": 0,
             "restored": 0,
+            "unchanged": 0,
             "processed": 0,
         }
 
@@ -139,9 +149,12 @@ class ListingService:
                     stats["created"] += 1
                 elif action == 'updated':
                     stats["updated"] += 1
-                    # Проверяем не было ли объявление удалённым
-                    if hasattr(listing, '_was_deleted') and listing._was_deleted:
-                        stats["restored"] += 1
+                elif action == 'changed_byn':
+                    stats["changed_byn"] += 1
+                elif action == 'restored':
+                    stats["restored"] += 1
+                elif action == 'unchanged':
+                    stats["unchanged"] += 1
 
                 stats["processed"] += 1
             except Exception as e:

@@ -11,6 +11,7 @@
 **Production база данных `kufar_monitor` (порт 5432) не должна изменяться напрямую.**
 
 **Правила:**
+
 1. **⛔ Запрещено:** миграции, SQL (INSERT/UPDATE/DELETE), очистка данных без подтверждения
 2. **✅ Обязательно:** создавать backup перед изменениями:
    ```bash
@@ -26,6 +27,7 @@
 **Kufar Monitor** — система мониторинга недвижимости для [Kufar.by](https://re.kufar.by). Автоматическое сканирование 6 городов, сохранение в PostgreSQL, отслеживание изменений цен и статусов.
 
 ### Ключевые возможности
+
 - **Автосканирование** — каждые 30 минут (настраивается)
 - **Ручное сканирование** — через веб-интерфейс
 - **Две валюты** — BYN/USD с переключателем (v3.0)
@@ -43,13 +45,13 @@ Frontend (React + TS) ↔ Backend (FastAPI) ↔ PostgreSQL ↔ Kufar.by Scraper
 
 ## Технологический стек
 
-| Компонент | Технологии |
-|-----------|------------|
+| Компонент    | Технологии                                                                              |
+| ------------ | --------------------------------------------------------------------------------------- |
 | **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, Zustand, TanStack Query, shadcn/ui, recharts |
-| **Backend** | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, pandas |
-| **Database** | PostgreSQL 16, Alembic |
-| **Scraper** | Playwright, BeautifulSoup4, aiohttp |
-| **Testing** | Playwright E2E (118), Vitest Unit (326, 66% coverage), pytest API (201, 55%) |
+| **Backend**  | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, pandas                              |
+| **Database** | PostgreSQL 16, Alembic                                                                  |
+| **Scraper**  | Playwright, BeautifulSoup4, aiohttp                                                     |
+| **Testing**  | Playwright E2E (118), Vitest Unit (326, 66% coverage), pytest API (201, 55%)            |
 
 ## Структура проекта
 
@@ -76,39 +78,12 @@ web/
 └── README.md
 ```
 
-## Быстрый старт
-
-```bash
-# Запустить всё
-docker-compose up --build
-
-# Остановить
-docker-compose down
-```
-
-### Точки доступа
-| Сервис | URL |
-|--------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| API Docs | http://localhost:8000/docs |
-| PostgreSQL | localhost:5432 |
-
-## Команды разработки
-
-### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-pip install -r requirements-test.txt
-
-# Dev-сервер
-uvicorn app.main:app --reload
-
 # Тесты
+
 docker-compose exec backend python -m pytest tests/ -v
 docker-compose exec backend python -m pytest tests/ --cov=app
-```
+
+````
 
 ### Frontend
 ```bash
@@ -121,7 +96,7 @@ npm run test:e2e          # Playwright (118 тестов)
 npm run test:unit         # Vitest (326 тестов)
 npm run test:unit:coverage  # Coverage (66.12%)
 npm run coverage          # Все тесты + coverage
-```
+````
 
 ## 📋 Правила разработки и Workflow
 
@@ -134,6 +109,7 @@ npm run coverage          # Все тесты + coverage
 ```
 
 **Правила:**
+
 - **Каждая задача сначала передаётся `product-manager-agent`** на декомпозицию и создание спецификаций
 - Каждая задача → отдельная ветка
 - MR (PR) можно создать только если тесты проходят
@@ -152,6 +128,7 @@ fix/*       — баги
 ```
 
 **Примеры:**
+
 - `feature/price-filter`
 - `fix/scan-history-bug`
 - `feature/websocket-progress`
@@ -198,6 +175,7 @@ npm run test:e2e
 - Require branches to be up to date
 
 **Status checks:**
+
 - `backend-tests`
 - `frontend-tests`
 - `e2e-tests`
@@ -210,11 +188,13 @@ npm run test:e2e
 **Файл:** `.github/workflows/ci.yml`
 
 **Jobs:**
+
 - `backend-tests` — pytest для backend
 - `frontend-tests` — vitest для frontend
 - `e2e-tests` — Playwright для E2E
 
 **Срабатывание:**
+
 - `pull_request` — для всех PR
 - `push` — для develop
 
@@ -225,6 +205,7 @@ npm run test:e2e
 **Файл:** `.github/pull_request_template.md`
 
 **Чеклист для PR:**
+
 - [ ] Backend тесты проходят
 - [ ] Frontend тесты проходят
 - [ ] E2E тесты проходят
@@ -289,6 +270,7 @@ Production deploy
 3. Только потом migration
 
 **Запрещено:**
+
 - Push в `main` напрямую — только через PR
 - Изменение production БД без backup
 - Миграции без тестирования на staging
@@ -298,6 +280,7 @@ Production deploy
 ## API Endpoints
 
 ### Listings
+
 ```bash
 GET /api/v1/listings?page=1&size=20&status=active&city=minsk
 GET /api/v1/listings/{id}
@@ -305,6 +288,7 @@ GET /api/v1/history/{id}  # История изменений
 ```
 
 ### Stats
+
 ```bash
 GET /api/v1/stats/summary?city=minsk
 GET /api/v1/stats/price-trends?city=minsk&rooms=1
@@ -313,6 +297,7 @@ GET /api/v1/stats/daily-activity?city=minsk&period_days=30
 ```
 
 ### Scan Management
+
 ```bash
 POST /api/v1/scan/trigger      # Ручное сканирование
 GET /api/v1/scan/status        # Статус
@@ -323,6 +308,7 @@ PUT /api/v1/scan/schedule      # Обновить (interval: 5-1440 мин)
 ```
 
 ### Scan History
+
 ```bash
 GET /api/v1/scan/history              # История (paginated)
 GET /api/v1/scan/history/{scan_id}    # Детали
@@ -330,6 +316,7 @@ GET /api/v1/scan/history/summary      # Сводка
 ```
 
 ### Export (v2.0)
+
 ```bash
 GET /api/v1/export/listings?format=csv&city=minsk&status=active
 GET /api/v1/export/summary?format=xlsx
@@ -338,41 +325,47 @@ GET /api/v1/export/summary?format=xlsx
 ## Схема базы данных
 
 ### listings
+
 - `id`, `kufar_id`, `url`, `title`, `price` (BYN), `price_usd`, `currency`
 - `city`, `address`, `rooms`, `area`, `floor`, `images` (JSONB)
 - `status` (new/active/updated/deleted/archived)
 - `first_seen_at`, `last_seen_at`, `deleted_at`
 
 ### listing_history
+
 - `id`, `listing_id`, `event_type` (created/price_changed/edited/deleted/restored)
 - `price_before`, `price_after`, `changed_fields` (JSONB), `snapshot` (JSONB)
 
 ### scan_history
+
 - `id`, `started_at`, `completed_at`, `city`, `status`, `trigger_type`
 - `listings_fetched/created/updated/deleted`, `pages_scraped`, `duration_seconds`
 
 ### scan_settings (1 запись, id=1)
+
 - `scan_interval_minutes` (5-1440), `enabled`, `updated_at`
 
 ## Доступные города
-| Код | Город |
-|-----|-------|
-| `minsk` | Минск |
+
+| Код       | Город   |
+| --------- | ------- |
+| `minsk`   | Минск   |
 | `mogilev` | Могилёв |
-| `grodno` | Гродно |
-| `brest` | Брест |
-| `gomel` | Гомель |
+| `grodno`  | Гродно  |
+| `brest`   | Брест   |
+| `gomel`   | Гомель  |
 | `vitebsk` | Витебск |
 
 ## Статусы объявлений
-| Статус | Описание |
-|--------|----------|
-| `new` | Первое обнаружение |
-| `active` | Активное (без изменений или восстановлено) |
-| `updated` | **Изменилась цена USD** (v3.0) |
-| `price_changed_byn` | Изменилась цена BYN (без изменения USD) |
-| `deleted` | Удалено (хранится 30 дней) |
-| `archived` | Удалено >30 дней назад |
+
+| Статус              | Описание                                   |
+| ------------------- | ------------------------------------------ |
+| `new`               | Первое обнаружение                         |
+| `active`            | Активное (без изменений или восстановлено) |
+| `updated`           | **Изменилась цена USD** (v3.0)             |
+| `price_changed_byn` | Изменилась цена BYN (без изменения USD)    |
+| `deleted`           | Удалено (хранится 30 дней)                 |
+| `archived`          | Удалено >30 дней назад                     |
 
 **Автоматическая архивация:** перед сканированием `deleted` → `archived` (если >30 дней)
 
@@ -381,6 +374,7 @@ GET /api/v1/export/summary?format=xlsx
 ## Тестирование
 
 ### Frontend
+
 ```bash
 cd frontend
 npm run test:e2e                    # 118 тестов
@@ -391,16 +385,19 @@ npm run coverage:show               # HTML отчёт
 ```
 
 **Unit тесты (326):**
+
 - Store (21), Hooks (9), API hooks (16)
 - UI Components (200+, 22 файла, 100%)
 - Charts (13), Listing (34), Layout (12), Pages (19)
 
 **E2E тесты (118):**
+
 - Dashboard (10), Listings (22), Listing Detail (5)
 - Settings (11), Statistics (18), Navigation (11)
 - UI Components (16), API Endpoints (18), Mobile (3)
 
 ### Backend
+
 ```bash
 cd backend
 docker-compose exec backend python -m pytest tests/ -v
@@ -408,6 +405,7 @@ docker-compose exec backend python -m pytest tests/ --cov=app  # 55% coverage
 ```
 
 **Тесты (201):**
+
 - Health (5), Listings (17), Stats (12), Scan (18)
 - Scan History (13), History (5), Logging (20)
 - Listing Service (28), Kufar Client (25), Scheduler (24)
@@ -417,10 +415,11 @@ docker-compose exec backend python -m pytest tests/ --cov=app  # 55% coverage
 ## Ключевые детали реализации
 
 ### WebSocket API (v3.0)
+
 **Endpoint:** `WS /ws/scan/progress`
 
 ```typescript
-const ws = new WebSocket('ws://localhost:8000/ws/scan/progress');
+const ws = new WebSocket("ws://localhost:8000/ws/scan/progress");
 ws.onmessage = (event) => {
   const progress = JSON.parse(event.data);
   // { is_scanning, city, stage, pages_scraped, listings_fetched, is_stable, elapsed_seconds }
@@ -430,9 +429,11 @@ ws.onmessage = (event) => {
 **Frontend hook:** `useScanProgressWebSocket()` в `frontend/src/api/listings.ts`
 
 ### Стадии сканирования
+
 1. `starting` → 2. `marking_deleted` → 3. `fetching` → 4. `parsing` → 5. `upserting` → 6. `marking_deleted_final` → 7. `done`
 
 **Прогресс (Frontend):**
+
 - `fetching`: 0-50% (pages_scraped)
 - `parsing`: 50-80% (listings_fetched)
 - `upserting`: 80-100% (listings_processed)
@@ -440,6 +441,7 @@ ws.onmessage = (event) => {
 **Флаг `is_stable`:** `true` на `marking_deleted_final`/`done`/`error`, иначе `false`
 
 ### Логика статуса `updated` (v3.0)
+
 ```python
 # backend/app/services/listing_service.py
 old_price_usd = existing.price_usd
@@ -453,7 +455,9 @@ else:
 ```
 
 ### Парсинг данных Kufar (v3.0)
+
 **Цены:** Kufar возвращает в копейках → делим на 100
+
 ```python
 price = price_raw // 100  # 12,278,675 → 122,786 BYN = $42,500
 ```
@@ -465,12 +469,14 @@ price = price_raw // 100  # 12,278,675 → 122,786 BYN = $42,500
 **Парсер:** `backend/app/scraper/kufar_scraper.py`, метод `_parse_ad()`
 
 ### Глобальное состояние сканирования
+
 ```typescript
 // frontend/src/store/filterStore.ts
-isManualScanning: boolean;  // Сохраняется между переходами
+isManualScanning: boolean; // Сохраняется между переходами
 ```
 
 **Преимущества:**
+
 - Прогресс не пропадает при навигации
 - Кнопка не застревает в состоянии сканирования
 
@@ -496,6 +502,7 @@ docker-compose logs backend
 ## Версии
 
 ### v3.0 (текущая)
+
 - WebSocket real-time прогресс
 - Исправление цен (деление на 100)
 - Статус `updated` при изменении `price_usd`
@@ -504,9 +511,11 @@ docker-compose logs backend
 - Сортировка: newest, oldest, asc, desc
 
 ### v2.0
+
 - Графики и аналитика
 - Экспорт (CSV, XLSX, JSON)
 - CI/CD pipeline
 
 ### v1.0
+
 - Базовое сканирование, REST API, веб-интерфейс

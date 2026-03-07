@@ -71,7 +71,10 @@ class ScanHistoryService:
         error_message: str = None,
         listings_created: int = None,
         listings_updated: int = None,
+        listings_changed_byn: int = None,
         listings_deleted: int = None,
+        listings_restored: int = None,
+        listings_unchanged: int = None,
         pages_scraped: int = None,
         duration_seconds: int = None
     ):
@@ -91,8 +94,14 @@ class ScanHistoryService:
             scan.listings_created = listings_created
         if listings_updated is not None:
             scan.listings_updated = listings_updated
+        if listings_changed_byn is not None:
+            scan.listings_changed_byn = listings_changed_byn
         if listings_deleted is not None:
             scan.listings_deleted = listings_deleted
+        if listings_restored is not None:
+            scan.listings_restored = listings_restored
+        if listings_unchanged is not None:
+            scan.listings_unchanged = listings_unchanged
         if pages_scraped is not None:
             scan.pages_scraped = pages_scraped
         if duration_seconds is not None:

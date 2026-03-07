@@ -497,7 +497,10 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
                 status="completed",
                 listings_created=stats.get("created", 0),
                 listings_updated=stats.get("updated", 0),
+                listings_changed_byn=stats.get("changed_byn", 0),
                 listings_deleted=stats.get("deleted", 0),
+                listings_restored=stats.get("restored", 0),
+                listings_unchanged=stats.get("unchanged", 0),
                 pages_scraped=pages_scraped,
                 duration_seconds=int((end_time - start_time).total_seconds())
             )
