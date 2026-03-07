@@ -49,6 +49,20 @@ async def get_listings(
     if price_to:
         conditions.append(or_(Listing.price <= price_to, Listing.price_usd <= price_to))
 
+    # Фильтр по комнатам
+    if rooms and len(rooms) > 0:
+        # Если выбраны конкретные комнаты (1-4)
+        room_conditions = [Listing.rooms == r for r in rooms]
+        
+        # Если также выбран rooms_other, добавляем условие для 5+ комнат
+        if rooms_other:
+            room_conditions.append(or_(Listing.rooms >= 5, Listing.rooms.is_(None)))
+        
+        conditions.append(or_(*room_conditions))
+    elif rooms_other:
+        # Только rooms_other выбран - показываем 5+ комнат и None
+        conditions.append(or_(Listing.rooms >= 5, Listing.rooms.is_(None)))
+
     query = select(Listing).where(and_(*conditions))
 
     # Сортировка

@@ -12,10 +12,16 @@ export interface Listing {
   area: number | null;
   floor: number | null;
   total_floors?: number | null;
+  category: string | null;
+  description: string | null;
+  district: string | null;
+  metro: string | null;
+  house_year: number | null;
   images: string[];
   status: string;
   first_seen_at: string;
   last_seen_at: string;
+  deleted_at?: string | null;
 }
 
 export interface PaginatedResponse {
@@ -49,6 +55,8 @@ export interface HistoryEvent {
   event_type: string;
   price_before?: number | null;
   price_after?: number | null;
+  changed_fields?: Record<string, any> | null;
+  snapshot?: Record<string, any> | null;
   created_at: string;
 }
 

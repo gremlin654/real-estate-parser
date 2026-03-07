@@ -72,31 +72,76 @@ class KufarScraper:
                 ad_params = ad_params_raw
             elif isinstance(ad_params_raw, list):
                 # Convert list of dicts to single dict
+                # Support both formats: {name, value} and {p, v, pl}
                 for param in ad_params_raw:
                     if isinstance(param, dict):
-                        name = param.get("name", "")
-                        value = param.get("value", "")
-                        if name:
-                            ad_params[name] = value
-            
-            # Extract rooms
-            rooms_raw = ad_params.get("РўРѕР»СЊРєРѕ РєРѕРјРЅР°С‚", "")
+                        # Format 1: {name, value}
+                        if "name" in param:
+                            name = param.get("name", "")
+                            value = param.get("value", "")
+                            if name:
+                                ad_params[name] = value
+                        # Format 2: {p, v, pl} - Kufar API format
+                        elif "p" in param:
+                            p_name = param.get("p", "")
+                            p_value = param.get("v", "")
+                            if p_name:
+                                ad_params[p_name] = p_value
+
+            # Extract rooms - use 'rooms' key from new format
+            rooms_raw = ad_params.get("rooms", "")
             try:
-                rooms = int(rooms_raw) if rooms_raw and str(rooms_raw).isdigit() else 0
-            except ValueError:
+                # rooms can be string or number
+                if isinstance(rooms_raw, (int, float)):
+                    rooms = int(rooms_raw)
+                elif rooms_raw and str(rooms_raw).isdigit():
+                    rooms = int(rooms_raw)
+                else:
+                    rooms = 0
+            except (ValueError, TypeError):
                 rooms = 0
-            
-            # Extract area
-            area_raw = ad_params.get("РћР±С‰Р°СЏ РїР»РѕС‰Р°РґСЊ", "")
+
+            # Extract area - use 'size' key for total area
+            area_raw = ad_params.get("size", "")
             try:
-                area = float(str(area_raw).replace(",", ".")) if area_raw else 0.0
-            except ValueError:
+                if isinstance(area_raw, (int, float)):
+                    area = float(area_raw)
+                elif area_raw:
+                    area = float(str(area_raw).replace(",", "."))
+                else:
+                    area = 0.0
+            except (ValueError, TypeError):
                 area = 0.0
-            
-            # Extract floor
-            floor_raw = ad_params.get("Р­С‚Р°Р¶", "")
-            floor = int(floor_raw) if floor_raw and str(floor_raw).isdigit() else 0
-            
+
+            # Extract floor - use 'floor' key
+            floor_raw = ad_params.get("floor", "")
+            try:
+                # floor can be array [5] or number
+                if isinstance(floor_raw, list) and len(floor_raw) > 0:
+                    floor = int(floor_raw[0])
+                elif isinstance(floor_raw, (int, float)):
+                    floor = int(floor_raw)
+                elif floor_raw and str(floor_raw).isdigit():
+                    floor = int(floor_raw)
+                else:
+                    floor = 0
+            except (ValueError, TypeError):
+                floor = 0
+
+            # Extract total_floors - use 're_number_floors' key
+            total_floors = None
+            total_floors_raw = ad_params.get("re_number_floors", "")
+            if total_floors_raw is not None and total_floors_raw != "":
+                try:
+                    if isinstance(total_floors_raw, (int, float)):
+                        total_floors = int(total_floors_raw)
+                    elif isinstance(total_floors_raw, str) and total_floors_raw.strip().isdigit():
+                        total_floors = int(total_floors_raw.strip())
+                    # Иначе оставляем None
+                except (ValueError, TypeError):
+                    # Если не удалось преобразовать, оставляем None
+                    pass
+
             # Extract images
             images = ad.get("images", [])
             image_urls = []
@@ -107,14 +152,35 @@ class KufarScraper:
                         # Используем rms{kufar.by формат для картинок
                         image_urls.append(f"https://rms.kufar.by/v1/gallery/{path}")
 
+            # Extract description from body_short
+            description = ad.get("body_short", "") or ad.get("body", "")
+
+            # Extract category
+            category = ad.get("category", "")
+
+            # Extract house_year from ad_parameters
+            house_year = None
+            year_built_raw = ad_params.get("year_built", "")
+            try:
+                if isinstance(year_built_raw, (int, float)):
+                    house_year = int(year_built_raw)
+                elif year_built_raw and str(year_built_raw).isdigit():
+                    house_year = int(year_built_raw)
+            except (ValueError, TypeError):
+                pass
+
+            # Extract district and metro if available
+            district = None
+            metro = None
+
             # Create listing
             # Kufar возвращает цены в копейках/центах (умноженные на 100)
             # Поэтому делим на 100 для получения целой цены
             price_byn_int = int(price_byn) if price_byn else 0
             price_usd_int = int(price_usd) if price_usd else 0
-            
+
             ad_id = str(ad.get("ad_id", ""))
-            
+
             listing = {
                 "kufar_id": ad_id,
                 "url": f"https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}" if city else f"https://re.kufar.by/vi/{ad_id}",
@@ -127,10 +193,16 @@ class KufarScraper:
                 "rooms": rooms,
                 "area": area,
                 "floor": floor,
+                "total_floors": total_floors,
+                "category": category if category else None,
+                "description": description if description else None,
+                "district": district,
+                "metro": metro,
+                "house_year": house_year,
                 "images": image_urls,
                 "raw_data": ad,
             }
-            
+
             return listing
         except Exception as e:
             logger.error(f"Error parsing ad: {e}")

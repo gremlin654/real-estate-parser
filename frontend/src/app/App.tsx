@@ -13,6 +13,8 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 минут
       retry: 1,
+      refetchOnWindowFocus: false, // Не обновлять при фокусе окна
+      refetchOnMount: false, // Не обновлять при монтировании если данные есть
     },
   },
 });

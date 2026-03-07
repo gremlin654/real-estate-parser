@@ -34,7 +34,8 @@ class ListingStatus(str, Enum):
 
 class EventType(str, Enum):
     created = "created"
-    price_changed = "price_changed"
+    price_changed = "price_changed"  # Изменение цены USD
+    price_changed_byn = "price_changed_byn"  # Изменение цены BYN
     edited = "edited"
     deleted = "deleted"
     restored = "restored"

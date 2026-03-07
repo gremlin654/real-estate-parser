@@ -42,6 +42,7 @@ export function Listings() {
     priceFrom,
     priceTo,
     rooms,
+    roomsOther,
     sort,
     currency,
     setPage,
@@ -58,6 +59,7 @@ export function Listings() {
     priceFrom,
     priceTo,
     rooms,
+    roomsOther,
     currency,
     sort,
   });
@@ -75,6 +77,10 @@ export function Listings() {
 
   const handleCurrencyChange = (value: 'USD' | 'BYN') => {
     setFilters({ currency: value });
+  };
+
+  const handleRoomsChange = (newRooms: number[], other?: boolean) => {
+    setFilters({ rooms: newRooms, roomsOther: other ?? false });
   };
 
   return (
@@ -115,7 +121,11 @@ export function Listings() {
               value={status}
               onChange={(value) => handleFilterChange('status', value)}
             />
-            <FilterByRooms value={rooms} onChange={(value) => handleFilterChange('rooms', value)} />
+            <FilterByRooms 
+              value={rooms} 
+              other={roomsOther}
+              onChange={handleRoomsChange} 
+            />
             <SortListings value={sort} onChange={(value) => handleFilterChange('sort', value)} />
 
             <Button

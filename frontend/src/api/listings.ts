@@ -19,6 +19,7 @@ const API_BASE = '/api/v1';
 /**
  * WebSocket hook для real-time прогресса сканирования.
  * Автоматически подключается к WebSocket при монтировании и отключается при размонтировании.
+ * Обновляет данные объявлений после завершения сканирования.
  */
 export const useScanProgressWebSocket = () => {
   const [progress, setProgress] = useState<ScanProgress>({
@@ -36,6 +37,7 @@ export const useScanProgressWebSocket = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { setManualScanning } = useFilterStore();
+  const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
     // Используем относительный URL для WebSocket
@@ -55,9 +57,14 @@ export const useScanProgressWebSocket = () => {
         try {
           const data = JSON.parse(event.data);
           setProgress((prev) => {
-            // Если сканирование завершилось, сбрасываем флаг
+            // Если сканирование завершилось, сбрасываем флаг и обновляем данные
             if (prev.is_scanning && !data.is_scanning) {
               setManualScanning(false);
+              // Обновить данные объявлений, summary и статистику
+              queryClient.invalidateQueries({ queryKey: ['listings'] });
+              queryClient.invalidateQueries({ queryKey: ['summary'] });
+              queryClient.invalidateQueries({ queryKey: ['stats'] });
+              console.log('Scan completed, data invalidated');
             }
             return data;
           });
@@ -73,7 +80,7 @@ export const useScanProgressWebSocket = () => {
       ws.onclose = () => {
         console.log('WebSocket disconnected');
         setIsConnected(false);
-        
+
         // Попытка переподключения через 3 секунды
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
@@ -84,7 +91,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [setManualScanning]);
+  }, [setManualScanning, queryClient]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -114,6 +121,7 @@ export const useListings = (filters: {
   priceFrom?: number | null;
   priceTo?: number | null;
   rooms?: number[];
+  roomsOther?: boolean;
   currency?: string;
   sort?: string;
 }) => {
@@ -130,8 +138,11 @@ export const useListings = (filters: {
       if (filters.rooms && filters.rooms.length > 0) {
         filters.rooms.forEach((room) => params.append('rooms', String(room)));
       }
+      if (filters.roomsOther) {
+        params.set('rooms_other', 'true');
+      }
       // currency используется только для отображения на frontend, не передаём на backend
-      
+
       // Маппинг значений сортировки
       if (filters.sort) {
         const sortMap: Record<string, string> = {

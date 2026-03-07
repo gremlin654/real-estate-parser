@@ -9,6 +9,7 @@ interface FilterState {
   priceFrom: number | null;
   priceTo: number | null;
   rooms: number[];
+  roomsOther: boolean;
   sort: string;
   size: number;
   page: number;
@@ -17,7 +18,7 @@ interface FilterState {
   setStatus: (status: string) => void;
   setCurrency: (currency: 'BYN' | 'USD') => void;
   setPriceRange: (from: number | null, to: number | null) => void;
-  setRooms: (rooms: number[]) => void;
+  setRooms: (rooms: number[], other?: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   setPage: (page: number) => void;
   setManualScanning: (scanning: boolean) => void;
@@ -33,6 +34,7 @@ export const useFilterStore = create<FilterState>()(
       priceFrom: null,
       priceTo: null,
       rooms: [],
+      roomsOther: false,
       sort: 'newest',
       size: 20,
       page: 1,
@@ -42,7 +44,7 @@ export const useFilterStore = create<FilterState>()(
       setStatus: (status) => set({ status, page: 1 }),
       setCurrency: (currency) => set({ currency }),
       setPriceRange: (from, to) => set({ priceFrom: from, priceTo: to, page: 1 }),
-      setRooms: (rooms) => set({ rooms, page: 1 }),
+      setRooms: (rooms, other) => set({ rooms, roomsOther: other ?? false, page: 1 }),
       setFilters: (filters) => set({ ...filters, page: 1 }),
       setPage: (page) => set({ page }),
       setManualScanning: (scanning) => set({ isManualScanning: scanning }),
@@ -54,6 +56,7 @@ export const useFilterStore = create<FilterState>()(
           priceFrom: null,
           priceTo: null,
           rooms: [],
+          roomsOther: false,
           sort: 'newest',
           size: 20,
           page: 1,

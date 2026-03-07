@@ -10,88 +10,46 @@
 
 **Production база данных `kufar_monitor` (порт 5432) не должна изменяться напрямую.**
 
-**Правила работы с production БД:**
-
-1. **⛔ Запрещено выполнять изменения без подтверждения:**
-   - Запуск миграций (`alembic upgrade/downgrade`)
-   - SQL-команды (INSERT, UPDATE, DELETE, TRUNCATE)
-   - Очистку таблиц или данных
-   - Изменение схемы
-   - Любые деструктивные операции
-
-2. **✅ Обязательно создавать backup перед изменениями:**
+**Правила:**
+1. **⛔ Запрещено:** миграции, SQL (INSERT/UPDATE/DELETE), очистка данных без подтверждения
+2. **✅ Обязательно:** создавать backup перед изменениями:
    ```bash
-   # Создать дамп production БД
    docker-compose exec db pg_dump -U postgres kufar_monitor > backup_$(date +%Y%m%d_%H%M%S).sql
-   
-   # Или создать snapshot через pg_dumpall
-   docker-compose exec db pg_dumpall -U postgres > full_backup_$(date +%Y%m%d_%H%M%S).sql
    ```
-
-3. **✅ Использовать тестовую БД для экспериментов:**
-   ```bash
-   # Тестовая БД (порт 5433) — безопасна для изменений
-   docker-compose exec db_test psql -U postgres -d kufar_monitor_test
-   ```
-
-4. **✅ Восстановление из backup:**
-   ```bash
-   # Восстановить из дампа
-   cat backup_20250101_120000.sql | docker-compose exec -T db psql -U postgres -d kufar_monitor
-   ```
+3. **✅ Тестовая БД:** порт 5433 (`kufar_monitor_test`) — безопасна для изменений
+4. **✅ Восстановление:** `cat backup_*.sql | docker-compose exec -T db psql -U postgres -d kufar_monitor`
 
 **Всегда уточняйте у пользователя перед выполнением команд, изменяющих production БД.**
 
 ## Обзор проекта
 
-**Kufar Monitor** — автоматизированная система мониторинга недвижимости для портала [Kufar.by](https://re.kufar.by) (белорусский портал недвижимости). Система сканирует выбранные города, сохраняет объявления в базу данных и отслеживает изменения цен и статусов.
+**Kufar Monitor** — система мониторинга недвижимости для [Kufar.by](https://re.kufar.by). Автоматическое сканирование 6 городов, сохранение в PostgreSQL, отслеживание изменений цен и статусов.
 
 ### Ключевые возможности
-
-- **Автоматическое сканирование** — плановый парсинг каждые 30 минут
-- **Ручное сканирование** — сканирование по требованию через веб-интерфейс
-- **Две валюты** — цены в BYN и USD с переключателем
-- **Отслеживание изменений** — фиксация изменений цены, статуса, удаления объявлений
-- **Фильтрация** — по городу, статусу, цене, валюте, сортировке
-- **История изменений** — полная история всех событий по каждому объявлению
-- **История сканирований** — отслеживание запусков сканера, статистика, ошибки
-- **Мультигород** — поддержка 6 городов (Минск, Могилёв, Гродно, Брест, Гомель, Витебск)
-- **Real-time прогресс** — WebSocket для отображения прогресса в реальном времени (v3.0)
-- **Галерея изображений** — полноразмерные изображения с CDN Kufar (rms.kufar.by)
-- **Тёмная тема** — современный дизайн в тёмных тонах
-- **Admin-панель** — боковая навигация
-- **📊 Графики и аналитика** — динамика цен, распределение по комнатам, активность по дням (v2.0)
-- **📤 Экспорт данных** — выгрузка в CSV, XLSX, JSON (v2.0)
-- **🔄 CI/CD** — автоматические тесты и deployment (v2.0)
-- **💱 Фильтр валюты** — переключение USD/BYN на лету (v3.0)
+- **Автосканирование** — каждые 30 минут (настраивается)
+- **Ручное сканирование** — через веб-интерфейс
+- **Две валюты** — BYN/USD с переключателем (v3.0)
+- **История изменений** — цены, статусы, удаления
+- **Real-time прогресс** — WebSocket (v3.0)
+- **📊 Графики** — динамика цен, распределение (v2.0)
+- **📤 Экспорт** — CSV, XLSX, JSON (v2.0)
+- **🔄 CI/CD** — GitHub Actions (v2.0)
 
 ## Архитектура
 
 ```
-┌─────────────┐      ┌──────────────┐      ┌─────────────┐
-│  Frontend   │─────▶│   Backend    │─────▶│  PostgreSQL │
-│ React + TS  │      │  FastAPI     │      │  Database   │
-│ TailwindCSS │◀─────│  SQLAlchemy  │◀─────│             │
-└─────────────┘      └──────────────┘      └─────────────┘
-                            │
-                            ▼
-                     ┌──────────────┐
-                     │  Kufar.by    │
-                     │  Scraper     │
-                     └──────────────┘
+Frontend (React + TS) ↔ Backend (FastAPI) ↔ PostgreSQL ↔ Kufar.by Scraper
 ```
 
 ## Технологический стек
 
 | Компонент | Технологии |
 |-----------|------------|
-| **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, React Router, Zustand, TanStack Query, shadcn/ui, lucide-react, recharts, **Playwright (E2E - 118 тестов)**, **Vitest (Unit - 326 тестов)**, **monocart-coverage-reports (66.12% coverage)** |
-| **Backend** | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, **pytest (API тесты - 201 тест)**, pandas, openpyxl |
-| **Database** | PostgreSQL 16, Alembic (миграции) |
-| **Scraper** | Playwright (Chromium), BeautifulSoup4, aiohttp, httpx |
-| **Infrastructure** | Docker, Docker Compose, **GitHub Actions (CI/CD)**, WebSocket |
-| **Testing** | Playwright (E2E - 118 тестов), Vitest (Unit - 326 тестов, 66.12% coverage), pytest (API - 201 тест, 55% coverage), monocart-coverage-reports, istanbul/v8, @testing-library/react |
-| **Analytics** | Recharts (графики и диаграммы) |
+| **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, Zustand, TanStack Query, shadcn/ui, recharts |
+| **Backend** | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, pandas |
+| **Database** | PostgreSQL 16, Alembic |
+| **Scraper** | Playwright, BeautifulSoup4, aiohttp |
+| **Testing** | Playwright E2E (118), Vitest Unit (326, 66% coverage), pytest API (201, 55%) |
 
 ## Структура проекта
 
@@ -99,484 +57,304 @@
 web/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/           # API маршруты (listings, history, stats, scan, export, ws)
-│   │   ├── core/             # Ядро приложения (logging_config.py)
-│   │   ├── db/               # Подключение к БД и миграции
-│   │   ├── models/           # SQLAlchemy модели (Listing, ListingHistory, ScanHistory)
-│   │   ├── schemas/          # Pydantic схемы
-│   │   ├── scraper/          # Логика скрапера (scheduler, parser, kufar_*.py)
-│   │   ├── services/         # Бизнес-логика (listing_service.py, scan_history_service.py)
-│   │   ├── config.py         # Конфигурация
-│   │   └── main.py           # FastAPI приложение
-│   │   └── docs/             # Документация (WEBSOCKET.md, LOGGING.md, SCAN_HISTORY.md)
-│   ├── tests/                # Pytest тесты (201 тест)
-│   │   ├── conftest.py       # Фикстуры
-│   │   ├── test_health.py
-│   │   ├── test_listings.py
-│   │   ├── test_stats.py     # Тесты статистики (обновлено v2.0)
-│   │   ├── test_scan.py
-│   │   ├── test_scan_history.py
-│   │   ├── test_history.py
-│   │   ├── test_logging.py
-│   │   ├── test_retry_logic.py
-│   │   ├── test_listing_service.py
-│   │   ├── test_kufar_client.py
-│   │   ├── test_scheduler.py
-│   │   └── test_export.py    # Тесты экспорта (11 тестов, v2.0)
-│   ├── docs/
-│   │   ├── LOGGING.md
-│   │   ├── SCAN_HISTORY.md
-│   │   └── TESTS.md
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── requirements-test.txt
-│   └── alembic.ini
-│
+│   │   ├── api/v1/           # API: listings, stats, scan, export, ws
+│   │   ├── models/           # Listing, ListingHistory, ScanHistory
+│   │   ├── services/         # listing_service, scan_history_service
+│   │   ├── scraper/          # scheduler, parser, kufar_*.py
+│   │   └── main.py
+│   ├── tests/                # 201 тест
+│   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── api/              # API хуки (TanStack Query, WebSocket)
-│   │   ├── api/listings.test.tsx
-│   │   ├── components/
-│   │   │   ├── ui/           # shadcn/ui компоненты
-│   │   │   ├── charts/       # Компоненты графиков (v2.0)
-│   │   │   │   ├── PriceTrendChart.tsx
-│   │   │   │   └── PriceTrendChart.test.tsx
-│   │   │   ├── listing/
-│   │   │   │   ├── ListingInfoCard.test.tsx
-│   │   │   │   └── HistoryTimeline.test.tsx
-│   │   │   ├── Layout.test.tsx
-│   │   │   └── AppLayout.test.tsx
-│   │   ├── features/         # Фичи (filter-by-currency, export-listings, etc.)
-│   │   │   └── listings/filter-by-currency/  # Фильтр валюты (v3.0)
-│   │   ├── pages/
-│   │   │   ├── Dashboard.tsx # Обновлён: графики (v2.0)
-│   │   │   ├── Listings.tsx  # Обновлён: экспорт (v2.0), фильтр валюты (v3.0)
-│   │   │   ├── ListingDetail.tsx
-│   │   │   ├── Settings.tsx
-│   │   │   └── Statistics.tsx
-│   │   ├── store/
-│   │   │   └── filterStore.test.ts
-│   │   ├── hooks/
-│   │   │   └── use-mobile.test.ts
-│   │   ├── lib/
-│   │   │   └── utils.test.ts
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css
-│   ├── tests/                # Playwright E2E тесты (118 тестов)
-│   │   ├── fixtures.ts
-│   │   ├── dashboard.spec.ts
-│   │   ├── listings.spec.ts
-│   │   ├── listing-detail.spec.ts
-│   │   ├── mobile.spec.ts
-│   │   ├── api-integration.spec.ts
-│   │   ├── scanning.spec.ts
-│   │   ├── pages/
-│   │   └── TESTS.md
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── playwright.config.ts
-│   ├── vite.config.ts
-│   ├── generate-coverage.js
-│   └── tsconfig.json
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml            # CI/CD pipeline (v2.0)
-│
-├── codecov.yml               # Codecov конфигурация (v2.0)
+│   │   ├── api/              # TanStack Query, WebSocket hooks
+│   │   ├── components/       # shadcn/ui, charts, listing
+│   │   ├── pages/            # Dashboard, Listings, Settings
+│   │   └── store/            # Zustand (filterStore)
+│   ├── tests/                # Playwright E2E (118 тестов)
+│   └── package.json
 ├── docker-compose.yml
-├── README.md
-└── QWEN.md
+└── README.md
 ```
 
-## Сборка и запуск
-
-### Требования
-
-- Docker и Docker Compose
-- 2 GB свободной памяти
-- Порты 3000, 8000, 5432 свободны (или измените docker-compose.yml)
-
-### Быстрый старт
+## Быстрый старт
 
 ```bash
-# Перейти в проект
-cd /path/to/web
-
-# Запустить все сервисы
+# Запустить всё
 docker-compose up --build
 
-# Остановить сервисы
+# Остановить
 docker-compose down
-
-# Перезапустить с пересборкой
-docker-compose up --build --force-recreate
 ```
 
 ### Точки доступа
+| Сервис | URL |
+|--------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API Docs | http://localhost:8000/docs |
+| PostgreSQL | localhost:5432 |
 
-| Сервис | URL | Описание |
-|--------|-----|----------|
-| **Frontend** | http://localhost:3000 | Веб-интерфейс |
-| **Backend API** | http://localhost:8000 | API сервер |
-| **API Docs** | http://localhost:8000/docs | Swagger документация |
-| **PostgreSQL** | localhost:5432 | База данных |
+## Команды разработки
 
-### Команды разработки
-
-#### Backend
-
+### Backend
 ```bash
 cd backend
-
-# Установить зависимости
 pip install -r requirements.txt
-
-# Установить тестовые зависимости
 pip install -r requirements-test.txt
 
-# Запустить dev-сервер (требуется PostgreSQL)
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Dev-сервер
+uvicorn app.main:app --reload
 
-# Запустить миграции
-alembic upgrade head
-
-# Создать новую миграцию
-alembic revision --autogenerate -m "Description"
-
-# Тестировать API
-curl http://localhost:8000/health
-
-# Запустить тесты
+# Тесты
 docker-compose exec backend python -m pytest tests/ -v
-
-# Запустить тесты с coverage
 docker-compose exec backend python -m pytest tests/ --cov=app
 ```
 
-#### Frontend
-
+### Frontend
 ```bash
 cd frontend
-
-# Установить зависимости
 npm install
-
-# Запустить dev-сервер
 npm run dev
 
-# Запустить тесты
-npm run test:e2e                    # E2E тесты (Playwright)
-npm run test:unit                   # Unit тесты (Vitest) - 96 тестов
-
-# Запустить тесты с покрытием
-npm run coverage                    # Все тесты (Unit + E2E)
-npm run test:unit:coverage          # Только Unit тесты с coverage
-npm run test:e2e:coverage           # E2E тесты с coverage + генерация отчёта
-
-# Просмотреть отчёт о покрытии
-npm run coverage:show               # Открыть HTML отчёт coverage
-open coverage/vitest/index.html     # HTML отчёт (Unit)
-npx playwright show-report          # HTML отчёт (E2E)
-```
-
-# Собрать продакшн
-npm run build
-
-# Линтинг
-npm run lint
-
 # Тесты
-npm run test:e2e           # Запустить все E2E тесты
-npm run test:e2e:headed    # Запустить в режиме браузера
-npm run test:e2e:ui        # Запустить UI режим
-npm run test:e2e:report    # Показать HTML отчёт
+npm run test:e2e          # Playwright (118 тестов)
+npm run test:unit         # Vitest (326 тестов)
+npm run test:unit:coverage  # Coverage (66.12%)
+npm run coverage          # Все тесты + coverage
 ```
+
+## 📋 Правила разработки и Workflow
+
+### 1️⃣ Workflow: от задачи до продакшена
+
+**Стандартный pipeline:**
+
+```
+Задача → Product Manager (декомпозиция) → Issue → Branch → Development → Tests → Pull Request → Review → Merge → Deploy
+```
+
+**Правила:**
+- **Каждая задача сначала передаётся `product-manager-agent`** на декомпозицию и создание спецификаций
+- Каждая задача → отдельная ветка
+- MR (PR) можно создать только если тесты проходят
+- MR нельзя смержить без review
+- CI должен быть зелёным
+
+---
+
+### 2️⃣ Ветвление (Branching Strategy)
+
+```
+main        — production
+develop     — staging
+feature/*   — новые фичи
+fix/*       — баги
+```
+
+**Примеры:**
+- `feature/price-filter`
+- `fix/scan-history-bug`
+- `feature/websocket-progress`
+
+---
+
+### 3️⃣ Обязательные тесты перед MR
+
+**Перед созданием MR обязательно:**
+
+```bash
+# backend tests
+pytest
+
+# frontend tests
+npm run test:unit
+
+# e2e tests
+npm run test:e2e
+```
+
+**⛔ Если хоть один тест падает → MR запрещён.**
+
+---
+
+### 4️⃣ Требования к Merge Request
+
+**MR можно смержить только если:**
+
+- ✔ CI зелёный
+- ✔ 1 code review получено
+- ✔ нет конфликтов слияния
+- ✔ coverage не упал
+
+---
+
+### 5️⃣ Branch Protection (GitHub Settings)
+
+**Для ветки `main` включить:**
+
+- Require pull request before merging
+- Require status checks to pass
+- Require review
+- Require branches to be up to date
+
+**Status checks:**
+- `backend-tests`
+- `frontend-tests`
+- `e2e-tests`
+- `lint`
+
+---
+
+### 6️⃣ CI Pipeline (GitHub Actions)
+
+**Файл:** `.github/workflows/ci.yml`
+
+**Jobs:**
+- `backend-tests` — pytest для backend
+- `frontend-tests` — vitest для frontend
+- `e2e-tests` — Playwright для E2E
+
+**Срабатывание:**
+- `pull_request` — для всех PR
+- `push` — для develop
+
+---
+
+### 7️⃣ Pull Request Template
+
+**Файл:** `.github/pull_request_template.md`
+
+**Чеклист для PR:**
+- [ ] Backend тесты проходят
+- [ ] Frontend тесты проходят
+- [ ] E2E тесты проходят
+- [ ] Проверена работа локально
+- [ ] Нет console errors
+- [ ] Обновлена документация
+
+---
+
+### 8️⃣ Pipeline для AI-ассистентов
+
+**При получении задачи:**
+
+1. **Передать `product-manager-agent`** на декомпозицию и создание спецификаций
+2. Запустить backend тесты
+3. Запустить frontend unit тесты
+4. Запустить Playwright E2E
+5. Исправить все ошибки
+6. Только после этого создавать PR
+
+---
+
+### 9️⃣ Идеальный Pipeline
+
+```
+Задача
+   ↓
+Product Manager Agent (декомпозиция, спецификации)
+   ↓
+Developer
+   ↓
+Feature branch
+   ↓
+Local tests
+   ↓
+Pull Request
+   ↓
+GitHub CI
+   ↓
+Code Review
+   ↓
+Merge → develop
+   ↓
+Staging tests
+   ↓
+Merge → main
+   ↓
+Production deploy
+```
+
+---
+
+### 🔟 Production БД — Дополнительные правила
+
+**⚠ Любое изменение production DB:**
+
+1. Сделать backup:
+   ```bash
+   docker-compose exec db pg_dump -U postgres kufar_monitor > backup_$(date +%Y%m%d_%H%M%S).sql
+   ```
+2. Проверить на test DB (порт 5433)
+3. Только потом migration
+
+**Запрещено:**
+- Push в `main` напрямую — только через PR
+- Изменение production БД без backup
+- Миграции без тестирования на staging
+
+---
 
 ## API Endpoints
-
-### Health Check
-```bash
-GET /health
-```
 
 ### Listings
 ```bash
 GET /api/v1/listings?page=1&size=20&status=active&city=minsk
 GET /api/v1/listings/{id}
-GET /api/v1/history/{id}  # История изменений объявления
+GET /api/v1/history/{id}  # История изменений
 ```
 
 ### Stats
 ```bash
-# Получить сводную статистику (можно фильтровать по городу)
 GET /api/v1/stats/summary?city=minsk
-
-# Динамика цен по месяцам (для конкретной комнаты)
-GET /api/v1/stats/price-trends?city=minsk&rooms=1&period_months=12
-
-# Распределение по комнатам
+GET /api/v1/stats/price-trends?city=minsk&rooms=1
 GET /api/v1/stats/room-distribution?city=minsk
-
-# Ежедневная активность (новые, удалённые, изменения цены)
 GET /api/v1/stats/daily-activity?city=minsk&period_days=30
-
-# Сравнение городов
-GET /api/v1/stats/city-comparison
 ```
-
-**Пример ответа `/api/v1/stats/price-trends`:**
-```json
-{
-  "city": "minsk",
-  "rooms": 1,
-  "period_months": 12,
-  "data": [
-    { "year": 2024, "month": 1, "avg_price_usd": 85000, "listings_count": 150 },
-    { "year": 2024, "month": 2, "avg_price_usd": 87500, "listings_count": 165 }
-  ]
-}
-```
-
-**Логика подсчета средней цены:**
-- Используется цена из `snapshot` события `created` в таблице `listing_history`
-- Это гарантирует, что берется цена на момент первого появления объявления
-- Если цена объявления изменилась, в статистике за прошлые месяцы остается оригинальная цена
-- Группировка по месяцам производится по `first_seen_at` (дата первого обнаружения)
-- Фильтр: `price_usd > 0` в snapshot, статусы `active`, `new`, `updated`
-- В ответе: средняя цена (округленная до 2 знаков) и количество объявлений за месяц
 
 ### Scan Management
 ```bash
 POST /api/v1/scan/trigger      # Ручное сканирование
-GET /api/v1/scan/status        # Статус сканирования
-GET /api/v1/scan/progress      # Real-time прогресс (устарело, используйте WebSocket)
-WS /ws/scan/progress           # WebSocket для real-time прогресса (v3.0)
-GET /api/v1/scan/city          # Текущий город
-POST /api/v1/scan/city         # Изменить город
+GET /api/v1/scan/status        # Статус
+WS /ws/scan/progress           # WebSocket real-time (v3.0)
 GET /api/v1/scan/cities        # Доступные города
 GET /api/v1/scan/schedule      # Настройки расписания
-PUT /api/v1/scan/schedule      # Обновить настройки расписания
+PUT /api/v1/scan/schedule      # Обновить (interval: 5-1440 мин)
 ```
-
-**Пример ответа `/api/v1/scan/schedule`:**
-```json
-{
-  "scan_interval_minutes": 30,
-  "enabled": true,
-  "updated_at": "2026-03-01T20:00:00"
-}
-```
-
-**Пример запроса `PUT /api/v1/scan/schedule`:**
-```json
-{
-  "scan_interval_minutes": 60,
-  "enabled": true
-}
-```
-
-**Валидация:**
-- `scan_interval_minutes`: 5-1440 минут (от 5 мин до 24 часов)
-- `enabled`: boolean (включить/выключить автоматическое сканирование)
 
 ### Scan History
 ```bash
-GET /api/v1/scan/history              # История сканирований (paginated)
-GET /api/v1/scan/history/{scan_id}    # Детали конкретного сканирования
-GET /api/v1/scan/history/summary      # Сводная статистика по сканированиям
-```
-
-**Пример ответа `/api/v1/scan/history`:**
-```json
-{
-  "items": [
-    {
-      "id": "uuid-string",
-      "started_at": "2026-03-01T19:00:00",
-      "completed_at": "2026-03-01T19:01:00",
-      "city": "minsk",
-      "city_name": "Минск",
-      "status": "completed",
-      "trigger_type": "manual",
-      "listings_fetched": 540,
-      "listings_created": 15,
-      "listings_updated": 520,
-      "listings_deleted": 5,
-      "pages_scraped": 18,
-      "duration_seconds": 53,
-      "error_message": null
-    }
-  ],
-  "total": 150
-}
-```
-
-**Пример ответа `/api/v1/scan/history/summary`:**
-```json
-{
-  "total_scans": 150,
-  "completed_scans": 145,
-  "failed_scans": 3,
-  "running_scans": 2,
-  "total_listings_fetched": 75000,
-  "total_listings_created": 1500,
-  "total_listings_updated": 72000,
-  "total_listings_deleted": 1500,
-  "avg_duration_seconds": 52
-}
+GET /api/v1/scan/history              # История (paginated)
+GET /api/v1/scan/history/{scan_id}    # Детали
+GET /api/v1/scan/history/summary      # Сводка
 ```
 
 ### Export (v2.0)
 ```bash
-# Экспорт объявлений в CSV/XLSX/JSON
-GET /api/v1/export/listings?format=csv&city=minsk&status=active&price_from=50000&price_to=150000&rooms=1&rooms=2
-
-# Экспорт сводной статистики
+GET /api/v1/export/listings?format=csv&city=minsk&status=active
 GET /api/v1/export/summary?format=xlsx
 ```
 
-**Параметры экспорта:**
-- `format`: `csv`, `xlsx`, `json` (по умолчанию: csv)
-- `city`: фильтр по городу
-- `status`: фильтр по статусу
-- `price_from`: минимальная цена
-- `price_to`: максимальная цена
-- `rooms`: количество комнат (можно указать несколько)
-
-**Пример CSV:**
-```csv
-id,kufar_id,title,price_byn,price_usd,currency,city,address,rooms,area,floor,url,status,first_seen_at,last_seen_at
-uuid,12345,2-комн квартира,125000,38000,BYN,minsk,пр. Независимости,2,54.5,3/9,https://...,active,2026-03-01,2026-03-03
-```
-
-### Пример ответа `/api/v1/scan/progress`:
-```json
-{
-  "is_scanning": true,
-  "city": "mogilev",
-  "city_name": "Могилёв",
-  "stage": "parsing",
-  "pages_scraped": 18,
-  "listings_fetched": 540,
-  "listings_processed": 200,
-  "is_stable": false,
-  "elapsed_seconds": 45
-}
-```
-
-**Поля ответа:**
-- `is_scanning` — backend сканирует в данный момент
-- `stage` — текущая стадия (fetching, parsing, upserting, etc.)
-- `pages_scraped` — количество спарсенных страниц
-- `listings_fetched` — количество найденных объявлений
-- `listings_processed` — количество обработанных объявлений
-- `is_stable` — данные стабильны (не меняются)
-- `elapsed_seconds` — время выполнения в секундах
-
 ## Схема базы данных
 
-### Таблица `listings`
+### listings
+- `id`, `kufar_id`, `url`, `title`, `price` (BYN), `price_usd`, `currency`
+- `city`, `address`, `rooms`, `area`, `floor`, `images` (JSONB)
+- `status` (new/active/updated/deleted/archived)
+- `first_seen_at`, `last_seen_at`, `deleted_at`
 
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | UUID | Первичный ключ |
-| `kufar_id` | String | ID объявления на Kufar (уникальный) |
-| `url` | Text | Ссылка на объявление (формат: /vi/{city}/kupit/kvartiru/{id}) |
-| `title` | Text | Заголовок |
-| `price` | Integer | Цена в BYN (делённая на 100, Kufar возвращает в копейках) |
-| `price_usd` | Integer | Цена в USD (опционально, делённая на 100) |
-| `currency` | String | Валюта: BYN или USD |
-| `city` | String | Код города |
-| `address` | Text | Адрес/местоположение |
-| `rooms` | Integer | Количество комнат |
-| `area` | Float | Площадь (м²) |
-| `floor` | Integer | Этаж |
-| `total_floors` | Integer | Этажность дома |
-| `category` | String | Категория |
-| `description` | Text | Описание объявления |
-| `district` | String | Район города |
-| `metro` | String | Станция метро |
-| `house_year` | Integer | Год постройки |
-| `images` | JSONB | Массив URL изображений (формат: https://rms.kufar.by/v1/gallery/{path}) |
-| `raw_data` | JSONB | Исходные данные |
-| `status` | Enum | Статус (new, active, updated, deleted, archived) |
-| `first_seen_at` | DateTime | Первое обнаружение |
-| `last_seen_at` | DateTime | Последнее обнаружение |
-| `deleted_at` | DateTime | Дата удаления |
+### listing_history
+- `id`, `listing_id`, `event_type` (created/price_changed/edited/deleted/restored)
+- `price_before`, `price_after`, `changed_fields` (JSONB), `snapshot` (JSONB)
 
-### Таблица `listing_history`
+### scan_history
+- `id`, `started_at`, `completed_at`, `city`, `status`, `trigger_type`
+- `listings_fetched/created/updated/deleted`, `pages_scraped`, `duration_seconds`
 
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | UUID | Первичный ключ |
-| `listing_id` | UUID | Внешний ключ на listings |
-| `event_type` | Enum | Тип события (created, price_changed, edited, deleted, restored) |
-| `price_before` | Integer | Цена до изменения |
-| `price_after` | Integer | Цена после изменения |
-| `changed_fields` | JSONB | Изменённые поля |
-| `snapshot` | JSONB | Снимок данных на момент события |
-| `created_at` | DateTime | Время события |
-
-### Таблица `scan_history`
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | UUID | Первичный ключ |
-| `started_at` | DateTime | Время начала сканирования |
-| `completed_at` | DateTime | Время завершения (NULL если ещё сканирует) |
-| `city` | String | Код города (minsk, mogilev, etc.) |
-| `city_name` | String | Название города на русском |
-| `status` | String | Статус: running, completed, error |
-| `trigger_type` | String | Тип запуска: manual, scheduled |
-| `listings_fetched` | Integer | Количество найденных объявлений |
-| `listings_created` | Integer | Количество созданных записей |
-| `listings_updated` | Integer | Количество обновленных записей |
-| `listings_deleted` | Integer | Количество помеченных как удаленные |
-| `pages_scraped` | Integer | Количество спарсенных страниц |
-| `errors` | JSONB | Массив сообщений об ошибках |
-| `duration_seconds` | Integer | Продолжительность в секундах |
-| `error_message` | Text | Сообщение об ошибке если status=error |
-
-**Индексы:**
-- `ix_scan_history_city` на колонке `city`
-
-### Таблица `scan_settings`
-
-| Колонка | Тип | Описание |
-|---------|-----|----------|
-| `id` | Integer | Первичный ключ (всегда = 1) |
-| `scan_interval_minutes` | Integer | Интервал сканирования в минутах (5-1440) |
-| `enabled` | Boolean | Включить/выключить автоматическое сканирование |
-| `updated_at` | DateTime | Время последнего обновления настроек |
-
-**Ограничения:**
-- `check_min_interval`: scan_interval_minutes >= 5
-- `check_max_interval`: scan_interval_minutes <= 1440
-
-**Примечание:** Таблица содержит только одну запись с `id = 1`
-
-## Переменные окружения
-
-Создайте файл `.env` или измените `docker-compose.yml`:
-
-```env
-# Backend
-DATABASE_URL=postgresql+asyncpg://postgres:secret@db/kufar_monitor
-KUFAR_CITY=mogilev
-API_PREFIX=/api/v1
-
-# Database
-POSTGRES_DB=kufar_monitor
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=secret
-```
-
-**Примечание:** `SCAN_INTERVAL_MINUTES` больше не используется — интервал сканирования настраивается через веб-интерфейс (`/settings`) или API (`PUT /api/v1/scan/schedule`).
+### scan_settings (1 запись, id=1)
+- `scan_interval_minutes` (5-1440), `enabled`, `updated_at`
 
 ## Доступные города
-
 | Код | Город |
 |-----|-------|
 | `minsk` | Минск |
@@ -587,510 +365,148 @@ POSTGRES_PASSWORD=secret
 | `vitebsk` | Витебск |
 
 ## Статусы объявлений
-
 | Статус | Описание |
 |--------|----------|
-| `new` | Новое объявление (первое обнаружение в текущем цикле сканирования) |
-| `active` | Активное объявление (без изменений цены или восстановлено после удаления) |
-| `updated` | Объявление обновлено — **изменилась цена в долларах (price_usd)** (v3.0) |
-| `price_changed_byn` | Изменилась цена в **BYN** (без изменения USD цены) |
-| `deleted` | Объявление удалено (исчезло с Kufar.by) — хранится 30 дней |
-| `archived` | Архивное объявление — удалено более 30 дней назад (автоматически) |
+| `new` | Первое обнаружение |
+| `active` | Активное (без изменений или восстановлено) |
+| `updated` | **Изменилась цена USD** (v3.0) |
+| `price_changed_byn` | Изменилась цена BYN (без изменения USD) |
+| `deleted` | Удалено (хранится 30 дней) |
+| `archived` | Удалено >30 дней назад |
 
-**Автоматическая архивация:**
-- Перед каждым сканированием вызывается `archive_old_deleted_listings(days_threshold=30)`
-- Все объявления со статусом `deleted` и `deleted_at < 30 дней` получают статус `archived`
-- Архивные объявления скрыты из выдачи по умолчанию
-- Для просмотра используйте фильтр `status=archived`
+**Автоматическая архивация:** перед сканированием `deleted` → `archived` (если >30 дней)
 
-**Восстановление объявлений (v3.0):**
-- Если удалённое объявление снова появляется в API, оно автоматически восстанавливается в статус `active`
-- Логика: при upsert проверяется `was_deleted`, если `true` → статус меняется на `active`
+**Восстановление (v3.0):** если `deleted` объявление появилось в API → статус `active`
 
-## Соглашения разработки
+## Тестирование
 
 ### Frontend
-
-- **TypeScript** — строгая типизация включена
-- **Компоненты** — функциональные компоненты с хуками
-- **State Management** — Zustand для фильтров, TanStack Query для API
-- **Styling** — TailwindCSS 4 с shadcn/ui компонентами
-- **Icons** — lucide-react
-- **Именование файлов** — PascalCase для компонентов, camelCase для утилит
-
-### Backend
-
-- **Python** — type hints с Pydantic моделями
-- **Async** — Async SQLAlchemy и asyncpg
-- **Logging** — loguru для структурированного логирования
-- **Error handling** — HTTPException с соответствующими кодами статуса
-
-### Тестирование
-
-#### Frontend (Playwright E2E + Vitest Unit)
-
 ```bash
 cd frontend
-
-# Установить зависимости
-npm install
-
-# Установить браузеры
-npx playwright install chromium
-
-# Запустить E2E тесты
-npm run test:e2e                    # Все E2E тесты (19 тестов)
-npm run test:e2e:chromium           # Только Chromium
-npm run test:e2e:ui                 # UI режим для отладки
-npm run test:e2e:headed             # В режиме браузера
-
-# Запустить Unit тесты
-npm run test:unit                   # Все Unit тесты (251 тест)
-npm run test:unit:watch             # Режим наблюдения
-npm run test:unit:coverage          # Unit тесты с coverage (55.86%)
-
-# Запустить все тесты с покрытием
-npm run coverage                    # Все тесты (Unit + E2E) с coverage
-npm run test:e2e:coverage           # E2E тесты с coverage
-
-# Просмотреть отчёты
-npm run coverage:show               # Открыть HTML отчёт coverage
-npx playwright show-report          # E2E отчёт тестов
-open coverage/vitest/index.html     # Unit coverage отчёт
+npm run test:e2e                    # 118 тестов
+npm run test:unit                   # 326 тестов
+npm run test:unit:coverage          # 66.12% coverage
+npm run coverage                    # Все тесты + coverage
+npm run coverage:show               # HTML отчёт
 ```
 
-**Покрытие тестами Frontend:**
+**Unit тесты (326):**
+- Store (21), Hooks (9), API hooks (16)
+- UI Components (200+, 22 файла, 100%)
+- Charts (13), Listing (34), Layout (12), Pages (19)
 
-| Тип тестов | Количество | Coverage |
-|------------|------------|----------|
-| **E2E (Playwright)** | 118 тестов | ✅ V8 format |
-| **Unit (Vitest)** | 326 тестов | 66.12% statements |
+**E2E тесты (118):**
+- Dashboard (10), Listings (22), Listing Detail (5)
+- Settings (11), Statistics (18), Navigation (11)
+- UI Components (16), API Endpoints (18), Mobile (3)
 
-**Unit тесты (Vitest) — 326 тестов:**
-- ✅ **Store (filterStore.ts)** — 21 тест (86.66% покрытие): фильтры, сортировка, пагинация, persist, manual scanning
-- ✅ **Hooks (use-mobile.tsx)** — 9 тестов (90% покрытие): matchMedia mock, resize events
-- ✅ **API hooks (listings.ts)** — 16 тестов: useListings, useListing, useSummary, useManualScan, mutations
-- ✅ **UI Components** — 200+ тестов (22 файла, 100% покрытие): accordion, alert, avatar, badge, button, card, dialog, input, label, pagination, popover, progress, rooms-filter, select, separator, skeleton, switch, table, tabs, tooltip
-- ✅ **Chart Components** — 13 тестов: PriceTrendChart (73.33% покрытие)
-- ✅ **Listing Components** — 34 теста: ListingInfoCard (14 тестов, 100%), HistoryTimeline (20 тестов, 82.75%)
-- ✅ **Layout Components** — 12 тестов: AppSidebar (100% покрытие)
-- ✅ **Pages** — 19 тестов: Settings (11 тестов, 95.65%), Statistics (8 тестов, 91.66%)
-- ✅ **Utils (utils.ts)** — 4 теста (100% покрытие): cn
-
-**E2E тесты (Playwright) — 118 тестов:**
-- ✅ **Dashboard** — 10 тестов: загрузка, карточки статистики, навигация, смена города
-- ✅ **Listings** — 22 теста: загрузка, объявления, фильтры, сортировка, пагинация
-- ✅ **Listing Detail** — 5 тестов: галерея, цена, статус, ссылка на Kufar
-- ✅ **Settings** — 11 тестов: настройки города, интервала, автосканирование, валидация
-- ✅ **Statistics** — 18 тестов: графики, табы комнат, селекторы города/периода
-- ✅ **Navigation** — 11 тестов: переходы между страницами, боковая панель
-- ✅ **UI Components** — 16 тестов: тёмная тема, иконки, hover эффекты, responsive
-- ✅ **API Endpoints** — 18 тестов: health, cities, schedule, stats, listings, history
-- ✅ **Mobile Responsive** — 3 теста: мобильная, планшетная, desktop версии
-- ✅ **Scanning** — 2 теста: кнопка, запуск сканирования
-- ✅ **API Integration** — 2 теста: загрузка данных, запрос к API
-
-**Структура тестов:**
-```
-frontend/
-├── tests/                          # E2E тесты (Playwright, 118 тестов)
-│   ├── fixtures.ts                 # Фикстуры с coverage
-│   ├── dashboard.spec.ts           # 3 теста
-│   ├── dashboard-extended.spec.ts  # 7 тестов
-│   ├── listings.spec.ts            # 4 теста
-│   ├── listings-filters.spec.ts    # 18 тестов
-│   ├── listing-detail.spec.ts      # 5 тестов
-│   ├── mobile.spec.ts              # 3 теста
-│   ├── scanning.spec.ts            # 2 теста
-│   ├── api-integration.spec.ts     # 2 теста
-│   ├── settings.spec.ts            # 11 тестов NEW
-│   ├── statistics.spec.ts          # 18 тестов NEW
-│   ├── navigation.spec.ts          # 11 тестов NEW
-│   ├── ui-components.spec.ts       # 16 тестов NEW
-│   ├── api-endpoints.spec.ts       # 18 тестов NEW
-│   └── pages/                      # Page Object модели
-│       ├── DashboardPage.tsx
-│       ├── ListingsPage.tsx
-│       ├── SettingsPage.tsx        # NEW
-│       ├── StatisticsPage.tsx      # NEW
-│       └── index.ts
-├── src/
-│   ├── api/listings.test.ts        # Unit: API hooks (16 тестов)
-│   ├── components/
-│   │   ├── ui/*.test.tsx           # Unit: UI компоненты (22 файла, 100% покрытие)
-│   │   ├── charts/PriceTrendChart.test.tsx  # Unit: график цен (13 тестов)
-│   │   ├── listing/                # Unit: listing компоненты
-│   │   │   ├── HistoryTimeline.test.tsx  # 20 тестов
-│   │   │   └── ListingInfoCard.test.tsx  # 14 тестов
-│   │   └── Layout.test.tsx         # Unit: Layout (12 тестов)
-│   ├── hooks/use-mobile.test.ts    # Unit: хуки (9 тестов)
-│   ├── lib/utils.test.ts           # Unit: утилиты (4 теста)
-│   ├── pages/
-│   │   ├── Settings.test.tsx       # 11 тестов (95.65%)
-│   │   └── Statistics.test.tsx     # 8 тестов (91.66%)
-│   └── store/filterStore.test.ts   # Unit: store (21 тест)
-├── coverage/vitest/                # Coverage отчёты (Unit, 66.12%)
-├── playwright-report/              # E2E отчёты + coverage
-└── playwright.config.ts            # Конфигурация
-```
-
-**Важно:**
-- E2E coverage требует запуска через `npm run test:e2e:coverage` для генерации финального отчёта
-- Coverage API работает только в Chromium (не поддерживается в Firefox/WebKit)
-
-#### Backend (Pytest API)
-
+### Backend
 ```bash
 cd backend
-
-# Установить тестовые зависимости
-pip install -r requirements-test.txt
-
-# Запустить все тесты (использует отдельную БД kufar_monitor_test)
 docker-compose exec backend python -m pytest tests/ -v
-
-# Запустить с отчётом о покрытии
-docker-compose exec backend python -m pytest tests/ --cov=app --cov-report=html
-
-# Запустить конкретный тест
-docker-compose exec backend python -m pytest tests/test_health.py -v
-
-# Запустить тесты с пересозданием тестовой БД
-docker-compose exec db_test psql -U postgres -c "DROP DATABASE IF EXISTS kufar_monitor_test;"
-docker-compose exec db_test psql -U postgres -c "CREATE DATABASE kufar_monitor_test;"
-docker-compose exec backend python -m pytest tests/ -v
+docker-compose exec backend python -m pytest tests/ --cov=app  # 55% coverage
 ```
 
-**Покрытие тестами (172 тест):**
-- ✅ Health Check (5 тестов)
-- ✅ Listings API (17 тестов)
-- ✅ Stats API (12 тестов)
-- ✅ Scan API (18 тестов)
-- ✅ Scan History API (13 тестов)
-- ✅ History API (5 тестов)
-- ✅ Logging (20 тестов)
-- ✅ Retry Logic (16 тестов)
-- ✅ **Listing Service (28 тестов)** — upsert, diff, mark_deleted, get_ids
-- ✅ **Kufar Client (25 тестов)** — API fetch, scraper, error handling
-- ✅ **Scheduler (24 теста)** — progress tracking, status, update schedule
+**Тесты (201):**
+- Health (5), Listings (17), Stats (12), Scan (18)
+- Scan History (13), History (5), Logging (20)
+- Listing Service (28), Kufar Client (25), Scheduler (24)
 
-**Структура тестов:**
-```
-backend/tests/
-├── conftest.py                 # Фикстуры (HTTP клиент, БД)
-├── test_health.py              # Health check endpoint
-├── test_listings.py            # Listings API
-├── test_stats.py               # Stats API
-├── test_scan.py                # Scan API + schedule
-├── test_scan_history.py        # Scan history API
-├── test_history.py             # History API
-├── test_logging.py             # Logging configuration
-├── test_retry_logic.py         # Retry logic for scraper
-├── test_listing_service.py     # ListingService unit tests
-├── test_kufar_client.py        # KufarAPIClient unit tests
-└── test_scheduler.py           # ScraperScheduler unit tests
-```
-
-**Важно:**
-- Backend тесты используют отдельную БД `kufar_monitor_test` на порту 5433
-- Production БД `kufar_monitor` на порту 5432 не используется в тестах
-- Каждый тест работает в отдельной транзакции с автооткатом
-- **Покрытие:** 55% (цель — 65%)
-
-## Итоговое покрытие тестов
-
-| Проект | Тесты | Покрытие |
-|--------|-------|----------|
-| **Frontend Unit** | 251 тест | 55.86% statements |
-| **Frontend E2E** | 19 тестов | V8 format |
-| **Backend API** | 172 тест | 55% statements |
-| **ВСЕГО** | **441 тест** | **~55% average** |
-
-## Troubleshooting
-
-**Порт занят:**
-```bash
-docker-compose down && docker-compose up --build
-```
-
-**Проблемы с БД:**
-```bash
-docker-compose down -v  # ⚠️ Удаляет все данные!
-docker-compose up --build
-```
-
-**Объявления не загружены:**
-- Проверьте доступность Kufar.by
-- Проверьте логи: `docker-compose logs backend`
+**Важно:** Backend тесты используют БД `kufar_monitor_test` (порт 5433)
 
 ## Ключевые детали реализации
 
 ### WebSocket API (v3.0)
-
 **Endpoint:** `WS /ws/scan/progress`
 
-**Подключение:**
 ```typescript
 const ws = new WebSocket('ws://localhost:8000/ws/scan/progress');
 ws.onmessage = (event) => {
   const progress = JSON.parse(event.data);
-  // progress: { is_scanning, city, stage, pages_scraped, listings_fetched, ... }
+  // { is_scanning, city, stage, pages_scraped, listings_fetched, is_stable, elapsed_seconds }
 };
 ```
 
 **Frontend hook:** `useScanProgressWebSocket()` в `frontend/src/api/listings.ts`
 
-**Backend:** `ConnectionManager` в `backend/app/api/v1/ws.py`
+### Стадии сканирования
+1. `starting` → 2. `marking_deleted` → 3. `fetching` → 4. `parsing` → 5. `upserting` → 6. `marking_deleted_final` → 7. `done`
 
-**Вещание прогресса:**
-- Вызывается после каждого обновления прогресса в `_broadcast_progress()`
-- Отправляет текущий статус всем подключённым клиентам
+**Прогресс (Frontend):**
+- `fetching`: 0-50% (pages_scraped)
+- `parsing`: 50-80% (listings_fetched)
+- `upserting`: 80-100% (listings_processed)
 
-**Документация:** `backend/docs/WEBSOCKET.md`
+**Флаг `is_stable`:** `true` на `marking_deleted_final`/`done`/`error`, иначе `false`
 
-### Компонент History Timeline
-
-Компонент `HistoryTimeline` (`frontend/src/components/listing/HistoryTimeline.tsx`) отображает вертикальную линию времени событий объявления:
-
-- **5 типов событий**: created, price_changed, edited, deleted, restored
-- **Цветные badge** для каждого типа события
-- **Отображение изменения цены**: показывает старую и новую цену
-- **Изменённые поля**: отображение старых и новых значений
-- **Русский формат дат** с иконкой календаря
-
-### Тёмная тема
-
-Приложение использует современную тёмную цветовую схему, определённую в `frontend/src/index.css`:
-
-- **Background**: `oklch(0.15 0.01 280)` — тёмно-серый
-- **Card**: `oklch(0.2 0.01 280)` — светлее тёмно-серый
-- **Text**: `oklch(0.9 0.01 280)` — светлый текст
-- **Primary**: `oklch(0.9 0.01 280)` — светлый для контраста
-
-### Боковая навигация
-
-Компонент `AppSidebar` (`frontend/src/components/Layout.tsx`) предоставляет:
-
-- **Сворачиваемая** — кнопка внизу для переключения развёрнуто/свёрнуто
-- **Навигация** — ссылки Dashboard и Listings
-- **Тёмная тема** — соответствует общему дизайну
-- **Адаптивная** — работает на мобильных с Sheet компонентом
-
-### Real-time прогресс сканирования
-
-**Backend (`backend/app/scraper/scheduler.py`):**
-
-- **Флаг `is_stable`** — показывает стабильность данных:
-  - `true` — на стадиях `marking_deleted_final`, `done`, `error`
-  - `false` — во время `fetching`, `parsing`, `upserting`
-- **Оценка количества** — если `listings_fetched = 0`, используется `pages_scraped * 30`
-
-**Frontend (`frontend/src/pages/Listings.tsx`):**
-
-- **Расчёт прогресса по стадиям**:
-  - `fetching`: 0-50% на основе страниц
-  - `parsing`: 50-80% на основе объявлений
-  - `upserting`: 80-100% на основе обработанных
-  - `done`: 100%
-- **Индикатор "● Обновляется..."** — показывается когда `is_stable = false`
-- **Глобальное состояние** — `isManualScanning` в Zustand store для сохранения при навигации
-
-**Стадии сканирования:**
-1. `starting` — запуск
-2. `marking_deleted` — подготовка базы
-3. `fetching` — парсинг страниц Kufar
-4. `parsing` — обработка данных
-5. `upserting` — сохранение в базу
-6. `marking_deleted_final` — финальное обновление статусов
-7. `done` — завершено
-
-### Scan History Tracking
-
-**Файлы:**
-- `backend/app/models/listing.py` — модель `ScanHistory`
-- `backend/app/services/scan_history_service.py` — сервис для управления историей
-- `backend/app/scraper/scheduler.py` — интеграция со сканером
-- `backend/app/api/v1/scan.py` — API endpoints
-
-**Функционал:**
-- Автоматическое создание записи при запуске сканирования (ручного или по расписанию)
-- Обновление статистики во время выполнения (listings_fetched, pages_scraped, errors)
-- Завершение записи с указанием статуса (completed/error) и продолжительности
-- Фильтрация по городу и статусу
-- Сводная статистика по всем сканированиям
-
-**Сервис `ScanHistoryService`:**
+### Логика статуса `updated` (v3.0)
 ```python
-# Создание записи
-scan = await service.create_scan_record(
-    city="minsk",
-    city_name="Минск",
-    trigger_type="manual"  # или "scheduled"
-)
-
-# Обновление статистики
-await service.update_scan_record(
-    scan_id=scan.id,
-    listings_fetched=540,
-    listings_created=15,
-    listings_updated=520,
-    listings_deleted=5,
-    pages_scraped=18,
-    errors=[]
-)
-
-# Завершение
-await service.complete_scan_record(
-    scan_id=scan.id,
-    status="completed",  # или "error"
-    error_message=None
-)
-
-# Получение истории
-scans = await service.get_scan_history(limit=50, city="minsk")
-
-# Сводка
-summary = await service.get_summary()
-```
-
-### Настройка расписания сканирования
-
-**Файлы:**
-- `backend/app/models/listing.py` — модель `ScanSettings`
-- `backend/app/services/scan_settings_service.py` — сервис для управления настройками
-- `backend/app/scraper/scheduler.py` — динамическое обновление расписания
-- `backend/app/api/v1/scan.py` — API endpoints (`GET/PUT /api/v1/scan/schedule`)
-- `frontend/src/pages/Settings.tsx` — UI компонент настройки
-- `frontend/src/api/listings.ts` — API hooks (`useScanSchedule`, `useUpdateScanSchedule`)
-
-**Функционал:**
-- Хранение настроек в БД (таблица `scan_settings`)
-- Интервал сканирования: 5-1440 минут (от 5 мин до 24 часов)
-- Включение/выключение автоматического сканирования
-- Динамическое обновление расписания без перезапуска backend
-- Настройка через веб-интерфейс (`/settings`) или API
-
-**Сервис `ScanSettingsService`:**
-```python
-# Получение настроек
-settings = await service.get_settings()
-# ScanSettings(id=1, scan_interval_minutes=30, enabled=True)
-
-# Обновление интервала
-await service.update_settings(scan_interval_minutes=60)
-
-# Отключение сканирования
-await service.update_settings(enabled=False)
-
-# Обновление обоих полей
-await service.update_settings(
-    scan_interval_minutes=45,
-    enabled=True
-)
-```
-
-**API примеры:**
-```bash
-# Получить настройки
-curl http://localhost:8000/api/v1/scan/schedule
-
-# Обновить интервал
-curl -X PUT http://localhost:8000/api/v1/scan/schedule \
-  -H "Content-Type: application/json" \
-  -d '{"scan_interval_minutes": 60}'
-
-# Отключить сканирование
-curl -X PUT http://localhost:8000/api/v1/scan/schedule \
-  -H "Content-Type: application/json" \
-  -d '{"enabled": false}'
-```
-
-**Миграция:** `008_add_scan_settings_table.py`
-
-### Логика установки статуса `updated`
-
-**`backend/app/services/listing_service.py`:**
-
-```python
-# Сохраняем старую цену USD
+# backend/app/services/listing_service.py
 old_price_usd = existing.price_usd
-
-# Обновляем все поля
-for key, value in listing_data.items():
-    if key != 'kufar_id':
-        setattr(existing, key, value)
-
-# Проверяем изменения
+# ... обновление полей ...
 if was_deleted:
     existing.status = ListingStatus.active  # Восстановление
-elif old_price_usd is not None and existing.price_usd is not None and old_price_usd != existing.price_usd:
+elif old_price_usd != existing.price_usd:
     existing.status = ListingStatus.updated  # Изменение цены USD
 else:
-    existing.status = ListingStatus.active  # Без изменений
+    existing.status = ListingStatus.active
 ```
 
-- **`updated`** — устанавливается **только при изменении `price_usd`** (v3.0)
-- **`active`** — при изменении других полей или без изменений
-- **`deleted`** — если объявление исчезло из API
-- **Восстановление** — если `deleted` объявление снова появилось → `active`
-- **Логирование** — `logger.info(f"Price USD changed for {kufar_id}: {old} -> {new}")`
-
 ### Парсинг данных Kufar (v3.0)
+**Цены:** Kufar возвращает в копейках → делим на 100
+```python
+price = price_raw // 100  # 12,278,675 → 122,786 BYN = $42,500
+```
 
-**Цены:**
-- Kufar возвращает цены в копейках/центах (умноженные на 100)
-- Парсер делит на 100: `price = price_raw // 100`
-- Пример: 12,278,675 → 122,786 BYN = $42,500
+**Ссылки:** `https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}`
 
-**Ссылки:**
-- Формат: `https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}`
-- Пример: `https://re.kufar.by/vi/mogilev/kupit/kvartiru/1030854838`
-
-**Картинки:**
-- Формат: `https://rms.kufar.by/v1/gallery/{path}`
-- Пример: `https://rms4.kufar.by/v1/gallery/adim1/9ba1ee93-e3cd-4086-afa1-06d36a2a444f.jpg`
+**Картинки:** `https://rms.kufar.by/v1/gallery/{path}`
 
 **Парсер:** `backend/app/scraper/kufar_scraper.py`, метод `_parse_ad()`
 
 ### Глобальное состояние сканирования
-
-**`frontend/src/store/filterStore.ts`:**
-
 ```typescript
+// frontend/src/store/filterStore.ts
 isManualScanning: boolean;  // Сохраняется между переходами
-setManualScanning: (scanning: boolean) => void;
 ```
 
 **Преимущества:**
-- ✅ Прогресс не пропадает при переходе на другую страницу
-- ✅ Polling продолжается пока backend сканирует
-- ✅ Кнопка не застревает в состоянии сканирования
+- Прогресс не пропадает при навигации
+- Кнопка не застревает в состоянии сканирования
+
+## Troubleshooting
+
+```bash
+# Порт занят
+docker-compose down && docker-compose up --build
+
+# Проблемы с БД (⚠️ удаляет данные!)
+docker-compose down -v && docker-compose up --build
+
+# Объявления не загружены
+docker-compose logs backend
+```
 
 ## Примечания
 
-- Kufar API может возвращать неточные данные для расширенных полей (house_type, renovation и т.д.)
-- Для 100% точности требуется парсинг детальных страниц (медленнее)
-- Скорость сканирования: ~53 секунды для 546 объявлений через API (~0.1 сек/объявление)
-- С парсингом детальных страниц: ~10-15 минут для 546 объявлений (~1.1-1.6 сек/объявление)
+- Kufar API может возвращать неточные расширенные данные (house_type, renovation)
+- Скорость сканирования: ~53 сек для 546 объявлений через API (~0.1 сек/объявление)
 - **Важно:** Прогресс может показывать неточные данные во время `fetching` (данные нестабильны)
 
 ## Версии
 
 ### v3.0 (текущая)
-- ✅ WebSocket для real-time прогресса сканирования
-- ✅ Исправление цен (деление на 100)
-- ✅ Исправление ссылок и картинок
-- ✅ Статус `updated` при изменении `price_usd`
-- ✅ Восстановление `deleted` объявлений
-- ✅ Фильтр валюты USD/BYN
-- ✅ Сортировка: newest, oldest, asc, desc
+- WebSocket real-time прогресс
+- Исправление цен (деление на 100)
+- Статус `updated` при изменении `price_usd`
+- Восстановление `deleted` объявлений
+- Фильтр валюты USD/BYN
+- Сортировка: newest, oldest, asc, desc
 
 ### v2.0
-- 📊 Графики и аналитика
-- 📤 Экспорт данных (CSV, XLSX, JSON)
-- 🔄 CI/CD pipeline
+- Графики и аналитика
+- Экспорт (CSV, XLSX, JSON)
+- CI/CD pipeline
 
 ### v1.0
-- Базовая функциональность сканирования
-- REST API
-- Веб-интерфейс
+- Базовое сканирование, REST API, веб-интерфейс

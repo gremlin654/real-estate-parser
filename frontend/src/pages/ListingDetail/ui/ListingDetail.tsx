@@ -35,6 +35,10 @@ import {
   AlertCircle,
   Archive,
   Activity,
+  FileText,
+  Clock,
+  Eye,
+  Tag,
 } from 'lucide-react';
 import { CITIES, STATUS_LABELS } from '@/shared/config';
 import { ListingInfo } from '@/entities/listing';
@@ -81,6 +85,7 @@ export function ListingDetail() {
   }
 
   const price = currency === 'USD' ? (listing.price_usd ?? listing.price) : listing.price;
+  const displayCurrency = currency === 'USD' && listing.price_usd ? 'USD' : currency;
   const city = listing.city ? CITIES[listing.city as keyof typeof CITIES] : null;
 
   return (
@@ -180,7 +185,7 @@ export function ListingDetail() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-3xl font-bold text-primary">
-              {price.toLocaleString()} {currency}
+              {price.toLocaleString()} {displayCurrency}
             </div>
 
             <Separator />
@@ -190,21 +195,21 @@ export function ListingDetail() {
                 <Building className="w-5 h-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Комнат</p>
-                  <p className="font-semibold">{listing.rooms || '-'}</p>
+                  <p className="font-semibold">{listing.rooms ?? '-'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Maximize className="w-5 h-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Площадь</p>
-                  <p className="font-semibold">{listing.area || '-'} м²</p>
+                  <p className="font-semibold">{listing.area ? `${listing.area.toFixed(1)} м²` : '-'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Этаж</p>
-                  <p className="font-semibold">{listing.floor || '-'}</p>
+                  <p className="font-semibold">{listing.floor ?? '-'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -216,6 +221,24 @@ export function ListingDetail() {
                   </p>
                 </div>
               </div>
+              {listing.total_floors && (
+                <div className="flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Этажность</p>
+                    <p className="font-semibold">{listing.total_floors}</p>
+                  </div>
+                </div>
+              )}
+              {listing.house_year && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Год постройки</p>
+                    <p className="font-semibold">{listing.house_year}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -230,55 +253,98 @@ export function ListingDetail() {
         </Card>
       </div>
 
-      {/* History */}
-      {history && history.length > 0 && (
+      {/* Description */}
+      {listing.description && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Описание
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">
+              {listing.description}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* History - показываем только важные события */}
+      {history && history.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              История изменений
+              История изменений ({history.filter(h => 
+                ['created', 'deleted', 'price_changed', 'price_changed_byn'].includes(h.event_type)
+              ).length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[400px]">
               <div className="space-y-4">
-                {history.map((event, idx) => (
-                  <div key={event.id} className="flex items-start gap-3">
-                    <div
-                      className={`w-3 h-3 rounded-full mt-1.5 ${
-                        event.event_type === 'created'
-                          ? 'bg-green-500'
-                          : event.event_type === 'deleted'
-                          ? 'bg-red-500'
-                          : event.event_type === 'price_changed'
-                          ? 'bg-yellow-500'
-                          : 'bg-blue-500'
-                      }`}
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        {event.event_type === 'created'
-                          ? 'Создано'
-                          : event.event_type === 'deleted'
-                          ? 'Удалено'
-                          : event.event_type === 'price_changed'
-                          ? 'Цена изменена'
-                          : 'Обновлено'}
-                      </p>
-                      {event.price_before && event.price_after && (
-                        <p className="text-sm text-muted-foreground">
-                          {event.price_before.toLocaleString()} →{' '}
-                          {event.price_after.toLocaleString()} USD
+                {history
+                  .filter(event => ['created', 'deleted', 'price_changed', 'price_changed_byn'].includes(event.event_type))
+                  .map((event, idx) => {
+                  const eventTypeConfig = {
+                    created: { label: 'Создано', color: 'bg-green-500', icon: CheckCircle },
+                    deleted: { label: 'Удалено', color: 'bg-red-500', icon: Archive },
+                    price_changed: { label: 'Цена USD изменена', color: 'bg-yellow-500', icon: TrendingUp },
+                    price_changed_byn: { label: 'Цена BYN изменена', color: 'bg-orange-500', icon: DollarSign },
+                  };
+
+                  const config = eventTypeConfig[event.event_type as keyof typeof eventTypeConfig] || {
+                    label: event.event_type, 
+                    color: 'bg-gray-500',
+                    icon: Activity 
+                  };
+                  const IconComponent = config.icon;
+
+                  return (
+                    <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                      <div className={`w-3 h-3 rounded-full mt-1.5 ${config.color}`} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <IconComponent className="w-4 h-4 text-muted-foreground" />
+                          <p className="font-medium">{config.label}</p>
+                        </div>
+                        {event.price_before && event.price_after && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {event.price_before.toLocaleString()} →{' '}
+                            {event.price_after.toLocaleString()} USD
+                          </p>
+                        )}
+                        {event.changed_fields && Object.keys(event.changed_fields).length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            {Object.entries(event.changed_fields).map(([field, values]) => (
+                              <div key={field} className="flex items-center gap-1">
+                                <Eye className="w-3 h-3" />
+                                <span>{field}:</span>
+                                <span className="line-through opacity-50">{String(values[0])}</span>
+                                <span>→</span>
+                                <span className="font-medium">{String(values[1])}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(event.created_at).toLocaleString('ru-RU')}
                         </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(event.created_at).toLocaleString('ru-RU')}
-                      </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </ScrollArea>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">История изменений пуста</p>
           </CardContent>
         </Card>
       )}

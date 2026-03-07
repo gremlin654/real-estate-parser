@@ -4,13 +4,18 @@ import { RoomsFilter } from '@/shared/ui/rooms-filter';
 
 interface FilterByRoomsProps {
   value: number[];
-  onChange: (rooms: number[]) => void;
+  other?: boolean;
+  onChange: (rooms: number[], other?: boolean) => void;
 }
 
-export function FilterByRooms({ value, onChange }: FilterByRoomsProps) {
+export function FilterByRooms({ value, other, onChange }: FilterByRoomsProps) {
   return (
     <div className="w-[200px]">
-      <RoomsFilter selectedRooms={value} onChange={onChange} />
+      <RoomsFilter 
+        selectedRooms={value} 
+        selectedOther={other}
+        onChange={onChange} 
+      />
     </div>
   );
 }

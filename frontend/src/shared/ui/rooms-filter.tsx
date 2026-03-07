@@ -9,23 +9,17 @@ import {
 import { Button } from '@/shared/ui/button';
 import { Separator } from '@/shared/ui/separator';
 
-export interface RoomsFilterOption {
-  value: string;
-  label: string;
-  type: 'room' | 'other';
-}
-
 export interface RoomsFilterProps {
   selectedRooms: number[];
   selectedOther?: boolean;
-  onChange: (rooms: number[]) => void;
+  onChange: (rooms: number[], other?: boolean) => void;
 }
 
-const ROOM_OPTIONS: RoomsFilterOption[] = [
-  { value: '1', label: '1 комната', type: 'room' },
-  { value: '2', label: '2 комнаты', type: 'room' },
-  { value: '3', label: '3 комнаты', type: 'room' },
-  { value: '4', label: '4 комнаты', type: 'room' },
+const ROOM_OPTIONS = [
+  { value: 1, label: '1 комната' },
+  { value: 2, label: '2 комнаты' },
+  { value: 3, label: '3 комнаты' },
+  { value: 4, label: '4 комнаты' },
 ];
 
 export function RoomsFilter({
@@ -37,14 +31,18 @@ export function RoomsFilter({
 
   const toggleRoom = (room: number) => {
     if (selectedRooms.includes(room)) {
-      onChange(selectedRooms.filter((r) => r !== room));
+      onChange(selectedRooms.filter((r) => r !== room), selectedOther);
     } else {
-      onChange([...selectedRooms, room]);
+      onChange([...selectedRooms, room], selectedOther);
     }
   };
 
+  const toggleOther = () => {
+    onChange(selectedRooms, !selectedOther);
+  };
+
   const clearAll = () => {
-    onChange([]);
+    onChange([], false);
   };
 
   const hasSelection = selectedRooms.length > 0 || selectedOther;
@@ -65,7 +63,7 @@ export function RoomsFilter({
           </span>
           {hasSelection && (
             <span className="ml-1 text-xs text-muted-foreground">
-              ({selectedRooms.length}{selectedOther ? '+' : ''})
+              ({selectedRooms.join(',')}{selectedOther ? '+' : ''})
             </span>
           )}
         </Button>
@@ -87,7 +85,7 @@ export function RoomsFilter({
           </div>
           <div className="space-y-1">
             {ROOM_OPTIONS.map((option) => {
-              const room = parseInt(option.value, 10);
+              const room = option.value;
               const isSelected = selectedRooms.includes(room);
 
               return (
@@ -116,6 +114,29 @@ export function RoomsFilter({
                 </button>
               );
             })}
+            <Separator className="my-2" />
+            <button
+              type="button"
+              onClick={toggleOther}
+              className={cn(
+                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors',
+                selectedOther && 'bg-accent/50'
+              )}
+            >
+              <div
+                className={cn(
+                  'h-4 w-4 rounded border flex items-center justify-center',
+                  selectedOther
+                    ? 'bg-primary border-primary'
+                    : 'border-input'
+                )}
+              >
+                {selectedOther && (
+                  <Check className="h-3 w-3 text-primary-foreground" />
+                )}
+              </div>
+              <span>5+ комнат (другие)</span>
+            </button>
           </div>
         </div>
       </PopoverContent>

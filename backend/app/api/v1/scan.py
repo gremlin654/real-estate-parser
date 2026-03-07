@@ -132,6 +132,14 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
     }
     await scheduler._broadcast_progress()
 
+    # Background task для периодической отправки прогресса (каждую 1 секунду)
+    async def periodic_progress():
+        while scheduler.scan_progress["is_scanning"]:
+            await asyncio.sleep(1)
+            await scheduler._broadcast_progress()
+
+    periodic_task = asyncio.create_task(periodic_progress())
+
     try:
         async with async_session_maker() as db:
             scan_history_service = ScanHistoryService(db)
@@ -237,3 +245,9 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
         scheduler.scan_progress["stage"] = "idle"
         scheduler.scan_progress["is_stable"] = True
         await scheduler._broadcast_progress()
+        # Отменить periodic task
+        periodic_task.cancel()
+        try:
+            await periodic_task
+        except asyncio.CancelledError:
+            pass
