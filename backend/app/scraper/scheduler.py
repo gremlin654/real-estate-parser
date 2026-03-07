@@ -10,7 +10,6 @@ from sqlalchemy import select
 from app.db.database import async_session_maker
 from app.config import settings, CITY_NAMES
 from app.services.scan_settings_service import ScanSettingsService
-from app.api.v1.ws import get_scan_manager
 
 
 class ScraperScheduler:
@@ -33,6 +32,7 @@ class ScraperScheduler:
     async def _broadcast_progress(self):
         """Отправить текущий прогресс всем WebSocket клиентам."""
         if self._ws_manager is None:
+            from app.api.v1.ws import get_scan_manager
             self._ws_manager = get_scan_manager()
 
         try:
