@@ -2,15 +2,13 @@
 
 import { Button } from '@/shared/ui/button';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw, AlertCircle, Eye } from 'lucide-react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFilterStore } from '@/store/filterStore';
 import { useScanProgressWebSocket } from '@/api/listings';
 import { Alert, AlertDescription } from '@/shared/ui/alert';
 import { CITIES } from '@/shared/config';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip';
-import { useState } from 'react';
-import { ScanProgressModal } from '@/features/scanning/active-scanning/ui/ScanProgressModal';
 
 interface TriggerManualScanProps {
   city: string;
@@ -18,7 +16,6 @@ interface TriggerManualScanProps {
 }
 
 export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
-  const [showProgressModal, setShowProgressModal] = useState(false);
   const queryClient = useQueryClient();
   const { setManualScanning, isCityScanning, getScanningCities } = useFilterStore();
   const scanningCities = getScanningCities();
@@ -57,7 +54,6 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
 
   const cityName = CITIES[city as keyof typeof CITIES] || city;
   const isCityCurrentlyScanning = isCityScanning(city);
-  const hasAnyScanning = scanningCities.length > 0;
 
   // Кнопка "Сканировать" заблокирована если:
   // 1. Мутация в процессе (mutation.isPending)
@@ -69,40 +65,26 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
 
   return (
     <div className="space-y-2">
-      {/* Кнопки управления */}
-      <div className="flex gap-2">
-        {/* Кнопка "Сканировать" */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={() => mutation.mutate()}
-                disabled={isScanDisabled}
-                className="flex-1"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
-                {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
-              </Button>
-            </TooltipTrigger>
-            {isCityCurrentlyScanning && (
-              <TooltipContent>
-                <p>Сканирование этого города уже выполняется</p>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
-
-        {/* Кнопка "Посмотреть прогресс" */}
-        <Button
-          variant="outline"
-          onClick={() => setShowProgressModal(true)}
-          disabled={!hasAnyScanning}
-          className="flex items-center gap-2"
-        >
-          <Eye className="w-4 h-4" />
-          <span className="hidden sm:inline">Прогресс</span>
-        </Button>
-      </div>
+      {/* Кнопка "Сканировать" */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={isScanDisabled}
+              className="min-w-[140px]"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
+              {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
+            </Button>
+          </TooltipTrigger>
+          {isCityCurrentlyScanning && (
+            <TooltipContent>
+              <p>Сканирование этого города уже выполняется</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
 
       {/* Информация о других активных сканированиях */}
       {otherScanningCities.length > 0 && !isCityCurrentlyScanning && (
@@ -115,9 +97,6 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
           </div>
         </Alert>
       )}
-
-      {/* Модальное окно просмотра прогресса */}
-      <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />
     </div>
   );
 }

@@ -31,6 +31,9 @@ import { SortListings } from '@/features/listings/sort-listings';
 import { ExportListings } from '@/features/listings/export-listings';
 import { TriggerManualScan } from '@/features/scanning/trigger-manual';
 import { ViewProgress } from '@/features/scanning/view-progress';
+import { ScanProgressModal } from '@/features/scanning/active-scanning';
+import { Button } from '@/shared/ui/button';
+import { Eye } from 'lucide-react';
 import { CITIES } from '@/shared/config';
 
 export function Listings() {
@@ -47,9 +50,13 @@ export function Listings() {
     currency,
     setPage,
     setFilters,
+    getScanningCities,
   } = useFilterStore();
 
   const [showFilters, setShowFilters] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const scanningCities = getScanningCities();
+  const hasAnyScanning = scanningCities.length > 0;
 
   const { data: listingsData, isLoading } = useListings({
     city: city === 'all' ? undefined : city,
@@ -98,8 +105,20 @@ export function Listings() {
 
         <div className="flex items-center gap-2">
           <TriggerManualScan city={city === 'all' ? 'minsk' : city} />
+          <Button
+            variant="outline"
+            onClick={() => setShowProgressModal(true)}
+            disabled={!hasAnyScanning}
+            className="flex items-center gap-2"
+          >
+            <Eye className="w-4 h-4" />
+            <span className="hidden sm:inline">Прогресс</span>
+          </Button>
           <ExportListings city={city !== 'all' ? city : undefined} status={status !== 'all' ? status : undefined} />
         </div>
+
+        {/* Модальное окно просмотра прогресса */}
+        <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />
       </div>
 
       {/* Progress */}
