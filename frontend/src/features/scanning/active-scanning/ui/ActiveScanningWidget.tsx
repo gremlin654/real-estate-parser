@@ -15,7 +15,8 @@ const MAX_VISIBLE_CITIES = 3;
  * Если сканирований нет → возвращает null.
  */
 export function ActiveScanningWidget() {
-  const scanningCities = useFilterStore((state) => state.getScanningCities());
+  const { getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
 
   // Если нет активных сканирований → ничего не рендерим
   if (scanningCities.length === 0) {

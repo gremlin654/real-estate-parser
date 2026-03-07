@@ -17,7 +17,8 @@ interface ScanProgressModalProps {
  * Показывает список всех активных сканирований в реальном времени.
  */
 export function ScanProgressModal({ open, onOpenChange }: ScanProgressModalProps) {
-  const scanningCities = useFilterStore((state) => state.getScanningCities());
+  const { getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
 
   const hasActiveScanning = scanningCities.length > 0;
 
