@@ -139,16 +139,16 @@ async def get_room_distribution(
     ).where(
         Listing.city == city,
         Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated]),
-        Listing.rooms.in_([1, 2, 3, 4]),
+        Listing.rooms >= 1,  # Все комнаты от 1 и больше
     ).group_by(
         Listing.rooms,
     ).order_by(
         Listing.rooms,
     )
-    
+
     result = await db.execute(query)
     rows = result.all()
-    
+
     data = [
         {
             "rooms": row.rooms,
@@ -157,7 +157,7 @@ async def get_room_distribution(
         }
         for row in rows
     ]
-    
+
     return {
         "city": city,
         "data": data,
