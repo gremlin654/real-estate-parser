@@ -35,8 +35,13 @@ def test_db_url():
     """Получение URL тестовой БД.
 
     Для локального запуска тестов используем localhost:5433.
-    Для запуска в Docker используем db_test.
+    Для запуска в Docker/CI используем db_test:5432.
     """
+    # Сначала проверяем env variable (для CI)
+    env_db_url = os.getenv("TEST_DATABASE_URL")
+    if env_db_url:
+        return env_db_url
+    
     # Проверяем, запущены ли в Docker (есть ли контейнер с именем db_test)
     if os.getenv("PYTEST_RUNNING_IN_DOCKER"):
         return settings.TEST_DATABASE_URL
