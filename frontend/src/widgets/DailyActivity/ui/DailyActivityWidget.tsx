@@ -3,6 +3,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/ui/card';
 import type { DailyActivityResponse } from '@/shared/types';
+import { formatDateShort } from '@/shared/lib/date-format';
 
 interface DailyActivityWidgetProps {
   data: DailyActivityResponse['data'];
@@ -60,7 +61,7 @@ export function DailyActivityWidget({
   }
 
   const chartData = data.map((item) => ({
-    date: new Date(item.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
+    date: formatDateShort(item.date),
     new_count: item.new_count,
     deleted_count: item.deleted_count,
     price_changed_count: item.price_changed_count,

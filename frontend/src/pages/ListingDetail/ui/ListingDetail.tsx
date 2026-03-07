@@ -40,6 +40,7 @@ import {
   Eye,
   Tag,
 } from 'lucide-react';
+import { formatDateTime } from '@/shared/lib/date-format';
 import { CITIES, STATUS_LABELS } from '@/shared/config';
 import { ListingInfo } from '@/entities/listing';
 import { useFilterStore } from '@/store/filterStore';
@@ -217,7 +218,7 @@ export function ListingDetail() {
                 <div>
                   <p className="text-xs text-muted-foreground">Первое обнаружение</p>
                   <p className="font-semibold">
-                    {new Date(listing.first_seen_at).toLocaleDateString('ru-RU')}
+                    {formatDateTime(listing.first_seen_at)}
                   </p>
                 </div>
               </div>
@@ -330,7 +331,7 @@ export function ListingDetail() {
                         )}
                         <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(event.created_at).toLocaleString('ru-RU')}
+                          {formatDateTime(event.created_at)}
                         </p>
                       </div>
                     </div>
