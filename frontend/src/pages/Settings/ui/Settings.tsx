@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Switch } from '@/shared/ui/switch';
@@ -26,7 +26,7 @@ import { CITIES } from '@/shared/config';
 export function Settings() {
   const { data: schedule, isLoading: isScheduleLoading } = useScanSchedule();
   const { data: cities } = useScanCities();
-  const { data: currentCity } = useCurrentScanCity();
+  const { data: currentCity, isLoading: isCityLoading } = useCurrentScanCity();
   const { mutate: updateSchedule } = useUpdateScanSchedule();
   const { mutate: updateCity } = useUpdateCurrentCity();
 
@@ -34,6 +34,13 @@ export function Settings() {
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
   const [selectedCity, setSelectedCity] = useState(currentCity || 'mogilev');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Обновляем локальное состояние при загрузке данных
+  useEffect(() => {
+    if (currentCity) {
+      setSelectedCity(currentCity);
+    }
+  }, [currentCity]);
 
   const handleSaveInterval = () => {
     setIsSaving(true);
@@ -50,7 +57,7 @@ export function Settings() {
     );
   };
 
-  const handleSaveCity = (city: string) => {
+  const handleCityChange = (city: string) => {
     setSelectedCity(city);
     setIsSaving(true);
     updateCity(
@@ -141,14 +148,14 @@ export function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ChangeCity value={selectedCity} onChange={handleSaveCity} />
+          <ChangeCity value={selectedCity} onChange={handleCityChange} />
           <div className="flex flex-wrap gap-2">
             {Object.entries(CITIES).map(([code, name]) => (
               <Badge
                 key={code}
                 variant={selectedCity === code ? 'default' : 'outline'}
                 className="cursor-pointer transition-all"
-                onClick={() => handleSaveCity(code)}
+                onClick={() => handleCityChange(code)}
               >
                 {name}
               </Badge>

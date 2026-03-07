@@ -112,13 +112,35 @@ export interface CityComparisonData {
   }>;
 }
 
+export interface ScanHistoryItem {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  city: string;
+  city_name: string;
+  status: 'running' | 'completed' | 'error';
+  trigger_type: 'manual' | 'scheduled';
+  listings_fetched: number;
+  listings_created: number;
+  listings_updated: number;
+  listings_changed_byn: number;
+  listings_deleted: number;
+  pages_scraped: number;
+  duration_seconds: number | null;
+  error_message: string | null;
+}
+
+export interface ScanHistoryResponse {
+  items: ScanHistoryItem[];
+  total: number;
+  page: number;
+  size: number;
+  total_pages: number;
+  date_from?: string;
+  date_to?: string;
+}
+
 export type City = 'minsk' | 'mogilev' | 'grodno' | 'brest' | 'gomel' | 'vitebsk';
 
-export const CITIES: Record<City, string> = {
-  minsk: 'Минск',
-  mogilev: 'Могилёв',
-  grodno: 'Гродно',
-  brest: 'Брест',
-  gomel: 'Гомель',
-  vitebsk: 'Витебск',
-};
+// Re-export из constants для устранения дублирования
+export { CITIES } from '../config/constants';
