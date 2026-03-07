@@ -29,7 +29,6 @@ import { StatCard } from '@/entities/stats';
 import { CITIES, SCAN_HISTORY_PAGE_SIZE } from '@/shared/config';
 import { ScanHistoryTable } from '@/features/scan-history';
 import { ActiveScanningWidget, ScanProgressModal } from '@/features/scanning/active-scanning';
-import { Button } from '@/shared/ui/button';
 import { Eye } from 'lucide-react';
 
 function StatCardWrapper({
