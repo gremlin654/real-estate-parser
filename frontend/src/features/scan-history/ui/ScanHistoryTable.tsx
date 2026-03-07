@@ -109,7 +109,7 @@ const ListingsStats = ({ item }: { item: ScanHistoryItem }) => {
       {item.listings_updated > 0 && (
         <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
           <RefreshCw className="w-3 h-3" />
-          <span>~{item.listings_updated}</span>
+          <span>{item.listings_updated}</span>
         </div>
       )}
       {item.listings_deleted > 0 && (
