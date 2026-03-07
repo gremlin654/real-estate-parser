@@ -107,12 +107,10 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
       {/* Информация о других активных сканированиях */}
       {otherScanningCities.length > 0 && !isCityCurrentlyScanning && (
         <Alert className="mt-2">
-          <div className="flex gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <AlertDescription className="text-sm">
-              Сканируются: {otherScanningCities.map((s) => s.city_name).join(', ')}
-            </AlertDescription>
-          </div>
+          <AlertCircle className="w-4 h-4 absolute top-4 left-4" />
+          <AlertDescription className="text-sm pl-7">
+            Сканируются: {otherScanningCities.map((s) => s.city_name).join(', ')}
+          </AlertDescription>
         </Alert>
       )}
 
