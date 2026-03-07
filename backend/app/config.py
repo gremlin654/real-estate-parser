@@ -7,7 +7,7 @@ CITY_CHOICES = Literal["mogilev", "minsk", "grodno", "brest", "gomel", "vitebsk"
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:secret@db/kufar_monitor"
-    TEST_DATABASE_URL: str = "postgresql+asyncpg://postgres:secret@db_test/kufar_monitor_test"
+    TEST_DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db_test/kufar_monitor_test"
     SCAN_INTERVAL_MINUTES: int = 30
     API_PREFIX: str = "/api/v1"
     KUFAR_CITY: CITY_CHOICES = "mogilev"

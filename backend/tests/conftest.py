@@ -14,12 +14,20 @@ from app.db.database import async_session_maker
 
 
 @pytest.fixture(scope="function")
-async def client():
-    """Create async client for testing API endpoints (no DB operations)."""
+async def client(test_session):
+    """Create async client for testing API endpoints with test DB session."""
     from httpx import ASGITransport
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    from unittest.mock import AsyncMock, patch
+    
+    # Mock the get_db dependency to use test_session
+    async def override_get_db():
+        yield test_session
+    
+    # Patch the dependency
+    with patch('app.db.database.async_session_maker', return_value=test_session):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
 
 @pytest.fixture(scope="session")
