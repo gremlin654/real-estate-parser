@@ -74,7 +74,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
               disabled={isScanDisabled}
               className="min-w-[140px]"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isScanDisabled ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 mr-2 ${isCityCurrentlyScanning ? 'animate-spin' : ''}`} />
               {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}
             </Button>
           </TooltipTrigger>
