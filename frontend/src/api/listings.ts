@@ -78,7 +78,6 @@ export const useScanProgressWebSocket = () => {
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected to', wsUrl);
         setIsConnected(true);
       };
 
@@ -87,15 +86,10 @@ export const useScanProgressWebSocket = () => {
           const data = JSON.parse(event.data);
           const storeMethods = storeMethodsRef.current;
 
-          console.log('WebSocket message received:', data);
-
           // Поддержка параллельных сканирований (v3.1)
           if (data.scanning_cities) {
             const activeCities = data.scanning_cities.map((s: any) => s.city);
             const currentScanningCities = storeMethods.getScanningCities();
-
-            console.log('Active scanning cities from WS:', activeCities);
-            console.log('Current scanning cities in store:', currentScanningCities);
 
             // Обновить или добавить активные сканирования
             data.scanning_cities.forEach((scan: any) => {
@@ -103,7 +97,6 @@ export const useScanProgressWebSocket = () => {
               const existing = currentScanningCities.find((s) => s.city === scan.city);
 
               if (existing) {
-                console.log(`Updating city ${scan.city}: progress=${progressPercent}, stage=${scan.stage}, pages=${scan.pages_scraped}`);
                 storeMethods.updateScanningCity(scan.city, {
                   progress: progressPercent,
                   stage: scan.stage,
@@ -113,7 +106,6 @@ export const useScanProgressWebSocket = () => {
                   listings_processed: scan.listings_processed,
                 });
               } else {
-                console.log(`Adding new city ${scan.city}: progress=${progressPercent}, stage=${scan.stage}`);
                 storeMethods.addScanningCity({
                   city: scan.city,
                   city_name: scan.city_name,
@@ -137,7 +129,6 @@ export const useScanProgressWebSocket = () => {
                 queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
                 queryClient.invalidateQueries({ queryKey: ['listings'] });
                 queryClient.invalidateQueries({ queryKey: ['summary'] });
-                console.log(`Сканирование ${s.city_name} завершено, данные обновлены`);
               }
             });
           }
@@ -155,7 +146,6 @@ export const useScanProgressWebSocket = () => {
               prev.elapsed_seconds !== data.elapsed_seconds;
 
             if (hasChanges) {
-              console.log('Progress updated:', data);
               return data;
             }
             return prev;
@@ -170,7 +160,6 @@ export const useScanProgressWebSocket = () => {
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
         setIsConnected(false);
 
         // Попытка переподключения через 3 секунды
@@ -181,7 +170,7 @@ export const useScanProgressWebSocket = () => {
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      // Failed to create WebSocket
     }
   }, [queryClient]); // 🔧 Только queryClient в зависимостях
 
