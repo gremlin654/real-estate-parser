@@ -14,7 +14,7 @@ class ScanSettingsService:
         settings = result.scalar_one_or_none()
 
         if not settings:
-            settings = ScanSettings(id=1, scan_interval_minutes=30, enabled=True, city="mogilev")
+            settings = ScanSettings(id=1, scan_interval_minutes=30, enabled=False, city="mogilev")
             self.db.add(settings)
             await self.db.commit()
             await self.db.refresh(settings)

@@ -31,7 +31,7 @@ export function Settings() {
   const { mutate: updateCity } = useUpdateCurrentCity();
 
   const [interval, setInterval] = useState(schedule?.scan_interval_minutes || 30);
-  const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
+  const [enabled, setEnabled] = useState(schedule?.enabled ?? false);
   const [selectedCity, setSelectedCity] = useState(currentCity || 'mogilev');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -40,7 +40,10 @@ export function Settings() {
     if (currentCity) {
       setSelectedCity(currentCity);
     }
-  }, [currentCity]);
+    if (schedule?.enabled !== undefined) {
+      setEnabled(schedule.enabled);
+    }
+  }, [currentCity, schedule]);
 
   const handleSaveInterval = () => {
     setIsSaving(true);
@@ -103,12 +106,27 @@ export function Settings() {
             Управление параметрами сканирования
           </p>
         </div>
-        {isSaving && (
-          <Badge variant="secondary" className="animate-pulse">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Сохранение...
+        <div className="flex items-center gap-2">
+          <Badge variant={enabled ? 'default' : 'secondary'} className={enabled ? 'bg-green-600' : ''}>
+            {enabled ? (
+              <>
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Автосканирование включено
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Автосканирование отключено
+              </>
+            )}
           </Badge>
-        )}
+          {isSaving && (
+            <Badge variant="outline" className="animate-pulse">
+              <RefreshCw className="w-3 h-3 mr-1" />
+              Сохранение...
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Scan Interval */}
@@ -149,18 +167,6 @@ export function Settings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <ChangeCity value={selectedCity} onChange={handleCityChange} />
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(CITIES).map(([code, name]) => (
-              <Badge
-                key={code}
-                variant={selectedCity === code ? 'default' : 'outline'}
-                className="cursor-pointer transition-all"
-                onClick={() => handleCityChange(code)}
-              >
-                {name}
-              </Badge>
-            ))}
-          </div>
           {currentCity && (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
