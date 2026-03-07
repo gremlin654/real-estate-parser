@@ -19,11 +19,18 @@ interface ScanHistoryTableProps {
 }
 
 /**
- * Форматирование даты в DD.MM HH:mm
+ * Форматирование даты в DD.MM HH:mm (с конвертацией UTC в Europe/Minsk)
  */
 const formatDateTime = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('ru-RU', {
+  
+  // Проверяем есть ли в строке указание на timezone
+  // Если нет - предполагаем что это UTC и добавляем Z
+  const normalizedDate = dateString.includes('Z') || dateString.includes('+') 
+    ? date 
+    : new Date(dateString + 'Z'); // Добавляем Z для UTC
+  
+  return normalizedDate.toLocaleDateString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
