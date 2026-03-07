@@ -64,10 +64,11 @@ export const useScanProgressWebSocket = () => {
             // Если сканирование завершилось, сбрасываем флаг и обновляем данные
             if (prev.is_scanning && !data.is_scanning) {
               setManualScanning(false);
-              // Обновить данные объявлений, summary и статистику
+              // Обновить данные объявлений, summary, статистику и историю сканирований
               queryClient.invalidateQueries({ queryKey: ['listings'] });
               queryClient.invalidateQueries({ queryKey: ['summary'] });
               queryClient.invalidateQueries({ queryKey: ['stats'] });
+              queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
               console.log('Scan completed, data invalidated');
             }
             return data;
