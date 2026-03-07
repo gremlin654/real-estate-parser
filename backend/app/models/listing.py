@@ -91,7 +91,7 @@ class ScanHistory(Base):
     __tablename__ = "scan_history"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    started_at = Column(DateTime, default=utc_now, nullable=False)
+    started_at = Column(DateTime, default=utc_now, nullable=False, index=True)
     completed_at = Column(DateTime, nullable=True)
     city = Column(String, nullable=False, index=True)
     city_name = Column(String, nullable=False)
@@ -114,4 +114,5 @@ class ScanSettings(Base):
     id = Column(Integer, primary_key=True, autoincrement=False)
     scan_interval_minutes = Column(Integer, nullable=False, default=30)
     enabled = Column(Boolean, nullable=False, default=True)
+    city = Column(String, nullable=False, default="mogilev")
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
