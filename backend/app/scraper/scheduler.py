@@ -108,19 +108,25 @@ class ScraperScheduler:
 
     async def start(self) -> None:
         """Запуск scheduler с проверкой включённых городов."""
+        # Если scheduler уже запущен - ничего не делаем
         if self.scheduler and self.scheduler.running:
+            logger.info("Scheduler already running")
             return
 
         async with async_session_maker() as db:
             settings_service = ScanSettingsService(db)
             enabled_cities = await settings_service.get_enabled_cities()
-        
+
         if not enabled_cities:
             logger.info("No cities enabled for auto-scan")
+            # Создаём пустой scheduler чтобы он был готов к работе
+            self.scheduler = AsyncIOScheduler()
+            self.scheduler.start()
             return
-        
+
+        # Создаём новый scheduler или перезапускаем существующий
         self.scheduler = AsyncIOScheduler()
-        
+
         # Для каждого включённого города добавить job
         for city in enabled_cities:
             city_settings = await settings_service.get_city_settings(city)
@@ -130,7 +136,7 @@ class ScraperScheduler:
                 id=f"scheduled_scan_{city}",
                 replace_existing=True,
             )
-        
+
         self.scheduler.start()
         logger.info(f"Scheduled scan started for cities: {enabled_cities}")
 
@@ -313,17 +319,20 @@ class ScraperScheduler:
 
     async def restart_with_settings(self, city: str, enabled: bool, interval_minutes: int):
         """Перезапуск scheduler для конкретного города."""
+        # Если scheduler не создан или не запущен - создаём и запускаем
         if not self.scheduler or not self.scheduler.running:
-            # Scheduler не запущен - ничего не делаем
-            logger.info(f"Scheduler not running, skipping restart for {city}")
-            return
-        
+            logger.info(f"Scheduler not running, starting fresh for {city}")
+            await self.start()
+            if not self.scheduler or not self.scheduler.running:
+                logger.error(f"Failed to start scheduler for {city}")
+                return
+
         job_id = f"scheduled_scan_{city}"
-        
+
         # Удалить существующий job для этого города
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
-        
+
         # Добавить новый job если город включён
         if enabled:
             self.scheduler.add_job(
