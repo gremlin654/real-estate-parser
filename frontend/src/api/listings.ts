@@ -42,7 +42,7 @@ export const useScanProgressWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { setManualScanning, addScanningCity, removeScanningCity, updateScanningCity, getScanningCities } = useFilterStore();
+  const store = useFilterStore();
   const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
@@ -62,64 +62,61 @@ export const useScanProgressWebSocket = () => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          
+          // Поддержка параллельных сканирований (v3.1)
+          if (data.scanning_cities) {
+            const activeCities = data.scanning_cities.map((s: any) => s.city);
+            const currentScanningCities = store.getScanningCities();
+
+            // Обновить или добавить активные сканирования
+            data.scanning_cities.forEach((scan: any) => {
+              const progressPercent = calculateProgress(scan);
+              const existing = currentScanningCities.find((s) => s.city === scan.city);
+
+              if (existing) {
+                store.updateScanningCity(scan.city, {
+                  progress: progressPercent,
+                  stage: scan.stage,
+                  elapsed_seconds: scan.elapsed_seconds,
+                  pages_scraped: scan.pages_scraped,
+                  listings_fetched: scan.listings_fetched,
+                  listings_processed: scan.listings_processed,
+                });
+              } else {
+                store.addScanningCity({
+                  city: scan.city,
+                  city_name: scan.city_name,
+                  trigger_type: scan.trigger_type,
+                  started_at: new Date().toISOString(),
+                  progress: progressPercent,
+                  stage: scan.stage,
+                  elapsed_seconds: scan.elapsed_seconds,
+                  pages_scraped: scan.pages_scraped,
+                  listings_fetched: scan.listings_fetched,
+                  listings_processed: scan.listings_processed,
+                });
+              }
+            });
+
+            // Удалить завершённые сканирования
+            currentScanningCities.forEach((s) => {
+              if (!activeCities.includes(s.city)) {
+                store.removeScanningCity(s.city);
+                // Инвалидировать кэш после завершения
+                queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
+                queryClient.invalidateQueries({ queryKey: ['listings'] });
+                queryClient.invalidateQueries({ queryKey: ['summary'] });
+                console.log(`Сканирование ${s.city_name} завершено, данные обновлены`);
+              }
+            });
+          }
+
+          // Обновить progress state только если изменилось is_scanning
           setProgress((prev) => {
-            // Поддержка параллельных сканирований (v3.1)
-            if (data.scanning_cities) {
-              const activeCities = data.scanning_cities.map((s: any) => s.city);
-              
-              // Обновить или добавить активные сканирования
-              data.scanning_cities.forEach((scan: any) => {
-                const progressPercent = calculateProgress(scan);
-                const existing = getScanningCities().find((s) => s.city === scan.city);
-                
-                if (existing) {
-                  updateScanningCity(scan.city, {
-                    progress: progressPercent,
-                    stage: scan.stage,
-                    elapsed_seconds: scan.elapsed_seconds,
-                    pages_scraped: scan.pages_scraped,
-                    listings_fetched: scan.listings_fetched,
-                    listings_processed: scan.listings_processed,
-                  });
-                } else {
-                  addScanningCity({
-                    city: scan.city,
-                    city_name: scan.city_name,
-                    trigger_type: scan.trigger_type,
-                    started_at: new Date().toISOString(),
-                    progress: progressPercent,
-                    stage: scan.stage,
-                    elapsed_seconds: scan.elapsed_seconds,
-                    pages_scraped: scan.pages_scraped,
-                    listings_fetched: scan.listings_fetched,
-                    listings_processed: scan.listings_processed,
-                  });
-                }
-              });
-              
-              // Удалить завершённые сканирования
-              getScanningCities().forEach((s) => {
-                if (!activeCities.includes(s.city)) {
-                  removeScanningCity(s.city);
-                  // Инвалидировать кэш после завершения
-                  queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
-                  queryClient.invalidateQueries({ queryKey: ['listings'] });
-                  queryClient.invalidateQueries({ queryKey: ['summary'] });
-                  console.log(`Сканирование ${s.city_name} завершено, данные обновлены`);
-                }
-              });
+            if (prev.is_scanning !== data.is_scanning || prev.stage !== data.stage) {
+              return data;
             }
-            
-            // Если сканирование завершилось (старый формат), сбрасываем флаг и обновляем данные
-            if (prev.is_scanning && !data.is_scanning) {
-              setManualScanning(false);
-              queryClient.invalidateQueries({ queryKey: ['listings'] });
-              queryClient.invalidateQueries({ queryKey: ['summary'] });
-              queryClient.invalidateQueries({ queryKey: ['stats'] });
-              queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
-              console.log('Scan completed, data invalidated');
-            }
-            return data;
+            return prev;
           });
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
@@ -144,7 +141,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [setManualScanning, queryClient, addScanningCity, removeScanningCity, updateScanningCity, getScanningCities]);
+  }, [queryClient, store]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
