@@ -17,6 +17,7 @@ import type {
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
+import { calculateProgress } from '@/shared/lib/scan-progress';
 
 const API_BASE = '/api/v1';
 
@@ -24,6 +25,7 @@ const API_BASE = '/api/v1';
  * WebSocket hook для real-time прогресса сканирования.
  * Автоматически подключается к WebSocket при монтировании и отключается при размонтировании.
  * Обновляет данные объявлений после завершения сканирования.
+ * Поддерживает параллельные сканирования по городам (v3.1).
  */
 export const useScanProgressWebSocket = () => {
   const [progress, setProgress] = useState<ScanProgress>({
@@ -40,7 +42,7 @@ export const useScanProgressWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { setManualScanning } = useFilterStore();
+  const { setManualScanning, addScanningCity, removeScanningCity, updateScanningCity, getScanningCities } = useFilterStore();
   const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
@@ -61,10 +63,56 @@ export const useScanProgressWebSocket = () => {
         try {
           const data = JSON.parse(event.data);
           setProgress((prev) => {
-            // Если сканирование завершилось, сбрасываем флаг и обновляем данные
+            // Поддержка параллельных сканирований (v3.1)
+            if (data.scanning_cities) {
+              const activeCities = data.scanning_cities.map((s: any) => s.city);
+              
+              // Обновить или добавить активные сканирования
+              data.scanning_cities.forEach((scan: any) => {
+                const progressPercent = calculateProgress(scan);
+                const existing = getScanningCities().find((s) => s.city === scan.city);
+                
+                if (existing) {
+                  updateScanningCity(scan.city, {
+                    progress: progressPercent,
+                    stage: scan.stage,
+                    elapsed_seconds: scan.elapsed_seconds,
+                    pages_scraped: scan.pages_scraped,
+                    listings_fetched: scan.listings_fetched,
+                    listings_processed: scan.listings_processed,
+                  });
+                } else {
+                  addScanningCity({
+                    city: scan.city,
+                    city_name: scan.city_name,
+                    trigger_type: scan.trigger_type,
+                    started_at: new Date().toISOString(),
+                    progress: progressPercent,
+                    stage: scan.stage,
+                    elapsed_seconds: scan.elapsed_seconds,
+                    pages_scraped: scan.pages_scraped,
+                    listings_fetched: scan.listings_fetched,
+                    listings_processed: scan.listings_processed,
+                  });
+                }
+              });
+              
+              // Удалить завершённые сканирования
+              getScanningCities().forEach((s) => {
+                if (!activeCities.includes(s.city)) {
+                  removeScanningCity(s.city);
+                  // Инвалидировать кэш после завершения
+                  queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
+                  queryClient.invalidateQueries({ queryKey: ['listings'] });
+                  queryClient.invalidateQueries({ queryKey: ['summary'] });
+                  console.log(`Сканирование ${s.city_name} завершено, данные обновлены`);
+                }
+              });
+            }
+            
+            // Если сканирование завершилось (старый формат), сбрасываем флаг и обновляем данные
             if (prev.is_scanning && !data.is_scanning) {
               setManualScanning(false);
-              // Обновить данные объявлений, summary, статистику и историю сканирований
               queryClient.invalidateQueries({ queryKey: ['listings'] });
               queryClient.invalidateQueries({ queryKey: ['summary'] });
               queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -96,7 +144,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [setManualScanning, queryClient]);
+  }, [setManualScanning, queryClient, addScanningCity, removeScanningCity, updateScanningCity, getScanningCities]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -442,5 +490,37 @@ export const useUpdateCityScanSettings = () => {
     onError: (error) => {
       toast.error('Ошибка сохранения: ' + error.message);
     },
+  });
+};
+
+/**
+ * Hook для получения статуса сканирования (поддержка параллельных сканирований).
+ * Polling каждые 5 секунд.
+ */
+export const useScanStatus = () => {
+  return useQuery<{
+    scanning_cities?: Array<{
+      city: string;
+      city_name: string;
+      trigger_type: 'manual' | 'scheduled';
+      stage: string;
+      pages_scraped: number;
+      listings_fetched: number;
+      listings_processed: number;
+      elapsed_seconds: number;
+      is_stable: boolean;
+    }>;
+    is_scanning?: boolean;
+    city?: string | null;
+  }>({
+    queryKey: ['scanStatus'],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE}/scan/status`);
+      if (!response.ok) throw new Error('Failed to fetch scan status');
+      return response.json();
+    },
+    refetchInterval: 5000, // Polling каждые 5 секунд
+    retry: 2,
+    retryDelay: 1000,
   });
 };

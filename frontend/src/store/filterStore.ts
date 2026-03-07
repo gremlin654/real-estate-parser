@@ -2,6 +2,19 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { City } from '@/shared/types';
 
+export interface ScanningCity {
+  city: string;
+  city_name: string;
+  trigger_type: 'manual' | 'scheduled';
+  started_at: string;
+  progress: number;
+  stage: string;
+  elapsed_seconds?: number;
+  pages_scraped?: number;
+  listings_fetched?: number;
+  listings_processed?: number;
+}
+
 interface FilterState {
   city: string;
   status: string;
@@ -14,6 +27,7 @@ interface FilterState {
   size: number;
   page: number;
   isManualScanning: boolean;
+  scanningCities: Map<string, ScanningCity>;
   setCity: (city: string) => void;
   setStatus: (status: string) => void;
   setCurrency: (currency: 'BYN' | 'USD') => void;
@@ -22,6 +36,11 @@ interface FilterState {
   setFilters: (filters: Partial<FilterState>) => void;
   setPage: (page: number) => void;
   setManualScanning: (scanning: boolean) => void;
+  addScanningCity: (city: ScanningCity) => void;
+  removeScanningCity: (city: string) => void;
+  updateScanningCity: (city: string, progress: Partial<ScanningCity>) => void;
+  getScanningCities: () => ScanningCity[];
+  isCityScanning: (city: string) => boolean;
   reset: () => void;
 }
 
@@ -39,6 +58,7 @@ export const useFilterStore = create<FilterState>()(
       size: 20,
       page: 1,
       isManualScanning: false,
+      scanningCities: new Map(),
 
       setCity: (city) => set({ city, page: 1 }),
       setStatus: (status) => set({ status, page: 1 }),
@@ -48,6 +68,42 @@ export const useFilterStore = create<FilterState>()(
       setFilters: (filters) => set({ ...filters, page: 1 }),
       setPage: (page) => set({ page }),
       setManualScanning: (scanning) => set({ isManualScanning: scanning }),
+      
+      addScanningCity: (cityData) => {
+        set((state) => {
+          const newMap = new Map(state.scanningCities);
+          newMap.set(cityData.city, cityData);
+          return { scanningCities: newMap };
+        });
+      },
+      
+      removeScanningCity: (city) => {
+        set((state) => {
+          const newMap = new Map(state.scanningCities);
+          newMap.delete(city);
+          return { scanningCities: newMap };
+        });
+      },
+      
+      updateScanningCity: (city, progress) => {
+        set((state) => {
+          const newMap = new Map(state.scanningCities);
+          const existing = newMap.get(city);
+          if (existing) {
+            newMap.set(city, { ...existing, ...progress });
+          }
+          return { scanningCities: newMap };
+        });
+      },
+      
+      getScanningCities: () => {
+        return Array.from(get().scanningCities.values());
+      },
+      
+      isCityScanning: (city) => {
+        return get().scanningCities.has(city);
+      },
+      
       reset: () =>
         set({
           city: 'mogilev',
@@ -60,6 +116,8 @@ export const useFilterStore = create<FilterState>()(
           sort: 'newest',
           size: 20,
           page: 1,
+          isManualScanning: false,
+          scanningCities: new Map(),
         }),
     }),
     {

@@ -1,13 +1,17 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
-import { Bell } from 'lucide-react';
+import { Bell, RefreshCw } from 'lucide-react';
 import { useAllScanSettings } from '@/api/listings';
 import { CityScanSettings } from '@/features/settings/city-scan-settings';
 import { CITIES } from '@/shared/config';
+import { useFilterStore } from '@/store/filterStore';
+import { ScanningCityCard } from '@/features/scanning/active-scanning';
 
 export function Settings() {
   const { data: allSettings, isLoading } = useAllScanSettings();
+  const { getScanningCities } = useFilterStore();
+  const scanningCities = getScanningCities();
 
   if (isLoading) {
     return (
@@ -50,6 +54,25 @@ export function Settings() {
           Управление параметрами сканирования для каждого города
         </p>
       </div>
+
+      {/* Активные сканирования */}
+      {scanningCities.length > 0 && (
+        <Card className="border-primary/20 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-primary animate-spin" />
+              🔄 Активные сканирования ({scanningCities.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {scanningCities.map((scan) => (
+                <ScanningCityCard key={scan.city} city={scan} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Список городов */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

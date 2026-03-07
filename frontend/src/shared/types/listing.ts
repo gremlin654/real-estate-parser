@@ -48,6 +48,18 @@ export interface ScanProgress {
   listings_processed: number;
   elapsed_seconds: number;
   is_stable: boolean;
+  // Поддержка параллельных сканирований (v3.1)
+  scanning_cities?: Array<{
+    city: string;
+    city_name: string;
+    trigger_type: 'manual' | 'scheduled';
+    stage: 'starting' | 'marking_deleted' | 'fetching' | 'parsing' | 'upserting' | 'marking_deleted_final' | 'done' | 'error';
+    pages_scraped: number;
+    listings_fetched: number;
+    listings_processed: number;
+    elapsed_seconds: number;
+    is_stable: boolean;
+  }>;
 }
 
 export interface HistoryEvent {

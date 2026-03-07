@@ -28,6 +28,7 @@ import {
 import { StatCard } from '@/entities/stats';
 import { CITIES, SCAN_HISTORY_PAGE_SIZE } from '@/shared/config';
 import { ScanHistoryTable } from '@/features/scan-history';
+import { ActiveScanningWidget } from '@/features/scanning/active-scanning';
 
 function StatCardWrapper({
   title,
@@ -125,6 +126,9 @@ export function Dashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Active Scanning Widget */}
+      <ActiveScanningWidget />
 
       {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
