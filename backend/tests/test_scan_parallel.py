@@ -55,8 +55,9 @@ class TestScraperSchedulerParallelScans:
         assert cities[0]["trigger_type"] == "manual"
         # scan_id хранится в данных сканирования, а не в response
         assert "started_at" in cities[0]
-        assert "progress" in cities[0]
-        assert cities[0]["progress"]["city"] == "minsk"
+        # Progress теперь хранится напрямую в объекте сканирования
+        assert cities[0]["stage"] == "starting"
+        assert cities[0]["city"] == "minsk"
 
     @pytest.mark.asyncio
     async def test_remove_scanning_city(self, scheduler):
@@ -114,9 +115,10 @@ class TestScraperSchedulerParallelScans:
         await scheduler._update_city_progress("minsk", new_progress)
 
         cities = scheduler._get_scanning_cities()
-        assert cities[0]["progress"]["stage"] == "fetching"
-        assert cities[0]["progress"]["pages_scraped"] == 10
-        assert cities[0]["progress"]["listings_fetched"] == 300
+        # Progress теперь хранится напрямую в объекте сканирования
+        assert cities[0]["stage"] == "fetching"
+        assert cities[0]["pages_scraped"] == 10
+        assert cities[0]["listings_fetched"] == 300
 
     @pytest.mark.asyncio
     async def test_remove_nonexistent_city(self, scheduler):
