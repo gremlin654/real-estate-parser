@@ -289,6 +289,7 @@ export const useUpdateScanSchedule = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scanSchedule'] });
+      queryClient.invalidateQueries({ queryKey: ['scanStatus'] });
     },
   });
 };

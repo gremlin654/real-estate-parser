@@ -144,11 +144,11 @@ async def update_schedule(request: ScanScheduleUpdateRequest):
             scan_interval_minutes=request.scan_interval_minutes,
             enabled=request.enabled
         )
-        
+
         # Перезапуск scheduler с новыми настройками
         scheduler = get_scheduler()
-        scheduler.update_interval(scan_settings.scan_interval_minutes)
-    
+        await scheduler.restart_with_settings(request.enabled, scan_settings.scan_interval_minutes)
+
     return {
         "scan_interval_minutes": scan_settings.scan_interval_minutes,
         "enabled": scan_settings.enabled,

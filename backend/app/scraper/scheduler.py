@@ -62,7 +62,164 @@ class ScraperScheduler:
             logger.info("Scheduler disabled in settings")
 
     async def _run_scan_scheduled(self):
+        """Запуск планового сканирования по расписанию."""
+        from app.scraper.kufar_scraper import KufarScraper
+        from app.services.listing_service import ListingService
+
         logger.info("Starting scheduled scan")
+
+        self.is_running = True
+        start_time = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Получить текущий город из настроек
+        async with async_session_maker() as db:
+            settings_service = ScanSettingsService(db)
+            scan_settings = await settings_service.get_settings()
+            city = scan_settings.city
+
+        # Создать запись истории сканирования
+        async with async_session_maker() as db:
+            scan_history_service = ScanHistoryService(db)
+            scan_record = await scan_history_service.create_scan_record(
+                city=city,
+                city_name=CITY_NAMES.get(city, city),
+                trigger_type="scheduled"
+            )
+
+        logger.info(f"Starting scheduled scan for {city}, scan_id: {scan_record.id}")
+
+        self.scan_progress = {
+            "is_scanning": True,
+            "city": city,
+            "city_name": CITY_NAMES.get(city, city),
+            "stage": "starting",
+            "pages_scraped": 0,
+            "listings_fetched": 0,
+            "listings_processed": 0,
+            "elapsed_seconds": 0,
+            "is_stable": False,
+        }
+        await self._broadcast_progress()
+
+        # Background task для периодической отправки прогресса (каждую 1 секунду)
+        async def periodic_progress():
+            while self.scan_progress["is_scanning"]:
+                await asyncio.sleep(1)
+                await self._broadcast_progress()
+
+        periodic_task = asyncio.create_task(periodic_progress())
+
+        try:
+            async with async_session_maker() as db:
+                scan_history_service = ScanHistoryService(db)
+                listing_service = ListingService(db)
+
+                # Парсинг страниц
+                self.scan_progress["stage"] = "fetching"
+                self.scan_progress["is_stable"] = False
+                await self._broadcast_progress()
+
+                # Запускаем сканирование через HTTP (быстро и надежно)
+                scraper = KufarScraper()
+
+                base_url = f"https://re.kufar.by/l/{city}/kupit/kvartiru"
+                all_listings = []
+                cursor = None
+                page_num = 0
+                max_pages = 500  # Максимум 500 страниц (~15000 объявлений)
+
+                while page_num < max_pages:
+                    # Build URL with cursor (use ? for first param, & for subsequent)
+                    url = f"{base_url}?cursor={cursor}" if cursor else base_url
+                    logger.info(f"Scraping page {page_num + 1}: {url}")
+
+                    listings, next_cursor = await scraper.scrape_page(url, city=city)
+
+                    if not listings:
+                        logger.info(f"No more listings found on page {page_num + 1}")
+                        break
+
+                    all_listings.extend(listings)
+
+                    # Обновляем прогресс после каждой страницы
+                    self.scan_progress["pages_scraped"] = page_num + 1
+                    self.scan_progress["listings_fetched"] = len(all_listings)
+                    self.scan_progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+                    await self._broadcast_progress()
+
+                    logger.info(f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}")
+
+                    # Check if there's a next cursor
+                    if not next_cursor or next_cursor == cursor:
+                        logger.info("No more pages")
+                        break
+
+                    cursor = next_cursor
+                    page_num += 1
+
+                    # Wait between pages to avoid rate limiting
+                    await asyncio.sleep(1)
+
+                listings_data = all_listings
+                pages_scraped = page_num
+
+                # Обновление записи сканирования
+                await scan_history_service.update_scan_record(
+                    scan_id=str(scan_record.id),
+                    listings_fetched=len(listings_data),
+                    pages_scraped=pages_scraped
+                )
+
+                # Парсинг и сохранение
+                self.scan_progress["stage"] = "upserting"
+                self.scan_progress["is_stable"] = False
+                await self._broadcast_progress()
+
+                stats = await listing_service.upsert_listings(listings_data, city)
+
+                self.scan_progress["listings_processed"] = stats.get("processed", 0)
+                self.scan_progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+                await self._broadcast_progress()
+
+                self.scan_progress["stage"] = "marking_deleted_final"
+                self.scan_progress["is_stable"] = True
+                await self._broadcast_progress()
+
+                # Завершение записи сканирования
+                await scan_history_service.complete_scan_record(
+                    scan_id=str(scan_record.id),
+                    status="completed",
+                )
+
+                logger.info(f"Scheduled scan completed: {stats}")
+
+        except Exception as e:
+            logger.error(f"Scheduled scan error: {e}")
+            import traceback
+            traceback.print_exc()
+            async with async_session_maker() as db:
+                scan_history_service = ScanHistoryService(db)
+                await scan_history_service.complete_scan_record(
+                    scan_id=str(scan_record.id),
+                    status="error",
+                    error_message=str(e)
+                )
+            # Отправить ошибку через WebSocket
+            self.scan_progress["stage"] = "error"
+            self.scan_progress["is_stable"] = True
+            await self._broadcast_progress()
+        finally:
+            self.is_running = False
+            self.scan_progress["is_scanning"] = False
+            self.scan_progress["stage"] = "idle"
+            self.scan_progress["is_stable"] = True
+            await self._broadcast_progress()
+            # Отменить periodic task
+            periodic_task.cancel()
+            try:
+                await periodic_task
+            except asyncio.CancelledError:
+                pass
 
     def stop(self):
         if self.scheduler:
@@ -80,6 +237,24 @@ class ScraperScheduler:
                 replace_existing=True,
             )
             logger.info(f"Scheduler interval updated to {interval_minutes} min")
+
+    async def restart_with_settings(self, enabled: bool, interval_minutes: int):
+        """Перезапуск scheduler с новыми настройками."""
+        if self.scheduler and self.scheduler.running:
+            self.scheduler.shutdown()
+        
+        if enabled:
+            self.scheduler = AsyncIOScheduler()
+            self.scheduler.add_job(
+                self._run_scan_scheduled,
+                trigger=IntervalTrigger(minutes=interval_minutes),
+                id="scheduled_scan",
+                replace_existing=True,
+            )
+            self.scheduler.start()
+            logger.info(f"Scheduler restarted with interval {interval_minutes} min, enabled={enabled}")
+        else:
+            logger.info("Scheduler disabled")
 
 
 _scheduler_instance: Optional[ScraperScheduler] = None
