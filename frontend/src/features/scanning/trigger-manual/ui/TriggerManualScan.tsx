@@ -92,14 +92,14 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
 export function TriggerManualScanAlert({ city }: { city: string }) {
   const { getScanningCities } = useFilterStore();
   const scanningCities = getScanningCities();
-  
+
   // Получаем список других сканирующихся городов для информирования
   const otherScanningCities = scanningCities.filter((s) => s.city !== city);
 
   if (otherScanningCities.length === 0) return null;
 
   return (
-    <Alert className="mt-2">
+    <Alert className="w-full">
       <div className="flex items-start gap-2">
         <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <AlertDescription className="text-sm">

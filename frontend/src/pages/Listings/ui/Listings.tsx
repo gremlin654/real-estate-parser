@@ -102,22 +102,24 @@ export function Listings() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <TriggerManualScan city={city === 'all' ? 'minsk' : city} />
-          <Button
-            variant="outline"
-            onClick={() => setShowProgressModal(true)}
-            disabled={!hasAnyScanning}
-            className="flex items-center gap-2"
-          >
-            <Eye className="w-4 h-4" />
-            <span className="hidden sm:inline">Прогресс</span>
-          </Button>
-          <ExportListings city={city !== 'all' ? city : undefined} status={status !== 'all' ? status : undefined} />
-        </div>
+        <div className="flex flex-col gap-2 w-full">
+          <div className="flex items-center gap-2">
+            <TriggerManualScan city={city === 'all' ? 'minsk' : city} />
+            <Button
+              variant="outline"
+              onClick={() => setShowProgressModal(true)}
+              disabled={!hasAnyScanning}
+              className="flex items-center gap-2"
+            >
+              <Eye className="w-4 h-4" />
+              <span className="hidden sm:inline">Прогресс</span>
+            </Button>
+            <ExportListings city={city !== 'all' ? city : undefined} status={status !== 'all' ? status : undefined} />
+          </div>
 
-        {/* Алерт о сканировании других городов */}
-        <TriggerManualScanAlert city={city === 'all' ? 'minsk' : city} />
+          {/* Алерт о сканировании других городов */}
+          <TriggerManualScanAlert city={city === 'all' ? 'minsk' : city} />
+        </div>
 
         {/* Модальное окно просмотра прогресса */}
         <ScanProgressModal open={showProgressModal} onOpenChange={setShowProgressModal} />
