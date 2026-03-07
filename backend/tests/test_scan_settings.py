@@ -460,16 +460,21 @@ class TestSchedulerPerCity:
             mock_session = AsyncMock()
             mock_session.__aenter__.return_value = mock_session
 
-            with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
-                mock_scheduler_instance = AsyncMock()
-                mock_scheduler_instance.running = False
-                MockScheduler.return_value = mock_scheduler_instance
+            mock_settings_service = AsyncMock()
+            mock_settings_service.get_all_settings.return_value = []
+            mock_settings_service.get_city_settings.return_value = None
 
-                await scheduler.restart_with_settings(
-                    city="mogilev",
-                    enabled=True,
-                    interval_minutes=30
-                )
+            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
+                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+                    mock_scheduler_instance = AsyncMock()
+                    mock_scheduler_instance.running = False
+                    MockScheduler.return_value = mock_scheduler_instance
+
+                    await scheduler.restart_with_settings(
+                        city="mogilev",
+                        enabled=True,
+                        interval_minutes=30
+                    )
 
         # Scheduler should be created
         assert scheduler.scheduler is not None
