@@ -76,7 +76,7 @@ jobs:
 
       - name: Run tests with coverage
         env:
-          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@db_test:5432/kufar_monitor_test
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor_test
         run: |
           cd backend
           python -m pytest tests/ --cov=app --cov-report=xml --cov-report=html -v
