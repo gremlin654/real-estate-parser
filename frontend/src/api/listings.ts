@@ -42,7 +42,11 @@ export const useScanProgressWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const store = useFilterStore();
+  // Кэшируем store reference чтобы избежать пересоздания
+  const storeRef = useRef<ReturnType<typeof useFilterStore> | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = useFilterStore();
+  }
   const queryClient = useQueryClient();
 
   const connect = useCallback(() => {
@@ -66,7 +70,7 @@ export const useScanProgressWebSocket = () => {
           // Поддержка параллельных сканирований (v3.1)
           if (data.scanning_cities) {
             const activeCities = data.scanning_cities.map((s: any) => s.city);
-            const currentScanningCities = store.getScanningCities();
+            const currentScanningCities = storeRef.current!.getScanningCities();
 
             // Обновить или добавить активные сканирования
             data.scanning_cities.forEach((scan: any) => {
@@ -74,7 +78,7 @@ export const useScanProgressWebSocket = () => {
               const existing = currentScanningCities.find((s) => s.city === scan.city);
 
               if (existing) {
-                store.updateScanningCity(scan.city, {
+                storeRef.current!.updateScanningCity(scan.city, {
                   progress: progressPercent,
                   stage: scan.stage,
                   elapsed_seconds: scan.elapsed_seconds,
@@ -83,7 +87,7 @@ export const useScanProgressWebSocket = () => {
                   listings_processed: scan.listings_processed,
                 });
               } else {
-                store.addScanningCity({
+                storeRef.current!.addScanningCity({
                   city: scan.city,
                   city_name: scan.city_name,
                   trigger_type: scan.trigger_type,
@@ -101,7 +105,7 @@ export const useScanProgressWebSocket = () => {
             // Удалить завершённые сканирования
             currentScanningCities.forEach((s) => {
               if (!activeCities.includes(s.city)) {
-                store.removeScanningCity(s.city);
+                storeRef.current!.removeScanningCity(s.city);
                 // Инвалидировать кэш после завершения
                 queryClient.invalidateQueries({ queryKey: ['scanHistory'] });
                 queryClient.invalidateQueries({ queryKey: ['listings'] });
@@ -111,7 +115,7 @@ export const useScanProgressWebSocket = () => {
             });
           }
 
-          // Обновить progress state только если изменилось is_scanning
+          // Обновить progress state только если изменилось is_scanning или stage
           setProgress((prev) => {
             if (prev.is_scanning !== data.is_scanning || prev.stage !== data.stage) {
               return data;
@@ -141,7 +145,7 @@ export const useScanProgressWebSocket = () => {
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
     }
-  }, [queryClient, store]);
+  }, [queryClient]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
