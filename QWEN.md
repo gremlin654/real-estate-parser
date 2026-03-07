@@ -56,13 +56,14 @@
 - **История изменений** — полная история всех событий по каждому объявлению
 - **История сканирований** — отслеживание запусков сканера, статистика, ошибки
 - **Мультигород** — поддержка 6 городов (Минск, Могилёв, Гродно, Брест, Гомель, Витебск)
-- **Real-time прогресс** — отображение прогресса сканирования в реальном времени с прогресс-баром
-- **Галерея изображений** — полноразмерные изображения с CDN Kufar
+- **Real-time прогресс** — WebSocket для отображения прогресса в реальном времени (v3.0)
+- **Галерея изображений** — полноразмерные изображения с CDN Kufar (rms.kufar.by)
 - **Тёмная тема** — современный дизайн в тёмных тонах
 - **Admin-панель** — боковая навигация
 - **📊 Графики и аналитика** — динамика цен, распределение по комнатам, активность по дням (v2.0)
 - **📤 Экспорт данных** — выгрузка в CSV, XLSX, JSON (v2.0)
 - **🔄 CI/CD** — автоматические тесты и deployment (v2.0)
+- **💱 Фильтр валюты** — переключение USD/BYN на лету (v3.0)
 
 ## Архитектура
 
@@ -87,8 +88,8 @@
 | **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, React Router, Zustand, TanStack Query, shadcn/ui, lucide-react, recharts, **Playwright (E2E - 118 тестов)**, **Vitest (Unit - 326 тестов)**, **monocart-coverage-reports (66.12% coverage)** |
 | **Backend** | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, **pytest (API тесты - 201 тест)**, pandas, openpyxl |
 | **Database** | PostgreSQL 16, Alembic (миграции) |
-| **Scraper** | Playwright (Chromium), BeautifulSoup4, aiohttp |
-| **Infrastructure** | Docker, Docker Compose, **GitHub Actions (CI/CD)** |
+| **Scraper** | Playwright (Chromium), BeautifulSoup4, aiohttp, httpx |
+| **Infrastructure** | Docker, Docker Compose, **GitHub Actions (CI/CD)**, WebSocket |
 | **Testing** | Playwright (E2E - 118 тестов), Vitest (Unit - 326 тестов, 66.12% coverage), pytest (API - 201 тест, 55% coverage), monocart-coverage-reports, istanbul/v8, @testing-library/react |
 | **Analytics** | Recharts (графики и диаграммы) |
 
@@ -98,7 +99,7 @@
 web/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/           # API маршруты (listings, history, stats, scan, export)
+│   │   ├── api/v1/           # API маршруты (listings, history, stats, scan, export, ws)
 │   │   ├── core/             # Ядро приложения (logging_config.py)
 │   │   ├── db/               # Подключение к БД и миграции
 │   │   ├── models/           # SQLAlchemy модели (Listing, ListingHistory, ScanHistory)
@@ -107,6 +108,7 @@ web/
 │   │   ├── services/         # Бизнес-логика (listing_service.py, scan_history_service.py)
 │   │   ├── config.py         # Конфигурация
 │   │   └── main.py           # FastAPI приложение
+│   │   └── docs/             # Документация (WEBSOCKET.md, LOGGING.md, SCAN_HISTORY.md)
 │   ├── tests/                # Pytest тесты (201 тест)
 │   │   ├── conftest.py       # Фикстуры
 │   │   ├── test_health.py
@@ -132,7 +134,7 @@ web/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── api/              # API хуки (TanStack Query)
+│   │   ├── api/              # API хуки (TanStack Query, WebSocket)
 │   │   ├── api/listings.test.tsx
 │   │   ├── components/
 │   │   │   ├── ui/           # shadcn/ui компоненты
@@ -144,9 +146,11 @@ web/
 │   │   │   │   └── HistoryTimeline.test.tsx
 │   │   │   ├── Layout.test.tsx
 │   │   │   └── AppLayout.test.tsx
+│   │   ├── features/         # Фичи (filter-by-currency, export-listings, etc.)
+│   │   │   └── listings/filter-by-currency/  # Фильтр валюты (v3.0)
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx # Обновлён: графики (v2.0)
-│   │   │   ├── Listings.tsx  # Обновлён: экспорт (v2.0)
+│   │   │   ├── Listings.tsx  # Обновлён: экспорт (v2.0), фильтр валюты (v3.0)
 │   │   │   ├── ListingDetail.tsx
 │   │   │   ├── Settings.tsx
 │   │   │   └── Statistics.tsx
@@ -347,7 +351,8 @@ GET /api/v1/stats/city-comparison
 ```bash
 POST /api/v1/scan/trigger      # Ручное сканирование
 GET /api/v1/scan/status        # Статус сканирования
-GET /api/v1/scan/progress      # Real-time прогресс
+GET /api/v1/scan/progress      # Real-time прогресс (устарело, используйте WebSocket)
+WS /ws/scan/progress           # WebSocket для real-time прогресса (v3.0)
 GET /api/v1/scan/city          # Текущий город
 POST /api/v1/scan/city         # Изменить город
 GET /api/v1/scan/cities        # Доступные города
@@ -478,10 +483,10 @@ uuid,12345,2-комн квартира,125000,38000,BYN,minsk,пр. Незави
 |---------|-----|----------|
 | `id` | UUID | Первичный ключ |
 | `kufar_id` | String | ID объявления на Kufar (уникальный) |
-| `url` | Text | Ссылка на объявление |
+| `url` | Text | Ссылка на объявление (формат: /vi/{city}/kupit/kvartiru/{id}) |
 | `title` | Text | Заголовок |
-| `price` | Integer | Цена в BYN |
-| `price_usd` | Integer | Цена в USD (опционально) |
+| `price` | Integer | Цена в BYN (делённая на 100, Kufar возвращает в копейках) |
+| `price_usd` | Integer | Цена в USD (опционально, делённая на 100) |
 | `currency` | String | Валюта: BYN или USD |
 | `city` | String | Код города |
 | `address` | Text | Адрес/местоположение |
@@ -494,7 +499,7 @@ uuid,12345,2-комн квартира,125000,38000,BYN,minsk,пр. Незави
 | `district` | String | Район города |
 | `metro` | String | Станция метро |
 | `house_year` | Integer | Год постройки |
-| `images` | JSONB | Массив URL изображений |
+| `images` | JSONB | Массив URL изображений (формат: https://rms.kufar.by/v1/gallery/{path}) |
 | `raw_data` | JSONB | Исходные данные |
 | `status` | Enum | Статус (new, active, updated, deleted, archived) |
 | `first_seen_at` | DateTime | Первое обнаружение |
@@ -587,7 +592,7 @@ POSTGRES_PASSWORD=secret
 |--------|----------|
 | `new` | Новое объявление (первое обнаружение в текущем цикле сканирования) |
 | `active` | Активное объявление (без изменений цены или восстановлено после удаления) |
-| `updated` | Объявление обновлено — **изменилась цена в долларах (price_usd)** |
+| `updated` | Объявление обновлено — **изменилась цена в долларах (price_usd)** (v3.0) |
 | `price_changed_byn` | Изменилась цена в **BYN** (без изменения USD цены) |
 | `deleted` | Объявление удалено (исчезло с Kufar.by) — хранится 30 дней |
 | `archived` | Архивное объявление — удалено более 30 дней назад (автоматически) |
@@ -597,6 +602,10 @@ POSTGRES_PASSWORD=secret
 - Все объявления со статусом `deleted` и `deleted_at < 30 дней` получают статус `archived`
 - Архивные объявления скрыты из выдачи по умолчанию
 - Для просмотра используйте фильтр `status=archived`
+
+**Восстановление объявлений (v3.0):**
+- Если удалённое объявление снова появляется в API, оно автоматически восстанавливается в статус `active`
+- Логика: при upsert проверяется `was_deleted`, если `true` → статус меняется на `active`
 
 ## Соглашения разработки
 
@@ -816,6 +825,29 @@ docker-compose up --build
 
 ## Ключевые детали реализации
 
+### WebSocket API (v3.0)
+
+**Endpoint:** `WS /ws/scan/progress`
+
+**Подключение:**
+```typescript
+const ws = new WebSocket('ws://localhost:8000/ws/scan/progress');
+ws.onmessage = (event) => {
+  const progress = JSON.parse(event.data);
+  // progress: { is_scanning, city, stage, pages_scraped, listings_fetched, ... }
+};
+```
+
+**Frontend hook:** `useScanProgressWebSocket()` в `frontend/src/api/listings.ts`
+
+**Backend:** `ConnectionManager` в `backend/app/api/v1/ws.py`
+
+**Вещание прогресса:**
+- Вызывается после каждого обновления прогресса в `_broadcast_progress()`
+- Отправляет текущий статус всем подключённым клиентам
+
+**Документация:** `backend/docs/WEBSOCKET.md`
+
 ### Компонент History Timeline
 
 Компонент `HistoryTimeline` (`frontend/src/components/listing/HistoryTimeline.tsx`) отображает вертикальную линию времени событий объявления:
@@ -979,9 +1011,46 @@ curl -X PUT http://localhost:8000/api/v1/scan/schedule \
 
 **`backend/app/services/listing_service.py`:**
 
-- **`updated`** — устанавливается **только при изменении `price_usd`**
+```python
+# Сохраняем старую цену USD
+old_price_usd = existing.price_usd
+
+# Обновляем все поля
+for key, value in listing_data.items():
+    if key != 'kufar_id':
+        setattr(existing, key, value)
+
+# Проверяем изменения
+if was_deleted:
+    existing.status = ListingStatus.active  # Восстановление
+elif old_price_usd is not None and existing.price_usd is not None and old_price_usd != existing.price_usd:
+    existing.status = ListingStatus.updated  # Изменение цены USD
+else:
+    existing.status = ListingStatus.active  # Без изменений
+```
+
+- **`updated`** — устанавливается **только при изменении `price_usd`** (v3.0)
 - **`active`** — при изменении других полей или без изменений
+- **`deleted`** — если объявление исчезло из API
+- **Восстановление** — если `deleted` объявление снова появилось → `active`
 - **Логирование** — `logger.info(f"Price USD changed for {kufar_id}: {old} -> {new}")`
+
+### Парсинг данных Kufar (v3.0)
+
+**Цены:**
+- Kufar возвращает цены в копейках/центах (умноженные на 100)
+- Парсер делит на 100: `price = price_raw // 100`
+- Пример: 12,278,675 → 122,786 BYN = $42,500
+
+**Ссылки:**
+- Формат: `https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}`
+- Пример: `https://re.kufar.by/vi/mogilev/kupit/kvartiru/1030854838`
+
+**Картинки:**
+- Формат: `https://rms.kufar.by/v1/gallery/{path}`
+- Пример: `https://rms4.kufar.by/v1/gallery/adim1/9ba1ee93-e3cd-4086-afa1-06d36a2a444f.jpg`
+
+**Парсер:** `backend/app/scraper/kufar_scraper.py`, метод `_parse_ad()`
 
 ### Глобальное состояние сканирования
 
@@ -1004,3 +1073,24 @@ setManualScanning: (scanning: boolean) => void;
 - Скорость сканирования: ~53 секунды для 546 объявлений через API (~0.1 сек/объявление)
 - С парсингом детальных страниц: ~10-15 минут для 546 объявлений (~1.1-1.6 сек/объявление)
 - **Важно:** Прогресс может показывать неточные данные во время `fetching` (данные нестабильны)
+
+## Версии
+
+### v3.0 (текущая)
+- ✅ WebSocket для real-time прогресса сканирования
+- ✅ Исправление цен (деление на 100)
+- ✅ Исправление ссылок и картинок
+- ✅ Статус `updated` при изменении `price_usd`
+- ✅ Восстановление `deleted` объявлений
+- ✅ Фильтр валюты USD/BYN
+- ✅ Сортировка: newest, oldest, asc, desc
+
+### v2.0
+- 📊 Графики и аналитика
+- 📤 Экспорт данных (CSV, XLSX, JSON)
+- 🔄 CI/CD pipeline
+
+### v1.0
+- Базовая функциональность сканирования
+- REST API
+- Веб-интерфейс
