@@ -103,7 +103,7 @@ export const useScanProgressWebSocket = () => {
               const existing = currentScanningCities.find((s) => s.city === scan.city);
 
               if (existing) {
-                console.log(`Updating city ${scan.city}: progress=${progressPercent}, stage=${scan.stage}`);
+                console.log(`Updating city ${scan.city}: progress=${progressPercent}, stage=${scan.stage}, pages=${scan.pages_scraped}`);
                 storeMethods.updateScanningCity(scan.city, {
                   progress: progressPercent,
                   stage: scan.stage,
@@ -113,7 +113,7 @@ export const useScanProgressWebSocket = () => {
                   listings_processed: scan.listings_processed,
                 });
               } else {
-                console.log(`Adding new city ${scan.city}: progress=${progressPercent}`);
+                console.log(`Adding new city ${scan.city}: progress=${progressPercent}, stage=${scan.stage}`);
                 storeMethods.addScanningCity({
                   city: scan.city,
                   city_name: scan.city_name,

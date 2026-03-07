@@ -70,12 +70,18 @@ class ScraperScheduler:
         """Получить список всех активных сканирований."""
         result = []
         for city, data in self.scanning_cities.items():
+            progress = data.get("progress", {})
             result.append({
                 "city": city,
                 "city_name": CITY_NAMES.get(city, city),
                 "trigger_type": data["trigger_type"],
                 "started_at": data["started_at"].isoformat(),
-                "progress": data["progress"]
+                "stage": progress.get("stage", "unknown"),
+                "pages_scraped": progress.get("pages_scraped", 0),
+                "listings_fetched": progress.get("listings_fetched", 0),
+                "listings_processed": progress.get("listings_processed", 0),
+                "elapsed_seconds": progress.get("elapsed_seconds", 0),
+                "is_stable": progress.get("is_stable", False),
             })
         return result
 
