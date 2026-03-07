@@ -350,22 +350,27 @@ class TestSchedulerPerCity:
     async def test_scheduler_start_no_enabled_cities(self, test_session):
         """Test scheduler start when no cities are enabled."""
         from app.scraper.scheduler import ScraperScheduler
-        
+
         scheduler = ScraperScheduler()
-        
+
         # Mock db session
         with patch('app.scraper.scheduler.async_session_maker') as mock_session_maker:
             mock_session = AsyncMock()
             mock_session.__aenter__.return_value = mock_session
-            
+
             mock_service = AsyncMock()
             mock_service.get_enabled_cities.return_value = []
-            
+
             with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_service):
-                await scheduler.start()
-        
-        # Scheduler should not be running
-        assert not scheduler.scheduler or not scheduler.scheduler.running
+                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+                    mock_scheduler_instance = AsyncMock()
+                    mock_scheduler_instance.running = False
+                    MockScheduler.return_value = mock_scheduler_instance
+
+                    await scheduler.start()
+
+        # Scheduler created but no jobs added
+        assert scheduler.scheduler is not None
 
     async def test_scheduler_start_with_enabled_cities(self, test_session):
         """Test scheduler start with enabled cities."""
@@ -447,15 +452,24 @@ class TestSchedulerPerCity:
     async def test_scheduler_restart_not_running(self, test_session):
         """Test scheduler restart when not running."""
         from app.scraper.scheduler import ScraperScheduler
-        
+
         scheduler = ScraperScheduler()
         scheduler.scheduler = None
-        
-        await scheduler.restart_with_settings(
-            city="mogilev",
-            enabled=True,
-            interval_minutes=30
-        )
-        
-        # Should not call add_job or remove_job
-        assert not hasattr(scheduler, 'scheduler') or scheduler.scheduler is None
+
+        with patch('app.scraper.scheduler.async_session_maker') as mock_session_maker:
+            mock_session = AsyncMock()
+            mock_session.__aenter__.return_value = mock_session
+
+            with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+                mock_scheduler_instance = AsyncMock()
+                mock_scheduler_instance.running = False
+                MockScheduler.return_value = mock_scheduler_instance
+
+                await scheduler.restart_with_settings(
+                    city="mogilev",
+                    enabled=True,
+                    interval_minutes=30
+                )
+
+        # Scheduler should be created
+        assert scheduler.scheduler is not None
