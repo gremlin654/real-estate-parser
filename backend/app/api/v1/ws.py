@@ -1,6 +1,7 @@
 """
 WebSocket endpoint для real-time прогресса сканирования.
 """
+
 import asyncio
 import json
 from typing import Set, Dict, List
@@ -38,7 +39,9 @@ class ConnectionManager:
         await websocket.accept()
         async with self._lock:
             self.active_connections.add(websocket)
-            logger.debug(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+            logger.debug(
+                f"WebSocket connected. Total connections: {len(self.active_connections)}"
+            )
 
             # Отправить текущий прогресс новому подключению
             await self._send_progress(websocket, self._get_current_message())
@@ -47,7 +50,9 @@ class ConnectionManager:
         """Закрыть WebSocket подключение."""
         async with self._lock:
             self.active_connections.discard(websocket)
-            logger.debug(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+            logger.debug(
+                f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
+            )
 
     def _get_current_message(self) -> Dict:
         """Сформировать текущее сообщение с прогрессом."""
@@ -57,7 +62,7 @@ class ConnectionManager:
 
     async def broadcast_progress(self, progress: Dict):
         """Отправить прогресс всем подключенным клиентам.
-        
+
         Args:
             progress: Прогресс для конкретного города из scheduler.scan_progress
         """
@@ -68,7 +73,7 @@ class ConnectionManager:
         async with self._lock:
             disconnected = set()
             message = self._get_current_message()
-            
+
             for connection in self.active_connections:
                 try:
                     await self._send_progress(connection, message)
@@ -82,7 +87,7 @@ class ConnectionManager:
 
     async def update_scanning_cities(self, scanning_cities: List[Dict]):
         """Обновить список активных сканирований.
-        
+
         Args:
             scanning_cities: Список сканируемых городов из scheduler._get_scanning_cities()
         """
@@ -102,12 +107,12 @@ manager = ConnectionManager()
 async def scan_progress_websocket(websocket: WebSocket):
     """
     WebSocket endpoint для получения real-time прогресса сканирования.
-    
+
     Клиент получает обновления при:
     - Изменении стадии сканирования
     - Обновлении количества обработанных страниц/объявлений
     - Завершении сканирования
-    
+
     Пример подключения:
         const ws = new WebSocket('ws://localhost:8000/ws/scan/progress')
         ws.onmessage = (event) => {

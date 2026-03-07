@@ -64,12 +64,16 @@ class Listing(Base):
     house_year = Column(Integer)
     images = Column(JSONB, default=list)
     raw_data = Column(JSONB)
-    status = Column(SQLEnum(ListingStatus, create_type=False), default=ListingStatus.active)
+    status = Column(
+        SQLEnum(ListingStatus, create_type=False), default=ListingStatus.active
+    )
     first_seen_at = Column(DateTime, default=utc_now)
     last_seen_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime)
 
-    history = relationship("ListingHistory", back_populates="listing", cascade="all, delete-orphan")
+    history = relationship(
+        "ListingHistory", back_populates="listing", cascade="all, delete-orphan"
+    )
 
 
 class ListingHistory(Base):

@@ -12,7 +12,9 @@ class ListingService:
         self.db = db
 
     async def get_by_kufar_id(self, kufar_id: str) -> Listing | None:
-        result = await self.db.execute(select(Listing).where(Listing.kufar_id == kufar_id))
+        result = await self.db.execute(
+            select(Listing).where(Listing.kufar_id == kufar_id)
+        )
         return result.scalar_one_or_none()
 
     async def _create_history_event(
@@ -36,7 +38,7 @@ class ListingService:
         self.db.add(history)
 
     async def upsert(self, listing_data: dict) -> tuple[Listing, str]:
-        kufar_id = listing_data['kufar_id']
+        kufar_id = listing_data["kufar_id"]
         existing = await self.get_by_kufar_id(kufar_id)
 
         if existing:
@@ -48,7 +50,7 @@ class ListingService:
             # Собираем изменённые поля
             changed_fields = {}
             for key, value in listing_data.items():
-                if key != 'kufar_id':
+                if key != "kufar_id":
                     old_value = getattr(existing, key, None)
                     if old_value != value:
                         changed_fields[key] = [old_value, value]
@@ -64,14 +66,20 @@ class ListingService:
                 await self._create_history_event(
                     listing_id=existing.id,
                     event_type=EventType.restored,
-                    snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
+                    snapshot=json.loads(
+                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    ),
                 )
                 logger.info(f"Listing {kufar_id} restored after deletion")
                 await self.db.commit()
                 await self.db.refresh(existing)
-                return existing, 'restored'
+                return existing, "restored"
             # Устанавливаем статус updated только если изменилась цена USD
-            elif old_price_usd is not None and existing.price_usd is not None and old_price_usd != existing.price_usd:
+            elif (
+                old_price_usd is not None
+                and existing.price_usd is not None
+                and old_price_usd != existing.price_usd
+            ):
                 existing.status = ListingStatus.updated
                 # Создаём событие изменения цены USD
                 await self._create_history_event(
@@ -80,14 +88,22 @@ class ListingService:
                     price_before=old_price_usd,
                     price_after=existing.price_usd,
                     changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
+                    snapshot=json.loads(
+                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    ),
                 )
-                logger.info(f"Price USD changed for {kufar_id}: {old_price_usd} -> {existing.price_usd}")
+                logger.info(
+                    f"Price USD changed for {kufar_id}: {old_price_usd} -> {existing.price_usd}"
+                )
                 await self.db.commit()
                 await self.db.refresh(existing)
-                return existing, 'updated'
+                return existing, "updated"
             # Изменилась цена BYN но не USD
-            elif old_price_byn is not None and existing.price is not None and old_price_byn != existing.price:
+            elif (
+                old_price_byn is not None
+                and existing.price is not None
+                and old_price_byn != existing.price
+            ):
                 existing.status = ListingStatus.price_changed_byn
                 # Создаём событие изменения цены BYN
                 await self._create_history_event(
@@ -96,19 +112,23 @@ class ListingService:
                     price_before=old_price_byn,
                     price_after=existing.price,
                     changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(json.dumps(existing.__dict__, default=str, skipkeys=True)),
+                    snapshot=json.loads(
+                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    ),
                 )
-                logger.info(f"Price BYN changed for {kufar_id}: {old_price_byn} -> {existing.price} (USD unchanged)")
+                logger.info(
+                    f"Price BYN changed for {kufar_id}: {old_price_byn} -> {existing.price} (USD unchanged)"
+                )
                 await self.db.commit()
                 await self.db.refresh(existing)
-                return existing, 'changed_byn'
+                return existing, "changed_byn"
             else:
                 # Оставляем статус active - никаких значимых изменений
                 existing.status = ListingStatus.active
                 # НЕ создаём событие истории для обычных изменений
                 await self.db.commit()
                 await self.db.refresh(existing)
-                return existing, 'unchanged'
+                return existing, "unchanged"
         else:
             # Create new
             new_listing = Listing(**listing_data)
@@ -120,11 +140,13 @@ class ListingService:
             await self._create_history_event(
                 listing_id=new_listing.id,
                 event_type=EventType.created,
-                snapshot=json.loads(json.dumps(new_listing.__dict__, default=str, skipkeys=True)),
+                snapshot=json.loads(
+                    json.dumps(new_listing.__dict__, default=str, skipkeys=True)
+                ),
             )
             logger.info(f"New listing created: {kufar_id}")
 
-            return new_listing, 'created'
+            return new_listing, "created"
 
     async def upsert_listings(self, listings_data: list[dict], city: str) -> dict:
         """Массовое обновление/создание объявлений"""
@@ -145,15 +167,15 @@ class ListingService:
                 listing, action = await self.upsert(listing_data)
                 kufar_ids.add(listing.kufar_id)
 
-                if action == 'created':
+                if action == "created":
                     stats["created"] += 1
-                elif action == 'updated':
+                elif action == "updated":
                     stats["updated"] += 1
-                elif action == 'changed_byn':
+                elif action == "changed_byn":
                     stats["changed_byn"] += 1
-                elif action == 'restored':
+                elif action == "restored":
                     stats["restored"] += 1
-                elif action == 'unchanged':
+                elif action == "unchanged":
                     stats["unchanged"] += 1
 
                 stats["processed"] += 1
@@ -173,7 +195,9 @@ class ListingService:
                 and_(
                     Listing.kufar_id.not_in(kufar_ids),
                     Listing.city == city,
-                    Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated])
+                    Listing.status.in_(
+                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+                    ),
                 )
             )
         )
@@ -186,7 +210,9 @@ class ListingService:
             await self._create_history_event(
                 listing_id=listing.id,
                 event_type=EventType.deleted,
-                snapshot=json.loads(json.dumps(listing.__dict__, default=str, skipkeys=True)),
+                snapshot=json.loads(
+                    json.dumps(listing.__dict__, default=str, skipkeys=True)
+                ),
             )
 
         await self.db.commit()

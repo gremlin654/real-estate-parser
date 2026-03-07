@@ -15,7 +15,9 @@ from app.services.scan_settings_service import ScanSettingsService
 class ScraperScheduler:
     def __init__(self):
         self.scheduler: Optional[AsyncIOScheduler] = None
-        self.is_running = False  # Обратная совместимость: True если len(scanning_cities) > 0
+        self.is_running = (
+            False  # Обратная совместимость: True если len(scanning_cities) > 0
+        )
         self.scan_progress = {
             "is_scanning": False,
             "city": None,
@@ -50,7 +52,7 @@ class ScraperScheduler:
                     "listings_processed": 0,
                     "elapsed_seconds": 0,
                     "is_stable": False,
-                }
+                },
             }
             # Обратная совместимость
             self.is_running = len(self.scanning_cities) > 0
@@ -71,18 +73,20 @@ class ScraperScheduler:
         result = []
         for city, data in self.scanning_cities.items():
             progress = data.get("progress", {})
-            result.append({
-                "city": city,
-                "city_name": CITY_NAMES.get(city, city),
-                "trigger_type": data["trigger_type"],
-                "started_at": data["started_at"].isoformat(),
-                "stage": progress.get("stage", "unknown"),
-                "pages_scraped": progress.get("pages_scraped", 0),
-                "listings_fetched": progress.get("listings_fetched", 0),
-                "listings_processed": progress.get("listings_processed", 0),
-                "elapsed_seconds": progress.get("elapsed_seconds", 0),
-                "is_stable": progress.get("is_stable", False),
-            })
+            result.append(
+                {
+                    "city": city,
+                    "city_name": CITY_NAMES.get(city, city),
+                    "trigger_type": data["trigger_type"],
+                    "started_at": data["started_at"].isoformat(),
+                    "stage": progress.get("stage", "unknown"),
+                    "pages_scraped": progress.get("pages_scraped", 0),
+                    "listings_fetched": progress.get("listings_fetched", 0),
+                    "listings_processed": progress.get("listings_processed", 0),
+                    "elapsed_seconds": progress.get("elapsed_seconds", 0),
+                    "is_stable": progress.get("is_stable", False),
+                }
+            )
         return result
 
     async def _update_city_progress(self, city: str, progress: Dict):
@@ -95,13 +99,16 @@ class ScraperScheduler:
         """Отправить текущий прогресс всем WebSocket клиентам."""
         if self._ws_manager is None:
             from app.api.v1.ws import get_scan_manager
+
             self._ws_manager = get_scan_manager()
 
         try:
             # Обновить список сканируемых городов в ws_manager
             await self._ws_manager.update_scanning_cities(self._get_scanning_cities())
-            
-            logger.info(f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}")
+
+            logger.info(
+                f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}"
+            )
             await self._ws_manager.broadcast_progress(self.scan_progress)
         except Exception as e:
             logger.warning(f"Failed to broadcast WebSocket progress: {e}")
@@ -156,7 +163,7 @@ class ScraperScheduler:
             scan_record = await scan_history_service.create_scan_record(
                 city=city,
                 city_name=CITY_NAMES.get(city, city),
-                trigger_type="scheduled"
+                trigger_type="scheduled",
             )
 
         logger.info(f"Starting scheduled scan for {city}, scan_id: {scan_record.id}")
@@ -165,7 +172,9 @@ class ScraperScheduler:
         await self._add_scanning_city(city, "scheduled", str(scan_record.id))
         await self._broadcast_progress()
 
-        logger.info(f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}")
+        logger.info(
+            f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}"
+        )
 
         # Background task для периодической отправки прогресса (каждую 1 секунду)
         async def periodic_progress():
@@ -181,11 +190,14 @@ class ScraperScheduler:
                 listing_service = ListingService(db)
 
                 # Парсинг страниц
-                await self._update_city_progress(city, {
-                    **self.scanning_cities[city]["progress"],
-                    "stage": "fetching",
-                    "is_stable": False,
-                })
+                await self._update_city_progress(
+                    city,
+                    {
+                        **self.scanning_cities[city]["progress"],
+                        "stage": "fetching",
+                        "is_stable": False,
+                    },
+                )
                 await self._broadcast_progress()
 
                 # Запускаем сканирование через HTTP (быстро и надежно)
@@ -214,11 +226,17 @@ class ScraperScheduler:
                     progress = self.scanning_cities[city]["progress"]
                     progress["pages_scraped"] = page_num + 1
                     progress["listings_fetched"] = len(all_listings)
-                    progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+                    progress["elapsed_seconds"] = int(
+                        (
+                            datetime.now(timezone.utc).replace(tzinfo=None) - start_time
+                        ).total_seconds()
+                    )
                     await self._update_city_progress(city, progress)
                     await self._broadcast_progress()
 
-                    logger.info(f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}")
+                    logger.info(
+                        f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}"
+                    )
 
                     # Check if there's a next cursor
                     if not next_cursor or next_cursor == cursor:
@@ -238,30 +256,40 @@ class ScraperScheduler:
                 await scan_history_service.update_scan_record(
                     scan_id=str(scan_record.id),
                     listings_fetched=len(listings_data),
-                    pages_scraped=pages_scraped
+                    pages_scraped=pages_scraped,
                 )
 
                 # Парсинг и сохранение
-                await self._update_city_progress(city, {
-                    **self.scanning_cities[city]["progress"],
-                    "stage": "upserting",
-                    "is_stable": False,
-                })
+                await self._update_city_progress(
+                    city,
+                    {
+                        **self.scanning_cities[city]["progress"],
+                        "stage": "upserting",
+                        "is_stable": False,
+                    },
+                )
                 await self._broadcast_progress()
 
                 stats = await listing_service.upsert_listings(listings_data, city)
 
                 progress = self.scanning_cities[city]["progress"]
                 progress["listings_processed"] = stats.get("processed", 0)
-                progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+                progress["elapsed_seconds"] = int(
+                    (
+                        datetime.now(timezone.utc).replace(tzinfo=None) - start_time
+                    ).total_seconds()
+                )
                 await self._update_city_progress(city, progress)
                 await self._broadcast_progress()
 
-                await self._update_city_progress(city, {
-                    **self.scanning_cities[city]["progress"],
-                    "stage": "marking_deleted_final",
-                    "is_stable": True,
-                })
+                await self._update_city_progress(
+                    city,
+                    {
+                        **self.scanning_cities[city]["progress"],
+                        "stage": "marking_deleted_final",
+                        "is_stable": True,
+                    },
+                )
                 await self._broadcast_progress()
 
                 # Завершение записи сканирования
@@ -276,7 +304,7 @@ class ScraperScheduler:
                     listings_restored=stats.get("restored", 0),
                     listings_unchanged=stats.get("unchanged", 0),
                     pages_scraped=pages_scraped,
-                    duration_seconds=int((end_time - start_time).total_seconds())
+                    duration_seconds=int((end_time - start_time).total_seconds()),
                 )
 
                 logger.info(f"Scheduled scan completed: {stats}")
@@ -284,21 +312,23 @@ class ScraperScheduler:
         except Exception as e:
             logger.error(f"Scheduled scan error: {e}")
             import traceback
+
             traceback.print_exc()
             async with async_session_maker() as db:
                 scan_history_service = ScanHistoryService(db)
                 await scan_history_service.complete_scan_record(
-                    scan_id=str(scan_record.id),
-                    status="error",
-                    error_message=str(e)
+                    scan_id=str(scan_record.id), status="error", error_message=str(e)
                 )
             # Отправить ошибку через WebSocket
             if city in self.scanning_cities:
-                await self._update_city_progress(city, {
-                    **self.scanning_cities[city]["progress"],
-                    "stage": "error",
-                    "is_stable": True,
-                })
+                await self._update_city_progress(
+                    city,
+                    {
+                        **self.scanning_cities[city]["progress"],
+                        "stage": "error",
+                        "is_stable": True,
+                    },
+                )
                 await self._broadcast_progress()
         finally:
             # Всегда очищать scanning_cities
@@ -317,7 +347,9 @@ class ScraperScheduler:
             self.is_running = False
             logger.info("Scheduler stopped")
 
-    async def restart_with_settings(self, city: str, enabled: bool, interval_minutes: int):
+    async def restart_with_settings(
+        self, city: str, enabled: bool, interval_minutes: int
+    ):
         """Перезапуск scheduler для конкретного города."""
         # Если scheduler не создан или не запущен - создаём и запускаем
         if not self.scheduler or not self.scheduler.running:
@@ -341,7 +373,9 @@ class ScraperScheduler:
                 id=job_id,
                 replace_existing=True,
             )
-            logger.info(f"Scheduled scan enabled for {city} with interval {interval_minutes} min")
+            logger.info(
+                f"Scheduled scan enabled for {city} with interval {interval_minutes} min"
+            )
         else:
             logger.info(f"Scheduled scan disabled for {city}")
 

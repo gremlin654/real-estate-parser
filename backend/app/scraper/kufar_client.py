@@ -12,7 +12,9 @@ class KufarAPIClient:
             "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
         }
 
-    async def fetch_listings(self, city: str = "mogilev", page: int = 1) -> Optional[dict]:
+    async def fetch_listings(
+        self, city: str = "mogilev", page: int = 1
+    ) -> Optional[dict]:
         # Используем публичный API Kufar с параметрами города
         url = f"https://search-api.kufar.by/v1/search/rendered-paginated"
         params = {

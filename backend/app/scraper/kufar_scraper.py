@@ -43,10 +43,12 @@ class KufarScraper:
 
     def _extract_next_data(self, html: str) -> Optional[dict]:
         """Extract __NEXT_DATA__ from HTML."""
-        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+        match = re.search(
+            r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL
+        )
         if not match:
             return None
-        
+
         try:
             return json.loads(match.group(1))
         except json.JSONDecodeError:
@@ -60,11 +62,13 @@ class KufarScraper:
             price_byn = ad.get("price_byn", 0)
             price_usd = ad.get("price_usd", 0)
             currency = ad.get("currency", "BYN")
-            
+
             # Extract location
             location = ad.get("location", {})
-            address = location.get("geography", {}).get("displayName", "") if location else ""
-            
+            address = (
+                location.get("geography", {}).get("displayName", "") if location else ""
+            )
+
             # Extract parameters - can be dict or list of dicts
             ad_params_raw = ad.get("ad_parameters", {})
             ad_params = {}
@@ -135,7 +139,10 @@ class KufarScraper:
                 try:
                     if isinstance(total_floors_raw, (int, float)):
                         total_floors = int(total_floors_raw)
-                    elif isinstance(total_floors_raw, str) and total_floors_raw.strip().isdigit():
+                    elif (
+                        isinstance(total_floors_raw, str)
+                        and total_floors_raw.strip().isdigit()
+                    ):
                         total_floors = int(total_floors_raw.strip())
                     # Иначе оставляем None
                 except (ValueError, TypeError):
@@ -183,7 +190,11 @@ class KufarScraper:
 
             listing = {
                 "kufar_id": ad_id,
-                "url": f"https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}" if city else f"https://re.kufar.by/vi/{ad_id}",
+                "url": (
+                    f"https://re.kufar.by/vi/{city}/kupit/kvartiru/{ad_id}"
+                    if city
+                    else f"https://re.kufar.by/vi/{ad_id}"
+                ),
                 "title": ad.get("subject", ""),
                 "price": price_byn_int // 100 if price_byn_int > 0 else 0,
                 "price_usd": price_usd_int // 100 if price_usd_int > 0 else 0,
@@ -207,6 +218,7 @@ class KufarScraper:
         except Exception as e:
             logger.error(f"Error parsing ad: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
@@ -229,39 +241,51 @@ class KufarScraper:
         """
         try:
             session = await self._get_session()
-            
+
             logger.info(f"Fetching via HTTP: {url}")
             async with session.get(url, timeout=self.timeout) as response:
                 html = await response.text()
-            
+
             logger.info(f"HTTP HTML size: {len(html)} bytes")
-            
+
             # Extract __NEXT_DATA__
             next_data = self._extract_next_data(html)
             if not next_data:
                 logger.warning("__NEXT_DATA__ not found in HTML")
                 return [], None
-            
+
             # Extract ads from props.initialState.listing.ads
-            ads = next_data.get("props", {}).get("initialState", {}).get("listing", {}).get("ads", [])
-            
+            ads = (
+                next_data.get("props", {})
+                .get("initialState", {})
+                .get("listing", {})
+                .get("ads", [])
+            )
+
             # Extract cursor from pagination
             next_cursor = None
-            pagination = next_data.get("props", {}).get("initialState", {}).get("listing", {}).get("pagination", [])
+            pagination = (
+                next_data.get("props", {})
+                .get("initialState", {})
+                .get("listing", {})
+                .get("pagination", [])
+            )
             if isinstance(pagination, list):
                 for item in pagination:
                     if isinstance(item, dict) and item.get("label") == "next":
                         next_cursor = item.get("token")
                         break
-            
+
             logger.info(f"Found {len(ads)} ads in __NEXT_DATA__")
-            logger.info(f"Pagination items: {len(pagination) if isinstance(pagination, list) else 0}")
+            logger.info(
+                f"Pagination items: {len(pagination) if isinstance(pagination, list) else 0}"
+            )
             logger.info(f"Next cursor: {next_cursor[:50] if next_cursor else None}...")
-            
+
             if not ads:
                 logger.warning("No ads found in __NEXT_DATA__")
                 return [], None
-            
+
             # Parse ads
             listings = []
             for ad in ads:
@@ -272,12 +296,12 @@ class KufarScraper:
                 except Exception as e:
                     logger.error(f"Error parsing ad: {e}")
                     continue
-            
+
             logger.info(f"Successfully parsed {len(listings)} listings")
-            
+
             if max_listings and len(listings) > max_listings:
                 listings = listings[:max_listings]
-            
+
             return listings, next_cursor
 
         except asyncio.TimeoutError:
@@ -286,6 +310,7 @@ class KufarScraper:
         except Exception as e:
             logger.error(f"Error scraping page: {e}")
             import traceback
+
             traceback.print_exc()
             return [], None
 
@@ -309,30 +334,32 @@ class KufarScraper:
         all_listings = []
         cursor = None
         page_num = 0
-        
+
         while page_num < max_pages:
             # Build URL with cursor
             url = f"{base_url}&cursor={cursor}" if cursor else base_url
             logger.info(f"Scraping page {page_num + 1}: {url}")
-            
+
             listings, next_cursor = await self.scrape_page(url, city=city)
-            
+
             if not listings:
                 logger.info(f"No more listings found on page {page_num + 1}")
                 break
-            
+
             all_listings.extend(listings)
-            logger.info(f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}")
-            
+            logger.info(
+                f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}"
+            )
+
             # Check if there's a next cursor
             if not next_cursor or next_cursor == cursor:
                 logger.info("No more pages")
                 break
-            
+
             cursor = next_cursor
             page_num += 1
-            
+
             # Wait between pages to avoid rate limiting
             await asyncio.sleep(1)
-        
+
         return all_listings

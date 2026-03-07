@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from loguru import logger
 
-
 # Mock data templates
 MOCK_TITLES = [
     "2-комнатная квартира, ул. Ленина",
@@ -60,22 +59,22 @@ class KufarAPIClient:
         """
         results = []
         listings_per_page = 30
-        
+
         for page in range(max_pages):
             page_listings = []
             for i in range(listings_per_page):
                 listing_id = page * listings_per_page + i + 1
-                
+
                 # Generate random data
                 price = random.randint(50000, 250000)
                 rooms = random.randint(1, 4)
                 area = round(random.uniform(30, 120), 1)
                 floor = random.randint(1, 12)
-                
+
                 # Generate date offset
                 days_ago = random.randint(0, 30)
                 created_date = datetime.now() - timedelta(days=days_ago)
-                
+
                 listing = {
                     "id": str(listing_id),
                     "title": random.choice(MOCK_TITLES),
@@ -90,13 +89,13 @@ class KufarAPIClient:
                     "raw_data": {
                         "scraped_at": datetime.now().isoformat(),
                         "source": "mock",
-                    }
+                    },
                 }
                 page_listings.append(listing)
-            
+
             results.extend(page_listings)
             logger.info(f"Generated page {page + 1}, total: {len(results)} listings")
-        
+
         logger.success(f"Generated {len(results)} mock listings")
         return results
 

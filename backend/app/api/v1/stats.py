@@ -21,8 +21,7 @@ async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db
 
     new_result = await db.execute(
         select(func.count(Listing.id)).where(
-            func.date(Listing.first_seen_at) == today,
-            *base_filters
+            func.date(Listing.first_seen_at) == today, *base_filters
         )
     )
     new_today = new_result.scalar() or 0
@@ -31,7 +30,7 @@ async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db
         select(func.count(Listing.id)).where(
             func.date(Listing.deleted_at) == today,
             Listing.status == ListingStatus.deleted,
-            *base_filters
+            *base_filters,
         )
     )
     deleted_today = deleted_result.scalar() or 0
@@ -39,22 +38,24 @@ async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db
     # Count price changes today (USD)
     price_changed_filters = base_filters.copy() if city else []
     price_changed_result = await db.execute(
-        select(func.count(ListingHistory.id)).where(
-            ListingHistory.event_type == 'price_changed',
+        select(func.count(ListingHistory.id))
+        .where(
+            ListingHistory.event_type == "price_changed",
             func.date(ListingHistory.created_at) == today,
             ListingHistory.price_before.isnot(None),
             ListingHistory.price_after.isnot(None),
-            *price_changed_filters
-        ).join(
-            Listing, ListingHistory.listing_id == Listing.id
+            *price_changed_filters,
         )
+        .join(Listing, ListingHistory.listing_id == Listing.id)
     )
     price_changed_usd_today = price_changed_result.scalar() or 0
 
     active_result = await db.execute(
         select(func.count(Listing.id)).where(
-            Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated]),
-            *base_filters
+            Listing.status.in_(
+                [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+            ),
+            *base_filters,
         )
     )
     active_total = active_result.scalar() or 0
@@ -81,28 +82,35 @@ async def get_price_trends(
 
     # Get data from listing_history snapshot for created events
     # Use func.extract for PostgreSQL
-    year_col = func.extract('year', ListingHistory.created_at).label('year')
-    month_col = func.extract('month', ListingHistory.created_at).label('month')
-    
-    query = select(
-        year_col,
-        month_col,
-        func.avg(func.cast(ListingHistory.snapshot['price_usd'].astext, Numeric)).label('avg_price'),
-        func.count(Listing.id).label('count'),
-    ).join(
-        Listing, ListingHistory.listing_id == Listing.id
-    ).where(
-        ListingHistory.event_type == 'created',
-        Listing.city == city,
-        Listing.rooms == rooms,
-        ListingHistory.snapshot['price_usd'].astext != 'null',
-        ListingHistory.created_at >= text(f"NOW() - INTERVAL '{period_months} months'"),
-    ).group_by(
-        year_col,
-        month_col,
-    ).order_by(
-        year_col,
-        month_col,
+    year_col = func.extract("year", ListingHistory.created_at).label("year")
+    month_col = func.extract("month", ListingHistory.created_at).label("month")
+
+    query = (
+        select(
+            year_col,
+            month_col,
+            func.avg(
+                func.cast(ListingHistory.snapshot["price_usd"].astext, Numeric)
+            ).label("avg_price"),
+            func.count(Listing.id).label("count"),
+        )
+        .join(Listing, ListingHistory.listing_id == Listing.id)
+        .where(
+            ListingHistory.event_type == "created",
+            Listing.city == city,
+            Listing.rooms == rooms,
+            ListingHistory.snapshot["price_usd"].astext != "null",
+            ListingHistory.created_at
+            >= text(f"NOW() - INTERVAL '{period_months} months'"),
+        )
+        .group_by(
+            year_col,
+            month_col,
+        )
+        .order_by(
+            year_col,
+            month_col,
+        )
     )
 
     result = await db.execute(query)
@@ -132,18 +140,25 @@ async def get_room_distribution(
     db: AsyncSession = Depends(get_db),
 ):
     """Распределение по комнатам"""
-    query = select(
-        Listing.rooms,
-        func.count(Listing.id).label('count'),
-        func.avg(Listing.price_usd).label('avg_price'),
-    ).where(
-        Listing.city == city,
-        Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated]),
-        Listing.rooms >= 1,  # Все комнаты от 1 и больше
-    ).group_by(
-        Listing.rooms,
-    ).order_by(
-        Listing.rooms,
+    query = (
+        select(
+            Listing.rooms,
+            func.count(Listing.id).label("count"),
+            func.avg(Listing.price_usd).label("avg_price"),
+        )
+        .where(
+            Listing.city == city,
+            Listing.status.in_(
+                [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+            ),
+            Listing.rooms >= 1,  # Все комнаты от 1 и больше
+        )
+        .group_by(
+            Listing.rooms,
+        )
+        .order_by(
+            Listing.rooms,
+        )
     )
 
     result = await db.execute(query)
@@ -172,42 +187,46 @@ async def get_daily_activity(
 ):
     """Ежедневная активность (новые, удалённые, изменения цены)"""
     from sqlalchemy import case, text
-    
+
     # Get activity from listing_history
-    query = select(
-        func.date(ListingHistory.created_at).label('date'),
-        func.sum(
-            case(
-                (ListingHistory.event_type == 'created', 1),
-                else_=0,
-            )
-        ).label('new_count'),
-        func.sum(
-            case(
-                (ListingHistory.event_type == 'deleted', 1),
-                else_=0,
-            )
-        ).label('deleted_count'),
-        func.sum(
-            case(
-                (ListingHistory.event_type == 'price_changed', 1),
-                else_=0,
-            )
-        ).label('price_changed_count'),
-    ).join(
-        Listing, ListingHistory.listing_id == Listing.id
-    ).where(
-        Listing.city == city,
-        ListingHistory.created_at >= text(f"NOW() - INTERVAL '{period_days} days'"),
-    ).group_by(
-        func.date(ListingHistory.created_at),
-    ).order_by(
-        func.date(ListingHistory.created_at),
+    query = (
+        select(
+            func.date(ListingHistory.created_at).label("date"),
+            func.sum(
+                case(
+                    (ListingHistory.event_type == "created", 1),
+                    else_=0,
+                )
+            ).label("new_count"),
+            func.sum(
+                case(
+                    (ListingHistory.event_type == "deleted", 1),
+                    else_=0,
+                )
+            ).label("deleted_count"),
+            func.sum(
+                case(
+                    (ListingHistory.event_type == "price_changed", 1),
+                    else_=0,
+                )
+            ).label("price_changed_count"),
+        )
+        .join(Listing, ListingHistory.listing_id == Listing.id)
+        .where(
+            Listing.city == city,
+            ListingHistory.created_at >= text(f"NOW() - INTERVAL '{period_days} days'"),
+        )
+        .group_by(
+            func.date(ListingHistory.created_at),
+        )
+        .order_by(
+            func.date(ListingHistory.created_at),
+        )
     )
-    
+
     result = await db.execute(query)
     rows = result.all()
-    
+
     data = [
         {
             "date": str(row.date),
@@ -217,7 +236,7 @@ async def get_daily_activity(
         }
         for row in rows
     ]
-    
+
     return {
         "city": city,
         "period_days": period_days,

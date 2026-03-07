@@ -11,7 +11,7 @@ def parse_listing(raw_data: dict) -> Optional[dict]:
     # Поэтому делим на 100 для получения целой цены
     price_raw = int(raw_data.get("price", 0))
     price = price_raw // 100 if price_raw > 0 else 0
-    
+
     price_usd_raw = raw_data.get("price_usd") or raw_data.get("price$")
     price_usd = None
     if price_usd_raw:
@@ -23,16 +23,48 @@ def parse_listing(raw_data: dict) -> Optional[dict]:
     title = raw_data.get("title") or raw_data.get("subject") or "Без названия"
 
     params = raw_data.get("params", {}) or {}
-    rooms = int(params.get("room_count") or params.get("rooms") or raw_data.get("rooms") or 0) or None
-    area = float(params.get("area") or params.get("square") or raw_data.get("area") or 0) or None
+    rooms = (
+        int(
+            params.get("room_count")
+            or params.get("rooms")
+            or raw_data.get("rooms")
+            or 0
+        )
+        or None
+    )
+    area = (
+        float(params.get("area") or params.get("square") or raw_data.get("area") or 0)
+        or None
+    )
     floor = int(params.get("floor") or raw_data.get("floor") or 0) or None
-    
+
     # Новые поля
-    total_floors = int(params.get("floors") or params.get("total_floors") or raw_data.get("total_floors") or 0) or None
-    description = raw_data.get("description") or raw_data.get("body") or raw_data.get("body_short") or ""
+    total_floors = (
+        int(
+            params.get("floors")
+            or params.get("total_floors")
+            or raw_data.get("total_floors")
+            or 0
+        )
+        or None
+    )
+    description = (
+        raw_data.get("description")
+        or raw_data.get("body")
+        or raw_data.get("body_short")
+        or ""
+    )
     district = raw_data.get("district") or params.get("district") or ""
     metro = raw_data.get("metro") or params.get("metro") or ""
-    house_year = int(params.get("year") or params.get("house_year") or raw_data.get("house_year") or 0) or None
+    house_year = (
+        int(
+            params.get("year")
+            or params.get("house_year")
+            or raw_data.get("house_year")
+            or 0
+        )
+        or None
+    )
 
     images = raw_data.get("images", []) or []
     if isinstance(images, str):
