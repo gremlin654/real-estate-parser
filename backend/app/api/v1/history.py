@@ -12,6 +12,7 @@ router = APIRouter(prefix="/history", tags=["history"])
 @router.get("/{listing_id}", response_model=list[ListingHistoryResponse])
 async def get_listing_history(listing_id: str, db: AsyncSession = Depends(get_db)):
     from uuid import UUID
+
     try:
         uuid_id = UUID(listing_id)
     except ValueError:

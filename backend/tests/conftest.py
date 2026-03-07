@@ -9,30 +9,43 @@ import os
 
 from app.main import app
 from app.config import settings
-from app.models.listing import Base, ScanHistory
+from app.models.listing import Base, ScanHistory, Listing, ListingStatus
 from app.db.database import async_session_maker
 
 
 @pytest.fixture(scope="function")
-async def client():
-    """Create async client for testing API endpoints (no DB operations)."""
+async def client(test_session):
+    """Create async client for testing API endpoints with test DB session."""
     from httpx import ASGITransport
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    from unittest.mock import AsyncMock, patch
+    
+    # Mock the get_db dependency to use test_session
+    async def override_get_db():
+        yield test_session
+    
+    # Patch the dependency
+    with patch('app.db.database.async_session_maker', return_value=test_session):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
 
 @pytest.fixture(scope="session")
 def test_db_url():
     """Получение URL тестовой БД.
-    
+
     Для локального запуска тестов используем localhost:5433.
-    Для запуска в Docker используем db_test.
+    Для запуска в Docker/CI используем db_test:5432.
     """
+    # Сначала проверяем env variable (для CI)
+    env_db_url = os.getenv("TEST_DATABASE_URL")
+    if env_db_url:
+        return env_db_url
+    
     # Проверяем, запущены ли в Docker (есть ли контейнер с именем db_test)
     if os.getenv("PYTEST_RUNNING_IN_DOCKER"):
         return settings.TEST_DATABASE_URL
-    
+
     # Локальный запуск - используем localhost
     return "postgresql+asyncpg://postgres:secret@localhost:5433/kufar_monitor_test"
 
@@ -45,23 +58,90 @@ async def test_session(test_db_url) -> AsyncGenerator[AsyncSession, None]:
         test_db_url,
         echo=False,
     )
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     async_session = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,
         expire_on_commit=False
     )
-    
+
     async with async_session() as session:
         yield session
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    
+
     await engine.dispose()
+
+
+@pytest.fixture
+async def create_test_listing(test_session) -> Listing:
+    """Create a single test listing."""
+    listing = Listing(
+        kufar_id="test_listing_123",
+        url="https://re.kufar.by/vi/123456",
+        title="Test Apartment",
+        price=100000,
+        price_usd=35000,
+        currency="BYN",
+        city="minsk",
+        address="Test Street 1",
+        rooms=2,
+        area=55.0,
+        floor=3,
+        total_floors=9,
+        category="apartments",
+        status=ListingStatus.active,
+        first_seen_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        last_seen_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    test_session.add(listing)
+    await test_session.commit()
+    await test_session.refresh(listing)
+    return listing
+
+
+@pytest.fixture
+async def test_listings(test_session) -> list[Listing]:
+    """Create multiple test listings for export tests."""
+    listings = []
+    base_time = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Создаём 5 тестовых объявлений
+    for i in range(5):
+        city = "minsk" if i % 2 == 0 else "mogilev"
+        status = ListingStatus.active if i % 3 != 0 else ListingStatus.new
+
+        listing = Listing(
+            kufar_id=f"test_listing_{i}",
+            url=f"https://re.kufar.by/vi/{100000 + i}",
+            title=f"Test Apartment {i}",
+            price=100000 + (i * 10000),
+            price_usd=35000 + (i * 3000),
+            currency="BYN",
+            city=city,
+            address=f"Test Street {i}",
+            rooms=(i % 4) + 1,  # 1-4 комнаты
+            area=50.0 + (i * 5),
+            floor=(i % 10) + 1,
+            total_floors=9,
+            category="apartments",
+            status=status,
+            first_seen_at=base_time - timedelta(days=i),
+            last_seen_at=base_time,
+        )
+        test_session.add(listing)
+        listings.append(listing)
+
+    await test_session.commit()
+
+    for listing in listings:
+        await test_session.refresh(listing)
+
+    return listings
 
 
 @pytest.fixture

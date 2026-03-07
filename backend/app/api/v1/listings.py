@@ -21,8 +21,12 @@ async def get_listings(
     price_from: Optional[int] = None,
     price_to: Optional[int] = None,
     rooms: Optional[list[int]] = Query(None, description="Room counts to filter"),
-    rooms_other: Optional[bool] = Query(None, description="Include listings with rooms outside 1-4 range"),
-    sort_order: Optional[str] = Query(None, description="Sort by price: 'asc' or 'desc'"),
+    rooms_other: Optional[bool] = Query(
+        None, description="Include listings with rooms outside 1-4 range"
+    ),
+    sort_order: Optional[str] = Query(
+        None, description="Sort by price: 'asc' or 'desc'"
+    ),
     currency: Optional[str] = Query(None, description="Filter by currency: USD or BYN"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,7 +48,9 @@ async def get_listings(
     # Поэтому убираем эту логику
 
     if price_from:
-        conditions.append(or_(Listing.price >= price_from, Listing.price_usd >= price_from))
+        conditions.append(
+            or_(Listing.price >= price_from, Listing.price_usd >= price_from)
+        )
 
     if price_to:
         conditions.append(or_(Listing.price <= price_to, Listing.price_usd <= price_to))
@@ -53,11 +59,11 @@ async def get_listings(
     if rooms and len(rooms) > 0:
         # Если выбраны конкретные комнаты (1-4)
         room_conditions = [Listing.rooms == r for r in rooms]
-        
+
         # Если также выбран rooms_other, добавляем условие для 5+ комнат
         if rooms_other:
             room_conditions.append(or_(Listing.rooms >= 5, Listing.rooms.is_(None)))
-        
+
         conditions.append(or_(*room_conditions))
     elif rooms_other:
         # Только rooms_other выбран - показываем 5+ комнат и None
@@ -70,16 +76,14 @@ async def get_listings(
         # По возрастанию цены (0 в начале, потом price_usd или price)
         query = query.order_by(
             case(
-                (Listing.price_usd.isnot(None), Listing.price_usd),
-                else_=Listing.price
+                (Listing.price_usd.isnot(None), Listing.price_usd), else_=Listing.price
             ).asc()
         )
     elif sort_order == "desc":
         # По убыванию цены (0 в конце, потом price_usd или price)
         query = query.order_by(
             case(
-                (Listing.price_usd.isnot(None), Listing.price_usd),
-                else_=Listing.price
+                (Listing.price_usd.isnot(None), Listing.price_usd), else_=Listing.price
             ).desc()
         )
     elif sort_order == "newest":
@@ -109,6 +113,7 @@ async def get_listings(
 @router.get("/{listing_id}", response_model=ListingResponse)
 async def get_listing(listing_id: str, db: AsyncSession = Depends(get_db)):
     from uuid import UUID
+
     try:
         uuid_id = UUID(listing_id)
     except ValueError:

@@ -459,9 +459,6 @@ export const useScanHistory = (filters?: {
     staleTime: 30 * 1000, // 30 секунд
     retry: 2,
     retryDelay: 1000,
-    onError: (error) => {
-      console.error('Failed to fetch scan history:', error);
-    },
   });
 };
 

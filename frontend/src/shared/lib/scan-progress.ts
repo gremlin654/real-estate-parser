@@ -16,13 +16,13 @@ export function calculateProgress(scan: Partial<ScanProgress>): number {
       return 2;
     case 'fetching':
       // 0-50%: прогресс на основе количества страниц (ожидаем максимум ~500)
-      return Math.min(50, (pages_scraped / 500) * 50);
+      return Math.min(50, ((pages_scraped || 0) / 500) * 50);
     case 'parsing':
       // 50-80%: прогресс на основе обработанных объявлений
-      return 50 + Math.min(30, (listings_fetched / 1500) * 30);
+      return 50 + Math.min(30, ((listings_fetched || 0) / 1500) * 30);
     case 'upserting':
       // 80-100%: прогресс на основе сохранённых объявлений
-      return 80 + Math.min(20, (listings_processed / 1500) * 20);
+      return 80 + Math.min(20, ((listings_processed || 0) / 1500) * 20);
     case 'marking_deleted_final':
       return 95;
     case 'done':

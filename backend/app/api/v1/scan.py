@@ -20,6 +20,7 @@ router = APIRouter(prefix="/scan", tags=["scan"])
 
 class ScanHistoryStatus(str, Enum):
     """Статусы сканирования для валидации."""
+
     running = "running"
     completed = "completed"
     error = "error"
@@ -27,8 +28,10 @@ class ScanHistoryStatus(str, Enum):
 
 # ============== Pydantic Models ==============
 
+
 class CitySettingsResponse(BaseModel):
     """Настройки сканирования для конкретного города."""
+
     enabled: bool
     scan_interval_minutes: int
     updated_at: Optional[str] = None
@@ -36,12 +39,16 @@ class CitySettingsResponse(BaseModel):
 
 class CitySettingsUpdateRequest(BaseModel):
     """Запрос на обновление настроек сканирования для города."""
+
     enabled: Optional[bool] = None
-    scan_interval_minutes: Optional[int] = Field(None, ge=5, le=1440, description="Интервал сканирования в минутах (5-1440)")
+    scan_interval_minutes: Optional[int] = Field(
+        None, ge=5, le=1440, description="Интервал сканирования в минутах (5-1440)"
+    )
 
 
 class AllScanSettingsResponse(BaseModel):
     """Настройки сканирования для всех городов."""
+
     cities: Dict[str, CitySettingsResponse]
 
 
@@ -52,7 +59,9 @@ class ScanScheduleResponse(BaseModel):
 
 
 class ScanScheduleUpdateRequest(BaseModel):
-    scan_interval_minutes: int = Field(..., ge=5, le=1440, description="Интервал сканирования в минутах (5-1440)")
+    scan_interval_minutes: int = Field(
+        ..., ge=5, le=1440, description="Интервал сканирования в минутах (5-1440)"
+    )
     enabled: bool
 
 
@@ -84,6 +93,7 @@ class ScanTriggerResponse(BaseModel):
 
 class ScanHistoryItem(BaseModel):
     """Элемент истории сканирования."""
+
     id: str
     started_at: str
     completed_at: Optional[str]
@@ -103,7 +113,7 @@ class ScanHistoryItem(BaseModel):
     class Config:
         from_attributes = True
 
-    @field_validator('id', mode='before')
+    @field_validator("id", mode="before")
     @classmethod
     def convert_id(cls, v):
         """Конвертирует UUID в строку."""
@@ -111,7 +121,7 @@ class ScanHistoryItem(BaseModel):
             return str(v)
         return v
 
-    @field_validator('started_at', 'completed_at', mode='before')
+    @field_validator("started_at", "completed_at", mode="before")
     @classmethod
     def convert_datetime(cls, v):
         """Конвертирует datetime в ISO строку."""
@@ -122,6 +132,7 @@ class ScanHistoryItem(BaseModel):
 
 class ScanHistoryResponse(BaseModel):
     """Пагинированный ответ истории сканирований."""
+
     items: List[ScanHistoryItem]
     total: int
     page: int
@@ -135,10 +146,7 @@ class ScanHistoryResponse(BaseModel):
 @router.get("/cities", response_model=list[CityResponse])
 async def get_cities():
     """Получить список всех доступных городов."""
-    return [
-        {"city": code, "city_name": name}
-        for code, name in CITY_NAMES.items()
-    ]
+    return [{"city": code, "city_name": name} for code, name in CITY_NAMES.items()]
 
 
 @router.get("/settings", response_model=AllScanSettingsResponse)
@@ -147,7 +155,7 @@ async def get_all_settings():
     async with async_session_maker() as db:
         scan_settings_service = ScanSettingsService(db)
         all_settings = await scan_settings_service.get_all_settings()
-    
+
     # Конвертировать в response формат
     cities = {}
     for city, settings in all_settings.items():
@@ -156,7 +164,7 @@ async def get_all_settings():
             scan_interval_minutes=settings.scan_interval_minutes,
             updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
         )
-    
+
     return {"cities": cities}
 
 
@@ -166,13 +174,13 @@ async def get_city_settings(city: str):
     if city not in CITY_NAMES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}"
+            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}",
         )
-    
+
     async with async_session_maker() as db:
         scan_settings_service = ScanSettingsService(db)
         settings = await scan_settings_service.get_or_create_city_settings(city)
-    
+
     return CitySettingsResponse(
         enabled=settings.enabled,
         scan_interval_minutes=settings.scan_interval_minutes,
@@ -183,36 +191,36 @@ async def get_city_settings(city: str):
 @router.put("/settings/{city}", response_model=CitySettingsResponse)
 async def update_city_settings(city: str, request: CitySettingsUpdateRequest):
     """Обновить настройки сканирования для конкретного города.
-    
+
     - **enabled**: Включить/выключить автосканирование для города
     - **scan_interval_minutes**: Интервал сканирования в минутах (5-1440)
     """
     if city not in CITY_NAMES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}"
+            detail=f"Invalid city: {city}. Must be one of: {', '.join(CITY_NAMES.keys())}",
         )
-    
+
     async with async_session_maker() as db:
         scan_settings_service = ScanSettingsService(db)
-        
+
         try:
             settings = await scan_settings_service.update_city_settings(
                 city=city,
                 enabled=request.enabled,
-                interval=request.scan_interval_minutes
+                interval=request.scan_interval_minutes,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        
+
         # Перезапуск scheduler с новыми настройками
         scheduler = get_scheduler()
         await scheduler.restart_with_settings(
             city=city,
             enabled=settings.enabled,
-            interval_minutes=settings.scan_interval_minutes
+            interval_minutes=settings.scan_interval_minutes,
         )
-    
+
     return CitySettingsResponse(
         enabled=settings.enabled,
         scan_interval_minutes=settings.scan_interval_minutes,
@@ -225,7 +233,7 @@ async def get_schedule():
     """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
     raise HTTPException(
         status_code=410,
-        detail="This endpoint is deprecated. Use /settings/{city} instead."
+        detail="This endpoint is deprecated. Use /settings/{city} instead.",
     )
 
 
@@ -234,7 +242,7 @@ async def update_schedule(request: ScanScheduleUpdateRequest):
     """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
     raise HTTPException(
         status_code=410,
-        detail="This endpoint is deprecated. Use /settings/{city} instead."
+        detail="This endpoint is deprecated. Use /settings/{city} instead.",
     )
 
 
@@ -243,7 +251,7 @@ async def get_city():
     """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
     raise HTTPException(
         status_code=410,
-        detail="This endpoint is deprecated. Use /settings/{city} instead."
+        detail="This endpoint is deprecated. Use /settings/{city} instead.",
     )
 
 
@@ -252,20 +260,22 @@ async def update_city(request: CityUpdateRequest):
     """⚠️ Устаревший endpoint. Используйте /settings/{city}."""
     raise HTTPException(
         status_code=410,
-        detail="This endpoint is deprecated. Use /settings/{city} instead."
+        detail="This endpoint is deprecated. Use /settings/{city} instead.",
     )
 
 
 @router.get("/status")
 async def get_status():
     """Получить статус сканирования.
-    
+
     Возвращает список всех активных сканирований по городам.
     """
     scheduler = get_scheduler()
     return {
         "scanning_cities": scheduler._get_scanning_cities(),
-        "scheduler_running": scheduler.scheduler.running if scheduler.scheduler else False,
+        "scheduler_running": (
+            scheduler.scheduler.running if scheduler.scheduler else False
+        ),
         "is_running": scheduler.is_running,  # Обратная совместимость
     }
 
@@ -273,19 +283,19 @@ async def get_status():
 @router.get("/progress")
 async def get_progress():
     """Получить прогресс всех активных сканирований.
-    
+
     Возвращает список сканируемых городов и агрегированный прогресс.
     """
     scheduler = get_scheduler()
     scanning_cities = scheduler._get_scanning_cities()
-    
+
     # Агрегированный прогресс (обратная совместимость)
     # Используем первое сканирование или default значение
     global_progress = scheduler.scan_progress.copy()
     if scanning_cities:
         # Если есть активные сканирования, используем первое для совместимости
         global_progress = scanning_cities[0]["progress"].copy()
-    
+
     return {
         "scanning_cities": scanning_cities,
         "global_progress": global_progress,
@@ -297,10 +307,18 @@ async def get_scan_history(
     page: int = Query(default=1, ge=1, description="Номер страницы"),
     size: int = Query(default=20, ge=1, le=100, description="Размер страницы (1-100)"),
     city: Optional[str] = Query(default=None, description="Фильтр по городу"),
-    status: Optional[ScanHistoryStatus] = Query(default=None, description="Фильтр по статусу: running, completed, error"),
-    trigger_type: Optional[str] = Query(default=None, description="Фильтр по типу запуска: manual, scheduled"),
-    date_from: Optional[datetime] = Query(default=None, description="Дата от (ISO format)"),
-    date_to: Optional[datetime] = Query(default=None, description="Дата до (ISO format)"),
+    status: Optional[ScanHistoryStatus] = Query(
+        default=None, description="Фильтр по статусу: running, completed, error"
+    ),
+    trigger_type: Optional[str] = Query(
+        default=None, description="Фильтр по типу запуска: manual, scheduled"
+    ),
+    date_from: Optional[datetime] = Query(
+        default=None, description="Дата от (ISO format)"
+    ),
+    date_to: Optional[datetime] = Query(
+        default=None, description="Дата до (ISO format)"
+    ),
 ):
     """
     Получение истории сканирований с пагинацией и фильтрами.
@@ -325,24 +343,24 @@ async def get_scan_history(
             status=status.value if status else None,
             trigger_type=trigger_type,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
         )
-    
+
     total_pages = math.ceil(total / size) if size > 0 else 0
-    
+
     return {
         "items": items,
         "total": total,
         "page": page,
         "size": size,
-        "total_pages": total_pages
+        "total_pages": total_pages,
     }
 
 
 @router.post("/trigger", response_model=ScanTriggerResponse)
 async def trigger_scan(request: ScanTriggerRequest, background_tasks: BackgroundTasks):
     """Запуск ручного сканирования - асинхронное выполнение в background
-    
+
     Поддерживает параллельные сканирования для разных городов.
     Если город уже сканируется - вернёт 409 Conflict.
     """
@@ -354,8 +372,7 @@ async def trigger_scan(request: ScanTriggerRequest, background_tasks: Background
     # Проверка: если город уже сканируется - вернуть 409
     if scheduler._is_city_scanning(request.city):
         raise HTTPException(
-            status_code=409, 
-            detail=f"Scanning already in progress for {request.city}"
+            status_code=409, detail=f"Scanning already in progress for {request.city}"
         )
 
     # Создаем запись истории сканирования
@@ -364,19 +381,21 @@ async def trigger_scan(request: ScanTriggerRequest, background_tasks: Background
         scan_record = await scan_history_service.create_scan_record(
             city=request.city,
             city_name=CITY_NAMES.get(request.city, request.city),
-            trigger_type="manual"
+            trigger_type="manual",
         )
 
     # Запускаем сканирование в background
     logger.info(f"Starting manual scan for {request.city}, scan_id: {scan_record.id}")
-    background_tasks.add_task(_run_manual_scan, scheduler, request.city, str(scan_record.id))
+    background_tasks.add_task(
+        _run_manual_scan, scheduler, request.city, str(scan_record.id)
+    )
 
     # Возвращаем статус сразу
     return ScanTriggerResponse(
         status="started",
         message="Manual scan started in background",
         city=request.city,
-        city_name=CITY_NAMES.get(request.city, request.city)
+        city_name=CITY_NAMES.get(request.city, request.city),
     )
 
 
@@ -407,11 +426,14 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
             listing_service = ListingService(db)
 
             # Парсинг страниц
-            await scheduler._update_city_progress(city, {
-                **scheduler.scanning_cities[city]["progress"],
-                "stage": "fetching",
-                "is_stable": False,
-            })
+            await scheduler._update_city_progress(
+                city,
+                {
+                    **scheduler.scanning_cities[city]["progress"],
+                    "stage": "fetching",
+                    "is_stable": False,
+                },
+            )
             await scheduler._broadcast_progress()
 
             # Запускаем сканирование через HTTP (быстро и надежно)
@@ -440,11 +462,17 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
                 progress = scheduler.scanning_cities[city]["progress"]
                 progress["pages_scraped"] = page_num + 1
                 progress["listings_fetched"] = len(all_listings)
-                progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+                progress["elapsed_seconds"] = int(
+                    (
+                        datetime.now(timezone.utc).replace(tzinfo=None) - start_time
+                    ).total_seconds()
+                )
                 await scheduler._update_city_progress(city, progress)
                 await scheduler._broadcast_progress()
 
-                logger.info(f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}")
+                logger.info(
+                    f"Page {page_num + 1}: found {len(listings)} listings, total: {len(all_listings)}"
+                )
 
                 # Check if there's a next cursor
                 if not next_cursor or next_cursor == cursor:
@@ -464,30 +492,40 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
             await scan_history_service.update_scan_record(
                 scan_id=scan_id,
                 listings_fetched=len(listings_data),
-                pages_scraped=pages_scraped
+                pages_scraped=pages_scraped,
             )
 
             # Парсинг и сохранение
-            await scheduler._update_city_progress(city, {
-                **scheduler.scanning_cities[city]["progress"],
-                "stage": "upserting",
-                "is_stable": False,
-            })
+            await scheduler._update_city_progress(
+                city,
+                {
+                    **scheduler.scanning_cities[city]["progress"],
+                    "stage": "upserting",
+                    "is_stable": False,
+                },
+            )
             await scheduler._broadcast_progress()
 
             stats = await listing_service.upsert_listings(listings_data, city)
 
             progress = scheduler.scanning_cities[city]["progress"]
             progress["listings_processed"] = stats.get("processed", 0)
-            progress["elapsed_seconds"] = int((datetime.now(timezone.utc).replace(tzinfo=None) - start_time).total_seconds())
+            progress["elapsed_seconds"] = int(
+                (
+                    datetime.now(timezone.utc).replace(tzinfo=None) - start_time
+                ).total_seconds()
+            )
             await scheduler._update_city_progress(city, progress)
             await scheduler._broadcast_progress()
 
-            await scheduler._update_city_progress(city, {
-                **scheduler.scanning_cities[city]["progress"],
-                "stage": "marking_deleted_final",
-                "is_stable": True,
-            })
+            await scheduler._update_city_progress(
+                city,
+                {
+                    **scheduler.scanning_cities[city]["progress"],
+                    "stage": "marking_deleted_final",
+                    "is_stable": True,
+                },
+            )
             await scheduler._broadcast_progress()
 
             # Завершение записи сканирования
@@ -502,7 +540,7 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
                 listings_restored=stats.get("restored", 0),
                 listings_unchanged=stats.get("unchanged", 0),
                 pages_scraped=pages_scraped,
-                duration_seconds=int((end_time - start_time).total_seconds())
+                duration_seconds=int((end_time - start_time).total_seconds()),
             )
 
             logger.info(f"Manual scan completed: {stats}")
@@ -510,21 +548,23 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
     except Exception as e:
         logger.error(f"Manual scan error: {e}")
         import traceback
+
         traceback.print_exc()
         async with async_session_maker() as db:
             scan_history_service = ScanHistoryService(db)
             await scan_history_service.complete_scan_record(
-                scan_id=scan_id,
-                status="error",
-                error_message=str(e)
+                scan_id=scan_id, status="error", error_message=str(e)
             )
         # Отправить ошибку через WebSocket
         if city in scheduler.scanning_cities:
-            await scheduler._update_city_progress(city, {
-                **scheduler.scanning_cities[city]["progress"],
-                "stage": "error",
-                "is_stable": True,
-            })
+            await scheduler._update_city_progress(
+                city,
+                {
+                    **scheduler.scanning_cities[city]["progress"],
+                    "stage": "error",
+                    "is_stable": True,
+                },
+            )
             await scheduler._broadcast_progress()
     finally:
         # Всегда очищать scanning_cities

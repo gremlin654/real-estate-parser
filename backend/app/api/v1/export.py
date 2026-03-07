@@ -37,36 +37,46 @@ async def export_listings(
     if format == "json":
         data = []
         for l in listings:
-            data.append({
-                "id": str(l.id),
-                "kufar_id": l.kufar_id,
-                "title": l.title,
-                "price": l.price,
-                "price_usd": l.price_usd,
-                "currency": l.currency,
-                "city": l.city,
-                "address": l.address,
-                "rooms": l.rooms,
-                "area": l.area,
-                "floor": l.floor,
-                "url": l.url,
-                "status": l.status,
-                "first_seen_at": l.first_seen_at.isoformat() if l.first_seen_at else None,
-            })
+            data.append(
+                {
+                    "id": str(l.id),
+                    "kufar_id": l.kufar_id,
+                    "title": l.title,
+                    "price": l.price,
+                    "price_usd": l.price_usd,
+                    "currency": l.currency,
+                    "city": l.city,
+                    "address": l.address,
+                    "rooms": l.rooms,
+                    "area": l.area,
+                    "floor": l.floor,
+                    "url": l.url,
+                    "status": l.status,
+                    "first_seen_at": (
+                        l.first_seen_at.isoformat() if l.first_seen_at else None
+                    ),
+                }
+            )
         return {"items": data, "total": len(listings)}
 
     elif format == "csv":
         output = io.StringIO()
-        output.write("id,kufar_id,title,price,price_usd,currency,city,rooms,area,floor,url,status\n")
+        output.write(
+            "id,kufar_id,title,price,price_usd,currency,city,rooms,area,floor,url,status\n"
+        )
         for l in listings:
-            output.write(f"{l.id},{l.kufar_id},{l.title},{l.price},{l.price_usd},{l.currency},{l.city},{l.rooms},{l.area},{l.floor},{l.url},{l.status}\n")
+            output.write(
+                f"{l.id},{l.kufar_id},{l.title},{l.price},{l.price_usd},{l.currency},{l.city},{l.rooms},{l.area},{l.floor},{l.url},{l.status}\n"
+            )
         return {"content": output.getvalue(), "total": len(listings)}
 
     return {"error": "Unsupported format"}
 
 
 @router.get("/summary")
-async def export_summary(format: str = Query("json"), db: AsyncSession = Depends(get_db)):
+async def export_summary(
+    format: str = Query("json"), db: AsyncSession = Depends(get_db)
+):
     from sqlalchemy import func
 
     result = await db.execute(select(func.count(Listing.id)))

@@ -5,4 +5,11 @@ from app.api.v1.scan import router as scan_router
 from app.api.v1.export import router as export_router
 from app.api.v1.ws import router as ws_router
 
-__all__ = ["listings_router", "history_router", "stats_router", "scan_router", "export_router", "ws_router"]
+__all__ = [
+    "listings_router",
+    "history_router",
+    "stats_router",
+    "scan_router",
+    "export_router",
+    "ws_router",
+]

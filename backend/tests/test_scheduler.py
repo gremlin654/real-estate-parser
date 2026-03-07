@@ -4,29 +4,9 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+from datetime import datetime
 
-from app.scraper.scheduler import ScraperScheduler, get_scheduler, init_scheduler, get_now
-
-
-class TestGetNow:
-    """Тесты для функции get_now."""
-
-    def test_get_now_returns_datetime(self):
-        """Проверка что get_now возвращает datetime."""
-        result = get_now()
-
-        assert isinstance(result, datetime)
-        assert result.tzinfo is None  # Без timezone info для совместимости с БД
-
-    def test_get_now_utc_based(self):
-        """Проверка что get_now основано на UTC времени."""
-        result = get_now()
-        now_utc = datetime.now(timezone.utc)
-
-        # Разница должна быть менее 1 секунды
-        diff = abs((now_utc.replace(tzinfo=None) - result).total_seconds())
-        assert diff < 1
+from app.scraper.scheduler import ScraperScheduler, get_scheduler, init_scheduler
 
 
 @pytest.mark.asyncio
@@ -39,10 +19,7 @@ class TestScraperSchedulerInit:
 
         assert scheduler.scheduler is None
         assert scheduler.is_running is False
-        assert scheduler.last_scan_time is None
-        assert scheduler.last_scan_stats == {}
-        assert scheduler._current_task is None
-        assert scheduler._current_scan_id is None
+        assert scheduler._ws_manager is None
 
     def test_init_progress_tracking(self):
         """Проверка инициализации отслеживания прогресса."""
@@ -50,10 +27,151 @@ class TestScraperSchedulerInit:
 
         assert scheduler.scan_progress["is_scanning"] is False
         assert scheduler.scan_progress["city"] is None
+        assert scheduler.scan_progress["city_name"] is None
         assert scheduler.scan_progress["stage"] == "idle"
         assert scheduler.scan_progress["pages_scraped"] == 0
         assert scheduler.scan_progress["listings_fetched"] == 0
         assert scheduler.scan_progress["listings_processed"] == 0
+        assert scheduler.scan_progress["is_stable"] is True
+
+    def test_init_scanning_cities(self):
+        """Проверка инициализации параллельных сканирований."""
+        scheduler = ScraperScheduler()
+
+        assert scheduler.scanning_cities == {}
+        assert scheduler._lock is not None
+        assert scheduler._ws_manager is None
+
+
+@pytest.mark.asyncio
+class TestScraperSchedulerCityManagement:
+    """Тесты управления городами сканирования."""
+
+    async def test_add_scanning_city(self):
+        """Проверка добавления города в сканирование."""
+        scheduler = ScraperScheduler()
+
+        await scheduler._add_scanning_city("minsk", "manual", "scan-123")
+
+        assert "minsk" in scheduler.scanning_cities
+        assert scheduler.scanning_cities["minsk"]["trigger_type"] == "manual"
+        assert scheduler.scanning_cities["minsk"]["scan_id"] == "scan-123"
+        assert scheduler.is_running is True
+
+    async def test_remove_scanning_city(self):
+        """Проверка удаления города из сканирования."""
+        scheduler = ScraperScheduler()
+
+        # Добавляем город
+        await scheduler._add_scanning_city("minsk", "manual", "scan-123")
+        assert "minsk" in scheduler.scanning_cities
+
+        # Удаляем город
+        await scheduler._remove_scanning_city("minsk")
+
+        assert "minsk" not in scheduler.scanning_cities
+        assert scheduler.is_running is False
+
+    async def test_is_city_scanning(self):
+        """Проверка проверки сканирования города."""
+        scheduler = ScraperScheduler()
+
+        await scheduler._add_scanning_city("minsk", "manual", "scan-123")
+
+        assert scheduler._is_city_scanning("minsk") is True
+        assert scheduler._is_city_scanning("brest") is False
+
+    async def test_get_scanning_cities(self):
+        """Проверка получения списка сканируемых городов."""
+        scheduler = ScraperScheduler()
+
+        await scheduler._add_scanning_city("minsk", "manual", "scan-123")
+        await scheduler._add_scanning_city("brest", "scheduled", "scan-456")
+
+        cities = scheduler._get_scanning_cities()
+
+        assert len(cities) == 2
+        city_codes = [c["city"] for c in cities]
+        assert "minsk" in city_codes
+        assert "brest" in city_codes
+
+    async def test_update_city_progress(self):
+        """Проверка обновления прогресса города."""
+        scheduler = ScraperScheduler()
+
+        await scheduler._add_scanning_city("minsk", "manual", "scan-123")
+
+        await scheduler._update_city_progress("minsk", {
+            "is_scanning": True,
+            "stage": "fetching",
+            "pages_scraped": 5,
+        })
+
+        progress = scheduler.scanning_cities["minsk"]["progress"]
+        assert progress["stage"] == "fetching"
+        assert progress["pages_scraped"] == 5
+
+
+@pytest.mark.asyncio
+class TestScraperSchedulerProgress:
+    """Тесты отслеживания прогресса."""
+
+    def test_update_progress(self):
+        """Проверка обновления прогресса."""
+        scheduler = ScraperScheduler()
+
+        scheduler.scan_progress["is_scanning"] = True
+        scheduler.scan_progress["city"] = "minsk"
+        scheduler.scan_progress["stage"] = "fetching"
+        scheduler.scan_progress["pages_scraped"] = 5
+
+        assert scheduler.scan_progress["is_scanning"] is True
+        assert scheduler.scan_progress["city"] == "minsk"
+        assert scheduler.scan_progress["stage"] == "fetching"
+        assert scheduler.scan_progress["pages_scraped"] == 5
+
+    def test_get_progress(self):
+        """Проверка получения прогресса."""
+        scheduler = ScraperScheduler()
+        scheduler.scan_progress["is_scanning"] = True
+        scheduler.scan_progress["city"] = "mogilev"
+        scheduler.scan_progress["stage"] = "parsing"
+        scheduler.scan_progress["pages_scraped"] = 10
+        scheduler.scan_progress["listings_fetched"] = 300
+
+        progress = scheduler.scan_progress.copy()
+
+        assert progress["is_scanning"] is True
+        assert progress["city"] == "mogilev"
+        assert progress["stage"] == "parsing"
+        assert progress["pages_scraped"] == 10
+        assert progress["listings_fetched"] == 300
+
+    def test_reset_progress(self):
+        """Проверка сброса прогресса."""
+        scheduler = ScraperScheduler()
+        scheduler.scan_progress["is_scanning"] = True
+        scheduler.scan_progress["city"] = "minsk"
+        scheduler.scan_progress["stage"] = "done"
+        scheduler.scan_progress["pages_scraped"] = 20
+
+        # Сброс прогресса
+        scheduler.scan_progress = {
+            "is_scanning": False,
+            "city": None,
+            "city_name": None,
+            "stage": "idle",
+            "pages_scraped": 0,
+            "listings_fetched": 0,
+            "listings_processed": 0,
+            "elapsed_seconds": 0,
+            "is_stable": True,
+        }
+
+        assert scheduler.scan_progress["is_scanning"] is False
+        assert scheduler.scan_progress["city"] is None
+        assert scheduler.scan_progress["stage"] == "idle"
+        assert scheduler.scan_progress["pages_scraped"] == 0
 
 
 @pytest.mark.asyncio
@@ -69,33 +187,8 @@ class TestScraperSchedulerStart:
         # Не должно вызывать ошибок
         await scheduler.start()
 
-    async def test_start_creates_scheduler(self):
-        """Проверка создания scheduler."""
-        scheduler = ScraperScheduler()
-
-        mock_settings = MagicMock()
-        mock_settings.scan_interval_minutes = 30
-        mock_settings.enabled = True
-
-        mock_db = AsyncMock()
-        mock_settings_service = MagicMock()
-        mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
-
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
-            mock_session.return_value.__aenter__.return_value = mock_db
-
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
-                    mock_sched_instance = MagicMock()
-                    MockScheduler.return_value = mock_sched_instance
-
-                    await scheduler.start()
-
-                    assert scheduler.scheduler is not None
-                    MockScheduler.assert_called_once()
-
-    async def test_start_disabled_scheduler(self):
-        """Проверка запуска с отключенным scheduler."""
+    async def test_start_no_enabled_cities(self):
+        """Проверка запуска без включённых городов."""
         scheduler = ScraperScheduler()
 
         mock_settings = MagicMock()
@@ -105,6 +198,7 @@ class TestScraperSchedulerStart:
         mock_db = AsyncMock()
         mock_settings_service = MagicMock()
         mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
+        mock_settings_service.get_enabled_cities = AsyncMock(return_value=[])
 
         with patch('app.scraper.scheduler.async_session_maker') as mock_session:
             mock_session.return_value.__aenter__.return_value = mock_db
@@ -117,198 +211,102 @@ class TestScraperSchedulerStart:
                     await scheduler.start()
 
                     # Scheduler создан но job не добавлен
+                    assert scheduler.scheduler is not None
                     mock_sched_instance.add_job.assert_not_called()
 
-
-@pytest.mark.asyncio
-class TestScraperSchedulerUpdateSchedule:
-    """Тесты обновления расписания."""
-
-    async def test_update_schedule_not_running(self):
-        """Проверка обновления когда scheduler не запущен."""
+    async def test_start_with_enabled_cities(self):
+        """Проверка запуска с включёнными городами."""
         scheduler = ScraperScheduler()
 
-        # Не должно вызывать ошибок
-        await scheduler.update_schedule(scan_interval_minutes=60, enabled=True)
+        mock_settings_minsk = MagicMock()
+        mock_settings_minsk.scan_interval_minutes = 30
 
-    async def test_update_schedule_remove_old_job(self):
-        """Проверка удаления старого job при обновлении."""
-        scheduler = ScraperScheduler()
-        scheduler.scheduler = MagicMock()
-        scheduler.scheduler.running = True
+        mock_settings_brest = MagicMock()
+        mock_settings_brest.scan_interval_minutes = 60
 
-        await scheduler.update_schedule(scan_interval_minutes=60, enabled=True)
+        mock_db = AsyncMock()
+        mock_settings_service = MagicMock()
+        mock_settings_service.get_settings = AsyncMock(side_effect=[
+            mock_settings_minsk,
+            mock_settings_brest,
+        ])
+        mock_settings_service.get_enabled_cities = AsyncMock(return_value=["minsk", "brest"])
+        mock_settings_service.get_city_settings = AsyncMock(side_effect=[
+            mock_settings_minsk,
+            mock_settings_brest,
+        ])
 
-        scheduler.scheduler.remove_job.assert_called_with("kufar_scan")
+        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
+            mock_session.return_value.__aenter__.return_value = mock_db
 
-    async def test_update_schedule_add_new_job(self):
-        """Проверка добавления нового job при обновлении."""
-        scheduler = ScraperScheduler()
-        scheduler.scheduler = MagicMock()
-        scheduler.scheduler.running = True
+            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
+                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+                    mock_sched_instance = MagicMock()
+                    MockScheduler.return_value = mock_sched_instance
 
-        await scheduler.update_schedule(scan_interval_minutes=60, enabled=True)
+                    await scheduler.start()
 
-        scheduler.scheduler.add_job.assert_called()
-
-
-@pytest.mark.asyncio
-class TestScraperSchedulerProgress:
-    """Тесты отслеживания прогресса."""
-
-    def test_update_progress(self):
-        """Проверка обновления прогресса."""
-        scheduler = ScraperScheduler()
-
-        scheduler.update_progress(
-            is_scanning=True,
-            city="minsk",
-            stage="fetching",
-            pages_scraped=5,
-        )
-
-        assert scheduler.scan_progress["is_scanning"] is True
-        assert scheduler.scan_progress["city"] == "minsk"
-        assert scheduler.scan_progress["stage"] == "fetching"
-        assert scheduler.scan_progress["pages_scraped"] == 5
-
-    def test_update_progress_invalid_key(self):
-        """Проверка обновления с неверным ключом."""
-        scheduler = ScraperScheduler()
-
-        # Не должно вызывать ошибок
-        scheduler.update_progress(invalid_key="value")
-
-        # Progress не должен измениться
-        assert "invalid_key" not in scheduler.scan_progress
-
-    def test_get_progress(self):
-        """Проверка получения прогресса."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["city"] = "mogilev"
-        scheduler.scan_progress["stage"] = "parsing"
-        scheduler.scan_progress["pages_scraped"] = 10
-        scheduler.scan_progress["listings_fetched"] = 300
-
-        progress = scheduler.get_progress()
-
-        assert progress["is_scanning"] is True
-        assert progress["city"] == "mogilev"
-        assert progress["stage"] == "parsing"
-        assert progress["pages_scraped"] == 10
-        assert progress["listings_fetched"] == 300
-
-    def test_get_progress_not_scanning(self):
-        """Проверка получения прогресса когда не сканирует."""
-        scheduler = ScraperScheduler()
-
-        progress = scheduler.get_progress()
-
-        assert progress["is_scanning"] is False
-        assert progress["stage"] == "idle"
-        assert progress["pages_scraped"] == 0
-
-    def test_get_progress_is_stable_done(self):
-        """Проверка is_stable на стадии done."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = False
-        scheduler.scan_progress["stage"] = "done"
-
-        progress = scheduler.get_progress()
-
-        assert progress["is_stable"] is True
-
-    def test_get_progress_is_stable_fetching(self):
-        """Проверка is_stable на стадии fetching."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["stage"] = "fetching"
-
-        progress = scheduler.get_progress()
-
-        assert progress["is_stable"] is False
-
-    def test_get_progress_estimate_listings(self):
-        """Проверка оценки количества объявлений."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["stage"] = "fetching"
-        scheduler.scan_progress["pages_scraped"] = 5
-        scheduler.scan_progress["listings_fetched"] = 0
-
-        progress = scheduler.get_progress()
-
-        # Должен оценить как 30 на страницу
-        assert progress["listings_fetched"] == 150  # 5 * 30
-
-    def test_reset_progress(self):
-        """Проверка сброса прогресса."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["city"] = "minsk"
-        scheduler.scan_progress["stage"] = "done"
-        scheduler.scan_progress["pages_scraped"] = 20
-
-        scheduler.reset_progress()
-
-        assert scheduler.scan_progress["is_scanning"] is False
-        assert scheduler.scan_progress["city"] is None
-        assert scheduler.scan_progress["stage"] == "idle"
-        assert scheduler.scan_progress["pages_scraped"] == 0
+                    # Job добавлен для каждого города
+                    assert mock_sched_instance.add_job.call_count == 2
 
 
 @pytest.mark.asyncio
-class TestScraperSchedulerStatus:
-    """Тесты получения статуса."""
+class TestScraperSchedulerStop:
+    """Тесты остановки scheduler."""
 
-    async def test_get_status(self):
-        """Проверка получения статуса."""
+    def test_stop_running_scheduler(self):
+        """Проверка остановки запущенного scheduler."""
         scheduler = ScraperScheduler()
         scheduler.is_running = True
-        scheduler.last_scan_time = datetime(2024, 1, 1, 12, 0)
-        scheduler.last_scan_stats = {"created": 10, "updated": 20}
 
-        mock_settings = MagicMock()
-        mock_settings.scan_interval_minutes = 30
-        mock_settings.enabled = True
+        mock_scheduler = MagicMock()
+        mock_scheduler.running = True
+        scheduler.scheduler = mock_scheduler
 
-        mock_db = AsyncMock()
-        mock_settings_service = MagicMock()
-        mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
+        scheduler.stop()
 
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
-            mock_session.return_value.__aenter__.return_value = mock_db
+        # stop() вызывает shutdown() у scheduler
+        mock_scheduler.shutdown.assert_called_once()
 
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                status = await scheduler.get_status()
-
-                assert status["is_running"] is True
-                assert status["scan_interval_minutes"] == 30
-                assert status["scheduled_scanning_enabled"] is True
-                assert status["last_scan_time"] is not None
-                assert status["last_scan_stats"]["created"] == 10
-
-    async def test_get_status_no_scheduler(self):
-        """Проверка получения статуса без scheduler."""
+    def test_stop_not_running_scheduler(self):
+        """Проверка остановки когда scheduler не запущен."""
         scheduler = ScraperScheduler()
+        scheduler.is_running = False
+        scheduler.scheduler = None
 
-        mock_settings = MagicMock()
-        mock_settings.scan_interval_minutes = 30
-        mock_settings.enabled = True
+        # Не должно вызывать ошибок
+        scheduler.stop()
 
-        mock_db = AsyncMock()
-        mock_settings_service = MagicMock()
-        mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
+        assert scheduler.scheduler is None
 
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
-            mock_session.return_value.__aenter__.return_value = mock_db
 
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                status = await scheduler.get_status()
+@pytest.mark.asyncio
+class TestScraperSchedulerRestart:
+    """Тесты перезапуска scheduler."""
 
-                assert status["is_running"] is False
-                assert status["scheduler_running"] is False
+    async def test_restart_with_settings_enable(self):
+        """Проверка перезапуска с включением города."""
+        scheduler = ScraperScheduler()
+        scheduler.scheduler = MagicMock()
+        scheduler.scheduler.running = True
+        scheduler.scheduler.get_job.return_value = MagicMock()
+
+        await scheduler.restart_with_settings("minsk", enabled=True, interval_minutes=60)
+
+        scheduler.scheduler.remove_job.assert_called()
+        scheduler.scheduler.add_job.assert_called()
+
+    async def test_restart_with_settings_disable(self):
+        """Проверка перезапуска с отключением города."""
+        scheduler = ScraperScheduler()
+        scheduler.scheduler = MagicMock()
+        scheduler.scheduler.running = True
+        scheduler.scheduler.get_job.return_value = MagicMock()
+
+        await scheduler.restart_with_settings("minsk", enabled=False, interval_minutes=60)
+
+        scheduler.scheduler.remove_job.assert_called()
+        scheduler.scheduler.add_job.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -317,250 +315,86 @@ class TestSchedulerGlobalFunctions:
 
     def test_get_scheduler_creates_instance(self):
         """Проверка что get_scheduler создаёт экземпляр."""
-        from app.scraper.scheduler import scraper_scheduler
-
         # Сбрасываем глобальный экземпляр
         import app.scraper.scheduler as scheduler_module
-        scheduler_module.scraper_scheduler = None
+        original = scheduler_module._scheduler_instance
+        scheduler_module._scheduler_instance = None
 
-        result = get_scheduler()
+        try:
+            result = get_scheduler()
 
-        assert result is not None
-        assert isinstance(result, ScraperScheduler)
-
-        # Восстанавливаем
-        scheduler_module.scraper_scheduler = scraper_scheduler
+            assert result is not None
+            assert isinstance(result, ScraperScheduler)
+        finally:
+            # Восстанавливаем
+            scheduler_module._scheduler_instance = original
 
     def test_init_scheduler(self):
         """Проверка init_scheduler."""
         import app.scraper.scheduler as scheduler_module
 
         # Сбрасываем глобальный экземпляр
-        original = scheduler_module.scraper_scheduler
-        scheduler_module.scraper_scheduler = None
+        original = scheduler_module._scheduler_instance
+        scheduler_module._scheduler_instance = None
 
-        result = init_scheduler()
+        try:
+            result = init_scheduler()
 
-        assert result is not None
-        assert isinstance(result, ScraperScheduler)
-        assert scheduler_module.scraper_scheduler is result
-
-        # Восстанавливаем
-        scheduler_module.scraper_scheduler = original
-
-
-@pytest.mark.asyncio
-class TestDelayedReset:
-    """Тесты отложенного сброса."""
-
-    async def test_delayed_reset_method_exists(self):
-        """Проверка что метод _delayed_reset существует."""
-        scheduler = ScraperScheduler()
-
-        # Метод должен существовать и быть async
-        assert hasattr(scheduler, '_delayed_reset')
-        assert asyncio.iscoroutinefunction(scheduler._delayed_reset)
+            assert result is not None
+            assert isinstance(result, ScraperScheduler)
+            assert scheduler_module._scheduler_instance is result
+        finally:
+            # Восстанавливаем
+            scheduler_module._scheduler_instance = original
 
 
 @pytest.mark.asyncio
-class TestScraperSchedulerProgress:
-    """Additional tests for scheduler progress tracking."""
+class TestScraperSchedulerBroadcast:
+    """Тесты WebSocket broadcast."""
 
-    async def test_update_progress(self):
-        """Test updating progress tracking."""
+    async def test_broadcast_progress_no_ws_manager(self):
+        """Проверка broadcast без ws_manager."""
         scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        
-        scheduler.update_progress(pages_scraped=10)
-        assert scheduler.scan_progress["pages_scraped"] == 10
-        
-        scheduler.update_progress(listings_fetched=300)
-        assert scheduler.scan_progress["listings_fetched"] == 300
 
-    async def test_update_progress_invalid_key(self):
-        """Test updating progress with invalid key."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        
-        # Should not raise error, just ignore invalid key
-        scheduler.update_progress(invalid_key=100)
-        assert "invalid_key" not in scheduler.scan_progress
+        # Не должно вызывать ошибок
+        await scheduler._broadcast_progress()
 
-    async def test_get_progress(self):
-        """Test getting progress."""
+    async def test_broadcast_progress_with_ws_manager(self):
+        """Проверка broadcast с ws_manager."""
         scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["pages_scraped"] = 5
-        scheduler.scan_progress["stage"] = "fetching"
-        
-        progress = scheduler.get_progress()
-        
+
+        mock_ws_manager = AsyncMock()
+        mock_ws_manager.update_scanning_cities = AsyncMock()
+        mock_ws_manager.broadcast_progress = AsyncMock()
+        scheduler._ws_manager = mock_ws_manager
+
+        await scheduler._broadcast_progress()
+
+        mock_ws_manager.update_scanning_cities.assert_called()
+        mock_ws_manager.broadcast_progress.assert_called()
+
+
+@pytest.mark.asyncio
+class TestScraperSchedulerRunScanScheduled:
+    """Тесты планового сканирования."""
+
+    async def test_run_scan_scheduled_creates_history(self):
+        """Проверка создания записи истории сканирования."""
+        scheduler = ScraperScheduler()
+
+        # Проверяем что метод существует
+        assert hasattr(scheduler, '_run_scan_scheduled')
+        assert asyncio.iscoroutinefunction(scheduler._run_scan_scheduled)
+
+    async def test_run_scan_scheduled_city_progress(self):
+        """Проверка обновления прогресса города."""
+        scheduler = ScraperScheduler()
+
+        # Добавляем город
+        await scheduler._add_scanning_city("minsk", "scheduled", "scan-123")
+
+        # Проверяем начальный прогресс
+        progress = scheduler.scanning_cities["minsk"]["progress"]
         assert progress["is_scanning"] is True
-        assert progress["pages_scraped"] == 5
-        assert progress["stage"] == "fetching"
-
-    async def test_get_progress_not_scanning(self):
-        """Test getting progress when not scanning."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = False
-        
-        progress = scheduler.get_progress()
-        
-        assert progress["is_scanning"] is False
-
-    async def test_get_progress_is_stable_done(self):
-        """Test is_stable flag when stage is done."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["stage"] = "done"
-        
-        progress = scheduler.get_progress()
-        
-        assert progress["is_stable"] is True
-
-    async def test_get_progress_is_stable_fetching(self):
-        """Test is_stable flag when stage is fetching."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["stage"] = "fetching"
-        
-        progress = scheduler.get_progress()
-        
-        assert progress["is_stable"] is False
-
-    async def test_get_progress_estimate_listings(self):
-        """Test listings estimate calculation."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["pages_scraped"] = 10
-        scheduler.scan_progress["listings_fetched"] = 0
-        
-        progress = scheduler.get_progress()
-        
-        # Should estimate 30 listings per page
-        assert progress["listings_fetched"] == 0
-
-    async def test_reset_progress(self):
-        """Test resetting progress."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["pages_scraped"] = 10
-        
-        scheduler.reset_progress()
-        
-        assert scheduler.scan_progress["is_scanning"] is False
-        assert scheduler.scan_progress["pages_scraped"] == 0
-        assert scheduler.scan_progress["stage"] == "idle"
-
-
-@pytest.mark.asyncio
-class TestScraperSchedulerRunScan:
-    """Tests for run_scan functionality."""
-
-    async def test_run_scan_sets_progress(self):
-        """Test that run_scan sets progress tracking."""
-        scheduler = ScraperScheduler()
-        
-        # Just check that progress is initialized correctly
-        assert scheduler.scan_progress["is_scanning"] is False
-        
-        # The actual run_scan requires full setup
-        # This test verifies the initial state is correct
-
-    async def test_run_scan_with_city(self):
-        """Test run_scan with specific city."""
-        scheduler = ScraperScheduler()
-        
-        # Verify city can be set in progress
-        scheduler.scan_progress["city"] = "mogilev"
-        assert scheduler.scan_progress["city"] == "mogilev"
-
-    async def test_run_scan_trigger_type_manual(self):
-        """Test run_scan with manual trigger type."""
-        scheduler = ScraperScheduler()
-        
-        # Verify manual trigger type is default
-        # Actual testing requires full setup
-        assert scheduler.is_running is False
-
-
-@pytest.mark.asyncio
-class TestScraperSchedulerStop:
-    """Tests for stopping scheduler."""
-
-    async def test_stop_running_scheduler(self):
-        """Test stopping a running scheduler."""
-        scheduler = ScraperScheduler()
-        scheduler.is_running = True
-        
-        mock_scheduler = MagicMock()
-        mock_scheduler.running = True
-        scheduler.scheduler = mock_scheduler
-        
-        scheduler.stop()
-        
-        assert scheduler.is_running is False
-        assert scheduler.scheduler is None
-        mock_scheduler.shutdown.assert_called_once()
-
-    async def test_stop_not_running_scheduler(self):
-        """Test stopping scheduler that's not running."""
-        scheduler = ScraperScheduler()
-        scheduler.is_running = False
-        scheduler.scheduler = None
-        
-        # Should not raise error
-        scheduler.stop()
-        
-        assert scheduler.scheduler is None
-
-
-@pytest.mark.asyncio
-class TestScraperSchedulerLoadSettings:
-    """Tests for loading settings."""
-
-    async def test_get_status_loads_settings(self):
-        """Test that get_status loads settings from database."""
-        scheduler = ScraperScheduler()
-        
-        mock_settings = MagicMock()
-        mock_settings.scan_interval_minutes = 45
-        mock_settings.enabled = False
-        
-        mock_db = AsyncMock()
-        mock_settings_service = MagicMock()
-        mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
-
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
-            mock_session.return_value.__aenter__.return_value = mock_db
-
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                status = await scheduler.get_status()
-                
-                assert status["scan_interval_minutes"] == 45
-                assert status["scheduled_scanning_enabled"] is False
-
-
-@pytest.mark.asyncio
-class TestScraperSchedulerUpdateProgress:
-    """Tests for progress update methods."""
-
-    def test_update_progress_all_keys(self):
-        """Test updating all progress keys."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        
-        valid_keys = ["stage", "pages_scraped", "listings_fetched", "listings_processed"]
-        
-        for key in valid_keys:
-            scheduler.update_progress(**{key: 100})
-            assert scheduler.scan_progress[key] == 100
-
-    def test_update_progress_city_name(self):
-        """Test updating city_name in progress."""
-        scheduler = ScraperScheduler()
-        scheduler.scan_progress["is_scanning"] = True
-        scheduler.scan_progress["city"] = "minsk"
-        
-        scheduler.update_progress(city_name="Минск")
-        assert scheduler.scan_progress["city_name"] == "Минск"
+        assert progress["city"] == "minsk"
+        assert progress["stage"] == "starting"

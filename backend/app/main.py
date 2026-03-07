@@ -5,7 +5,14 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.db.database import engine, async_session_maker
 from app.models import Listing, ListingHistory, ScanHistory
-from app.api.v1 import listings_router, history_router, stats_router, scan_router, export_router, ws_router
+from app.api.v1 import (
+    listings_router,
+    history_router,
+    stats_router,
+    scan_router,
+    export_router,
+    ws_router,
+)
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
 
@@ -24,13 +31,14 @@ async def lifespan(app: FastAPI):
     async with async_session_maker() as db:
         from sqlalchemy import update
         from datetime import datetime
+
         await db.execute(
             update(ScanHistory)
-            .where(ScanHistory.status == 'running')
+            .where(ScanHistory.status == "running")
             .values(
-                status='error',
-                error_message='Backend restarted - scan interrupted',
-                completed_at=datetime.utcnow()
+                status="error",
+                error_message="Backend restarted - scan interrupted",
+                completed_at=datetime.utcnow(),
             )
         )
         await db.commit()

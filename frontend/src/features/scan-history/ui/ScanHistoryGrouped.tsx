@@ -76,13 +76,8 @@ export const ScanHistoryGrouped = ({
   });
 
   // Обработчик изменения развёрнутости
-  const handleValueChange = (value: string) => {
-    setExpandedCities((prev) => {
-      if (prev.includes(value)) {
-        return prev.filter((city) => city !== value);
-      }
-      return [...prev, value];
-    });
+  const handleValueChange = (value: string[]) => {
+    setExpandedCities(value);
   };
 
   if (isLoading) {
