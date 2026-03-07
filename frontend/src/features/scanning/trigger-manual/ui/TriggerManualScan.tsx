@@ -57,7 +57,6 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
 
   const cityName = CITIES[city as keyof typeof CITIES] || city;
   const isCityCurrentlyScanning = isCityScanning(city);
-  const scanningCities = getScanningCities();
   const hasAnyScanning = scanningCities.length > 0;
 
   // Кнопка "Сканировать" заблокирована если:
