@@ -512,9 +512,7 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
 
             if not is_valid:
                 # Аномалия: получено < 50% от ожидаемого
-                logger.error(
-                    f"Manual scan aborted for {city}: {validation_message}"
-                )
+                logger.error(f"Manual scan aborted for {city}: {validation_message}")
 
                 # Завершаем сканирование со статусом "error" БЕЗ upsert и mark_deleted
                 end_time = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -616,9 +614,7 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
 
                 # === ЕДИНЫЙ COMMIT ВСЕХ ОПЕРАЦИЙ ===
                 await db.commit()
-                logger.info(
-                    f"Transaction committed for {city}: {stats}"
-                )
+                logger.info(f"Transaction committed for {city}: {stats}")
 
                 # Завершение записи сканирования
                 end_time = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -643,9 +639,7 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
             except Exception as e:
                 logger.error(f"[Scan {scan_id}] Error in transaction: {e}")
                 await db.rollback()
-                logger.info(
-                    f"[Scan {scan_id}] Transaction rolled back for {city}"
-                )
+                logger.info(f"[Scan {scan_id}] Transaction rolled back for {city}")
                 raise
 
     except Exception as e:
@@ -653,16 +647,16 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
         import traceback
 
         traceback.print_exc()
-        
+
         # Откат транзакции при ошибке
         async with async_session_maker() as db:
             scan_history_service = ScanHistoryService(db)
             await scan_history_service.complete_scan_record(
                 scan_id=scan_id,
                 status="error",
-                error_message=f"{type(e).__name__}: {str(e)}"
+                error_message=f"{type(e).__name__}: {str(e)}",
             )
-        
+
         # Отправить ошибку через WebSocket
         if city in scheduler.scanning_cities:
             await scheduler._update_city_progress(

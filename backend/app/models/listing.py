@@ -126,6 +126,7 @@ class ScanSettings(Base):
 
 class ScanStats(Base):
     """Статистика сканирований по городам для валидации аномалий."""
+
     __tablename__ = "scan_stats"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

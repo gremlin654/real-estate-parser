@@ -154,7 +154,7 @@ class ListingService:
     ) -> dict:
         """
         Массовое обновление/создание объявлений БЕЗ маркировки удалённых.
-        
+
         Mark deleted вызывается отдельно в scheduler после валидации количества.
         Возвращает статистику по операциям.
         """
@@ -194,22 +194,25 @@ class ListingService:
         return stats
 
     async def upsert_listings(
-        self, listings_data: list[dict], city: str, mark_deleted_externally: bool = False
+        self,
+        listings_data: list[dict],
+        city: str,
+        mark_deleted_externally: bool = False,
     ) -> dict:
         """
         Массовое обновление/создание объявлений.
-        
+
         Args:
             listings_data: Список данных объявлений
             city: Город сканирования
             mark_deleted_externally: Если True, mark_deleted вызывается отдельно в scheduler.
                                      Если False, mark_deleted вызывается здесь (старое поведение).
-        
+
         Returns:
             Статистика по операциям
         """
         stats = await self.upsert_listings_no_mark_deleted(listings_data, city)
-        
+
         # Помечаем удалённые объявления только если не вызывается externall
         if not mark_deleted_externally and stats["processed"] > 0:
             kufar_ids = set(item["kufar_id"] for item in listings_data)
@@ -268,7 +271,9 @@ class ListingService:
 
                     stats["processed"] += 1
                 except Exception as e:
-                    logger.error(f"Error upserting listing {listing_data.get('kufar_id')}: {e}")
+                    logger.error(
+                        f"Error upserting listing {listing_data.get('kufar_id')}: {e}"
+                    )
                     raise  # Пробрасываем для отката транзакции
 
             # Флаг успешного завершения для внешнего использования
@@ -323,7 +328,9 @@ class ListingService:
 
         for listing_data in listings_data:
             try:
-                listing, action = await temp_service.upsert_no_commit_inner(listing_data)
+                listing, action = await temp_service.upsert_no_commit_inner(
+                    listing_data
+                )
                 kufar_ids.add(listing.kufar_id)
 
                 if action == "created":
@@ -339,7 +346,9 @@ class ListingService:
 
                 stats["processed"] += 1
             except Exception as e:
-                logger.error(f"Error upserting listing {listing_data.get('kufar_id')}: {e}")
+                logger.error(
+                    f"Error upserting listing {listing_data.get('kufar_id')}: {e}"
+                )
                 raise  # Пробрасываем ошибку для отката транзакции
 
         stats["kufar_ids"] = kufar_ids
@@ -348,7 +357,7 @@ class ListingService:
     async def upsert_no_commit_inner(self, listing_data: dict) -> tuple[Listing, str]:
         """
         Внутренний метод upsert без commit() - для использования в upsert_listings_no_commit().
-        
+
         Использует self.db сессию которая должна быть передана извне.
         """
         kufar_id = listing_data["kufar_id"]
@@ -475,7 +484,7 @@ class ListingService:
         """
         # Временный сервис для использования переданной сессии
         temp_service = ListingService(db_session)
-        
+
         result = await db_session.execute(
             select(Listing).where(
                 and_(

@@ -2,6 +2,7 @@
 Сервис для управления статистикой сканирований по городам.
 Используется для валидации аномалий при сканировании.
 """
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.listing import ScanStats
@@ -22,9 +23,7 @@ class ScanStatsService:
 
     async def get_city_stats(self, city: str) -> Optional[ScanStats]:
         """Получить статистику по городу."""
-        result = await self.db.execute(
-            select(ScanStats).where(ScanStats.city == city)
-        )
+        result = await self.db.execute(select(ScanStats).where(ScanStats.city == city))
         return result.scalar_one_or_none()
 
     async def get_or_create_stats(self, city: str) -> ScanStats:
@@ -63,9 +62,7 @@ class ScanStatsService:
 
         return stats
 
-    async def update_stats(
-        self, city: str, listings_count: int
-    ) -> ScanStats:
+    async def update_stats(self, city: str, listings_count: int) -> ScanStats:
         """
         Обновить статистику по городу после успешного сканирования.
 
@@ -188,10 +185,12 @@ class ScanStatsService:
             # Сначала пробуем получить или создать статистику без commit()
             # Это гарантирует что запись существует перед блокировкой
             await self._get_or_create_stats_no_commit(city, session)
-            
+
             # Применяем блокировку для валидации
             query = select(ScanStats).where(ScanStats.city == city)
-            query = query.with_for_update(skip_locked=True)  # PostgreSQL FOR UPDATE с skip_locked
+            query = query.with_for_update(
+                skip_locked=True
+            )  # PostgreSQL FOR UPDATE с skip_locked
             result = await session.execute(query)
             stats = result.scalar_one_or_none()
         else:

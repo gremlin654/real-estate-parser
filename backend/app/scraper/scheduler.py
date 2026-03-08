@@ -276,9 +276,7 @@ class ScraperScheduler:
 
                 if not is_valid:
                     # Аномалия: получено < 50% от ожидаемого
-                    logger.error(
-                        f"Scan aborted for {city}: {validation_message}"
-                    )
+                    logger.error(f"Scan aborted for {city}: {validation_message}")
 
                     # Завершаем сканирование со статусом "error" БЕЗ upsert и mark_deleted
                     end_time = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -328,8 +326,7 @@ class ScraperScheduler:
                     progress["listings_processed"] = stats.get("processed", 0)
                     progress["elapsed_seconds"] = int(
                         (
-                            datetime.now(timezone.utc).replace(tzinfo=None)
-                            - start_time
+                            datetime.now(timezone.utc).replace(tzinfo=None) - start_time
                         ).total_seconds()
                     )
                     await self._update_city_progress(city, progress)
@@ -358,9 +355,7 @@ class ScraperScheduler:
                         )
                     else:
                         stats["deleted"] = 0
-                        logger.info(
-                            f"No listings to mark as deleted for {city}"
-                        )
+                        logger.info(f"No listings to mark as deleted for {city}")
 
                     await self._update_city_progress(
                         city,
@@ -383,9 +378,7 @@ class ScraperScheduler:
 
                     # === ЕДИНЫЙ COMMIT ВСЕХ ОПЕРАЦИЙ ===
                     await db.commit()
-                    logger.info(
-                        f"Transaction committed for {city}: {stats}"
-                    )
+                    logger.info(f"Transaction committed for {city}: {stats}")
 
                     # Завершение записи сканирования
                     end_time = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -408,9 +401,7 @@ class ScraperScheduler:
                     )
 
                 except Exception as e:
-                    logger.error(
-                        f"[Scan {scan_record.id}] Error in transaction: {e}"
-                    )
+                    logger.error(f"[Scan {scan_record.id}] Error in transaction: {e}")
                     await db.rollback()
                     logger.info(
                         f"[Scan {scan_record.id}] Transaction rolled back for {city}"
@@ -422,16 +413,16 @@ class ScraperScheduler:
             import traceback
 
             traceback.print_exc()
-            
+
             # Откат транзакции при ошибке
             async with async_session_maker() as db:
                 scan_history_service = ScanHistoryService(db)
                 await scan_history_service.complete_scan_record(
                     scan_id=str(scan_record.id),
                     status="error",
-                    error_message=f"{type(e).__name__}: {str(e)}"
+                    error_message=f"{type(e).__name__}: {str(e)}",
                 )
-            
+
             # Отправить ошибку через WebSocket
             if city in self.scanning_cities:
                 await self._update_city_progress(
