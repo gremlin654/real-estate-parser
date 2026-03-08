@@ -67,6 +67,8 @@ export interface HistoryEvent {
   event_type: string;
   price_before?: number | null;
   price_after?: number | null;
+  price_before_usd?: number | null;
+  price_after_usd?: number | null;
   changed_fields?: Record<string, any> | null;
   snapshot?: Record<string, any> | null;
   created_at: string;

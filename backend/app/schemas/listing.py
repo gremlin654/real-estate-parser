@@ -40,6 +40,8 @@ class ListingHistoryResponse(BaseModel):
     event_type: str
     price_before: Optional[int] = None
     price_after: Optional[int] = None
+    price_before_usd: Optional[int] = None  # Цена до изменения в USD (копейках)
+    price_after_usd: Optional[int] = None   # Цена после изменения в USD (копейках)
     changed_fields: Optional[dict] = None
     snapshot: Optional[dict] = None
     created_at: datetime

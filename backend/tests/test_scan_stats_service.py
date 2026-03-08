@@ -261,6 +261,7 @@ class TestScanStatsService:
         """Проверка валидации при недостатке данных."""
         mock_stats = MagicMock(spec=ScanStats)
         mock_stats.city = "minsk"
+        mock_stats.avg_listings_count = 0  # Нет среднего
         mock_stats.recent_counts = [500]  # Только 1 запись (нужно минимум 3)
 
         mock_result = MagicMock()
@@ -438,6 +439,11 @@ class TestScanStatsServiceScenarios:
         db.refresh = AsyncMock()
         db.add = MagicMock()
         return db
+
+    @pytest.fixture
+    def scan_stats_service(self, db_mock):
+        """Создание сервиса статистики."""
+        return ScanStatsService(db_mock)
 
     async def test_scenario_partial_load_150_of_500(self, db_mock):
         """Сценарий: частичная загрузка 150 из 500 → аномалия."""
@@ -725,3 +731,114 @@ class TestScanStatsServiceScenarios:
         assert is_valid is True
         # Проверка что execute был вызван (query с with_for_update(skip_locked=True) выполнен)
         assert db_mock.execute.called
+
+    async def test_validate_insufficient_history_with_avg_anomaly(
+        self, scan_stats_service, db_mock
+    ):
+        """Проверка: недостаточно истории (< 3) но есть среднее → аномалия (150 из 438)."""
+        mock_stats = MagicMock(spec=ScanStats)
+        mock_stats.city = "grodno"
+        mock_stats.avg_listings_count = 438  # Среднее есть
+        mock_stats.recent_counts = [727]  # Но только 1 запись в истории
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_stats
+        db_mock.execute.return_value = mock_result
+
+        # Получено 150 объявлений (34% от 438) - аномалия
+        is_valid, message, expected = await scan_stats_service.validate_listings_count(
+            "grodno", 150
+        )
+
+        assert is_valid is False, "Должна быть обнаружена аномалия"
+        assert "Аномалия" in message
+        assert "получено 150" in message
+        assert "ожидалось ~438" in message
+        assert "менее 90%" in message
+        assert expected == 438
+
+    async def test_validate_insufficient_history_with_avg_valid(
+        self, scan_stats_service, db_mock
+    ):
+        """Проверка: недостаточно истории (< 3) но есть среднее → валидно (400 из 438)."""
+        mock_stats = MagicMock(spec=ScanStats)
+        mock_stats.city = "grodno"
+        mock_stats.avg_listings_count = 438  # Среднее есть
+        mock_stats.recent_counts = [727]  # Но только 1 запись в истории
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_stats
+        db_mock.execute.return_value = mock_result
+
+        # Получено 400 объявлений (91% от 438) - валидно
+        is_valid, message, expected = await scan_stats_service.validate_listings_count(
+            "grodno", 400
+        )
+
+        assert is_valid is True, "Должно быть валидно"
+        assert "Валидация пройдена (по среднему)" in message
+        assert expected == 438
+
+    async def test_validate_insufficient_history_zero_avg_first_scan(
+        self, scan_stats_service, db_mock
+    ):
+        """Проверка: недостаточно истории и avg_listings_count = 0 → первое сканирование."""
+        mock_stats = MagicMock(spec=ScanStats)
+        mock_stats.city = "minsk"
+        mock_stats.avg_listings_count = 0  # Нет среднего
+        mock_stats.recent_counts = []  # Пустая история
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_stats
+        db_mock.execute.return_value = mock_result
+
+        # Первое сканирование с нормальным количеством
+        is_valid, message, expected = await scan_stats_service.validate_listings_count(
+            "minsk", 500
+        )
+
+        assert is_valid is True
+        assert "Первое сканирование — валидация отключена" in message
+        assert expected == 0
+
+    async def test_validate_insufficient_history_boundary_90_percent(
+        self, scan_stats_service, db_mock
+    ):
+        """Проверка: недостаточно истории, среднее 438, получено 395 (>= 90%) → валидно."""
+        mock_stats = MagicMock(spec=ScanStats)
+        mock_stats.city = "grodno"
+        mock_stats.avg_listings_count = 438
+        mock_stats.recent_counts = [727]
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_stats
+        db_mock.execute.return_value = mock_result
+
+        # 438 * 0.9 = 394.2, 395 >= 394.2 (выше границы 90%)
+        is_valid, message, expected = await scan_stats_service.validate_listings_count(
+            "grodno", 395
+        )
+
+        assert is_valid is True
+        assert "Валидация пройдена (по среднему)" in message
+
+    async def test_validate_insufficient_history_below_90_percent(
+        self, scan_stats_service, db_mock
+    ):
+        """Проверка: недостаточно истории, среднее 438, получено 393 (89.7%) → аномалия."""
+        mock_stats = MagicMock(spec=ScanStats)
+        mock_stats.city = "grodno"
+        mock_stats.avg_listings_count = 438
+        mock_stats.recent_counts = [727]
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_stats
+        db_mock.execute.return_value = mock_result
+
+        # 393 < 438 * 0.9 = 394.2 (ниже границы 90%)
+        is_valid, message, expected = await scan_stats_service.validate_listings_count(
+            "grodno", 393
+        )
+
+        assert is_valid is False
+        assert "Аномалия" in message

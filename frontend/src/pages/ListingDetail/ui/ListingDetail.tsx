@@ -312,8 +312,15 @@ export function ListingDetail() {
                         </div>
                         {event.price_before && event.price_after && (
                           <p className="text-sm text-muted-foreground mt-1">
-                            {event.price_before.toLocaleString()} →{' '}
-                            {event.price_after.toLocaleString()} USD
+                            {(currency === 'USD' 
+                              ? (event.price_before_usd ?? event.price_before / 100) 
+                              : (event.price_before / 100)
+                            ).toLocaleString()}{' '}
+                            →{' '}
+                            {(currency === 'USD' 
+                              ? (event.price_after_usd ?? event.price_after / 100) 
+                              : (event.price_after / 100)
+                            ).toLocaleString()} {displayCurrency}
                           </p>
                         )}
                         {event.changed_fields && Object.keys(event.changed_fields).length > 0 && (

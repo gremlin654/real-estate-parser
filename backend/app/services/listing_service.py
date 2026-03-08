@@ -24,6 +24,8 @@ class ListingService:
         event_type: EventType,
         price_before: Optional[int] = None,
         price_after: Optional[int] = None,
+        price_before_usd: Optional[int] = None,
+        price_after_usd: Optional[int] = None,
         changed_fields: Optional[dict] = None,
         snapshot: Optional[dict] = None,
     ):
@@ -33,6 +35,8 @@ class ListingService:
             event_type=event_type,
             price_before=price_before,
             price_after=price_after,
+            price_before_usd=price_before_usd,
+            price_after_usd=price_after_usd,
             changed_fields=changed_fields,
             snapshot=snapshot,
         )
@@ -88,6 +92,8 @@ class ListingService:
                     event_type=EventType.price_changed,
                     price_before=old_price_usd,
                     price_after=existing.price_usd,
+                    price_before_usd=old_price_usd,
+                    price_after_usd=existing.price_usd,
                     changed_fields=changed_fields if changed_fields else None,
                     snapshot=json.loads(
                         json.dumps(existing.__dict__, default=str, skipkeys=True)
@@ -112,6 +118,8 @@ class ListingService:
                     event_type=EventType.price_changed_byn,
                     price_before=old_price_byn,
                     price_after=existing.price,
+                    price_before_usd=old_price_usd,
+                    price_after_usd=existing.price_usd,
                     changed_fields=changed_fields if changed_fields else None,
                     snapshot=json.loads(
                         json.dumps(existing.__dict__, default=str, skipkeys=True)
@@ -408,6 +416,8 @@ class ListingService:
                     event_type=EventType.price_changed,
                     price_before=old_price_usd,
                     price_after=existing.price_usd,
+                    price_before_usd=old_price_usd,
+                    price_after_usd=existing.price_usd,
                     changed_fields=changed_fields if changed_fields else None,
                     snapshot=json.loads(
                         json.dumps(existing.__dict__, default=str, skipkeys=True)
@@ -431,6 +441,8 @@ class ListingService:
                     event_type=EventType.price_changed_byn,
                     price_before=old_price_byn,
                     price_after=existing.price,
+                    price_before_usd=old_price_usd,
+                    price_after_usd=existing.price_usd,
                     changed_fields=changed_fields if changed_fields else None,
                     snapshot=json.loads(
                         json.dumps(existing.__dict__, default=str, skipkeys=True)

@@ -200,6 +200,30 @@ class ScanStatsService:
 
         if not stats or not stats.recent_counts or len(stats.recent_counts) < 3:
             # Первое сканирование или недостаточно данных
+            
+            # Если есть среднее (avg_listings_count > 0), используем его для валидации
+            if stats and stats.avg_listings_count > 0:
+                expected_count = stats.avg_listings_count
+                threshold = expected_count * 0.9  # 90% порог
+                
+                if current_count < threshold:
+                    message = (
+                        f"⚠️ Аномалия: получено {current_count} объявлений, "
+                        f"ожидалось ~{expected_count} (менее 90% от среднего, порог {threshold:.0f})"
+                    )
+                    logger.warning(
+                        f"[{city}] Аномалия: получено {current_count} объявлений, "
+                        f"ожидалось ~{expected_count} (менее 90% от среднего)"
+                    )
+                    return False, message, expected_count
+                
+                # Валидация пройдена
+                logger.info(
+                    f"[{city}] Валидация пройдена (история < 3): {current_count} >= {threshold}"
+                )
+                return True, "Валидация пройдена (по среднему)", expected_count
+            
+            # Нет среднего — первое сканирование
             if current_count == 0:
                 logger.warning(
                     f"[{city}] First scan returned 0 listings — possible API error"

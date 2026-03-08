@@ -26,7 +26,11 @@ class TestGetHistory:
         """Проверка получения истории с данными."""
         # Уникальный префикс для этого теста
         prefix = f"hist_{random.randint(1000, 9999)}"
-        
+
+        # Устанавливаем price_usd для тестового объявления
+        create_test_listing.price_usd = 42500
+        await test_session.commit()
+
         # Создаём записи истории
         for event_type in [EventType.created, EventType.price_changed, EventType.edited]:
             history = ListingHistory(
@@ -35,6 +39,8 @@ class TestGetHistory:
                 event_type=event_type,
                 price_before=90000 if event_type == EventType.price_changed else None,
                 price_after=100000 if event_type == EventType.price_changed else None,
+                price_before_usd=40000 if event_type == EventType.price_changed else None,
+                price_after_usd=42500 if event_type == EventType.price_changed else None,
                 created_at=datetime.now().replace(tzinfo=None),
             )
             test_session.add(history)
@@ -47,6 +53,14 @@ class TestGetHistory:
         assert response.status_code == 200
         data = response.json()
         assert len(data) > 0
+        
+        # Проверяем что новые поля USD присутствуют в ответе
+        price_changed_entry = next((h for h in data if h['event_type'] == 'price_changed'), None)
+        if price_changed_entry:
+            assert 'price_before_usd' in price_changed_entry
+            assert 'price_after_usd' in price_changed_entry
+            assert price_changed_entry['price_before_usd'] == 40000
+            assert price_changed_entry['price_after_usd'] == 42500
 
     async def test_get_history_invalid_uuid(self, client: AsyncClient):
         """Проверка обработки невалидного UUID."""
@@ -68,6 +82,8 @@ class TestListingHistoryModel:
             event_type=EventType.price_changed,
             price_before=90000,
             price_after=100000,
+            price_before_usd=40000,
+            price_after_usd=42500,
             created_at=datetime.now().replace(tzinfo=None),
         )
 
@@ -78,6 +94,8 @@ class TestListingHistoryModel:
         assert history.event_type == EventType.price_changed
         assert history.price_before == 90000
         assert history.price_after == 100000
+        assert history.price_before_usd == 40000
+        assert history.price_after_usd == 42500
 
     async def test_history_event_types(self, test_session, create_test_listing):
         """Проверка всех типов событий."""
