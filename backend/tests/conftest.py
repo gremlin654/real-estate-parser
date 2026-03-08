@@ -17,17 +17,26 @@ from app.db.database import async_session_maker
 async def client(test_session):
     """Create async client for testing API endpoints with test DB session."""
     from httpx import ASGITransport
-    from unittest.mock import AsyncMock, patch
-    
+    from unittest.mock import AsyncMock, patch, MagicMock
+    from app.db.database import async_session_maker as original_session_maker
+
     # Mock the get_db dependency to use test_session
     async def override_get_db():
         yield test_session
-    
-    # Patch the dependency
-    with patch('app.db.database.async_session_maker', return_value=test_session):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            yield ac
+
+    # Mock async_session_maker to return test_session for all calls
+    # This is needed for background tasks that use async_session_maker()
+    mock_session_maker = MagicMock(return_value=test_session)
+    mock_session_maker.return_value.__aenter__ = AsyncMock(return_value=test_session)
+    mock_session_maker.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    # Patch the dependency globally
+    with patch('app.db.database.async_session_maker', mock_session_maker):
+        with patch('app.scraper.scheduler.async_session_maker', mock_session_maker):
+            with patch('app.api.v1.scan.async_session_maker', mock_session_maker):
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    yield ac
 
 
 @pytest.fixture(scope="session")

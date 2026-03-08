@@ -10,6 +10,9 @@ from sqlalchemy import select
 from app.db.database import async_session_maker
 from app.config import settings, CITY_NAMES
 from app.services.scan_settings_service import ScanSettingsService
+from app.services.scan_stats_service import ScanStatsService
+from app.services.listing_service import ListingService
+from app.services.scan_history_service import ScanHistoryService
 
 
 class ScraperScheduler:
@@ -150,8 +153,6 @@ class ScraperScheduler:
     async def _run_scan_scheduled(self, city: str):
         """Запуск планового сканирования по расписанию для конкретного города."""
         from app.scraper.kufar_scraper import KufarScraper
-        from app.services.listing_service import ListingService
-        from app.services.scan_history_service import ScanHistoryService
 
         logger.info(f"Starting scheduled scan for {city}")
 
@@ -188,6 +189,7 @@ class ScraperScheduler:
             async with async_session_maker() as db:
                 scan_history_service = ScanHistoryService(db)
                 listing_service = ListingService(db)
+                scan_stats_service = ScanStatsService(db)
 
                 # Парсинг страниц
                 await self._update_city_progress(
@@ -251,74 +253,185 @@ class ScraperScheduler:
 
                 listings_data = all_listings
                 pages_scraped = page_num
+                total_listings_fetched = len(listings_data)
+
+                logger.info(
+                    f"Fetching completed for {city}: {total_listings_fetched} listings from {pages_scraped} pages"
+                )
 
                 # Обновление записи сканирования
                 await scan_history_service.update_scan_record(
                     scan_id=str(scan_record.id),
-                    listings_fetched=len(listings_data),
+                    listings_fetched=total_listings_fetched,
                     pages_scraped=pages_scraped,
                 )
 
-                # Парсинг и сохранение
-                await self._update_city_progress(
-                    city,
-                    {
-                        **self.scanning_cities[city]["progress"],
-                        "stage": "upserting",
-                        "is_stable": False,
-                    },
-                )
-                await self._broadcast_progress()
-
-                stats = await listing_service.upsert_listings(listings_data, city)
-
-                progress = self.scanning_cities[city]["progress"]
-                progress["listings_processed"] = stats.get("processed", 0)
-                progress["elapsed_seconds"] = int(
-                    (
-                        datetime.now(timezone.utc).replace(tzinfo=None) - start_time
-                    ).total_seconds()
-                )
-                await self._update_city_progress(city, progress)
-                await self._broadcast_progress()
-
-                await self._update_city_progress(
-                    city,
-                    {
-                        **self.scanning_cities[city]["progress"],
-                        "stage": "marking_deleted_final",
-                        "is_stable": True,
-                    },
-                )
-                await self._broadcast_progress()
-
-                # Завершение записи сканирования
-                end_time = datetime.now(timezone.utc).replace(tzinfo=None)
-                await scan_history_service.complete_scan_record(
-                    scan_id=str(scan_record.id),
-                    status="completed",
-                    listings_created=stats.get("created", 0),
-                    listings_updated=stats.get("updated", 0),
-                    listings_changed_byn=stats.get("changed_byn", 0),
-                    listings_deleted=stats.get("deleted", 0),
-                    listings_restored=stats.get("restored", 0),
-                    listings_unchanged=stats.get("unchanged", 0),
-                    pages_scraped=pages_scraped,
-                    duration_seconds=int((end_time - start_time).total_seconds()),
+                # === ВАЛИДАЦИЯ КОЛИЧЕСТВА ОБЪЯВЛЕНИЙ ===
+                # Валидация выполняется перед транзакцией
+                is_valid, validation_message, expected_count = (
+                    await scan_stats_service.validate_listings_count(
+                        city, total_listings_fetched, use_lock=False
+                    )
                 )
 
-                logger.info(f"Scheduled scan completed: {stats}")
+                if not is_valid:
+                    # Аномалия: получено < 50% от ожидаемого
+                    logger.error(
+                        f"Scan aborted for {city}: {validation_message}"
+                    )
+
+                    # Завершаем сканирование со статусом "error" БЕЗ upsert и mark_deleted
+                    end_time = datetime.now(timezone.utc).replace(tzinfo=None)
+                    await scan_history_service.complete_scan_record(
+                        scan_id=str(scan_record.id),
+                        status="error",
+                        error_message=validation_message,
+                        pages_scraped=pages_scraped,
+                        duration_seconds=int((end_time - start_time).total_seconds()),
+                    )
+
+                    # Обновляем прогресс
+                    await self._update_city_progress(
+                        city,
+                        {
+                            **self.scanning_cities[city]["progress"],
+                            "stage": "error",
+                            "is_stable": True,
+                        },
+                    )
+                    await self._broadcast_progress()
+
+                    # Возвращаемся без upsert и mark_deleted
+                    return
+
+                # === ЕДИНАЯ ТРАНЗАКЦИЯ: upsert + mark_deleted + update_stats ===
+                # Все три операции выполняются в одной сессии для атомарности
+                # При ошибке любой операции - откат всех трёх через rollback
+                try:
+                    # === UPSERT В ТРАНЗАКЦИИ ===
+                    await self._update_city_progress(
+                        city,
+                        {
+                            **self.scanning_cities[city]["progress"],
+                            "stage": "upserting",
+                            "is_stable": False,
+                        },
+                    )
+                    await self._broadcast_progress()
+
+                    # Выполняем upsert в транзакции (без commit внутри)
+                    stats = await listing_service.upsert_listings_no_commit(
+                        listings_data, city, db
+                    )
+
+                    progress = self.scanning_cities[city]["progress"]
+                    progress["listings_processed"] = stats.get("processed", 0)
+                    progress["elapsed_seconds"] = int(
+                        (
+                            datetime.now(timezone.utc).replace(tzinfo=None)
+                            - start_time
+                        ).total_seconds()
+                    )
+                    await self._update_city_progress(city, progress)
+                    await self._broadcast_progress()
+
+                    # === MARK DELETED (только после успешной валидации и upsert) ===
+                    await self._update_city_progress(
+                        city,
+                        {
+                            **self.scanning_cities[city]["progress"],
+                            "stage": "marking_deleted",
+                            "is_stable": False,
+                        },
+                    )
+                    await self._broadcast_progress()
+
+                    # Помечаем удалённые объявления (без commit внутри)
+                    kufar_ids = stats.get("kufar_ids", set())
+                    if kufar_ids:
+                        deleted_count = await listing_service.mark_deleted_no_commit(
+                            kufar_ids, city, db
+                        )
+                        stats["deleted"] = deleted_count
+                        logger.info(
+                            f"Marked {deleted_count} listings as deleted for {city}"
+                        )
+                    else:
+                        stats["deleted"] = 0
+                        logger.info(
+                            f"No listings to mark as deleted for {city}"
+                        )
+
+                    await self._update_city_progress(
+                        city,
+                        {
+                            **self.scanning_cities[city]["progress"],
+                            "stage": "marking_deleted_final",
+                            "is_stable": True,
+                        },
+                    )
+                    await self._broadcast_progress()
+
+                    # === ОБНОВЛЕНИЕ СТАТИСТИКИ (в той же сессии!) ===
+                    # Валидация с блокировкой для предотвращения гонок
+                    await scan_stats_service.validate_listings_count(
+                        city, total_listings_fetched, use_lock=True
+                    )
+                    await scan_stats_service.update_stats_no_commit(
+                        city, total_listings_fetched, db
+                    )
+
+                    # === ЕДИНЫЙ COMMIT ВСЕХ ОПЕРАЦИЙ ===
+                    await db.commit()
+                    logger.info(
+                        f"Transaction committed for {city}: {stats}"
+                    )
+
+                    # Завершение записи сканирования
+                    end_time = datetime.now(timezone.utc).replace(tzinfo=None)
+                    await scan_history_service.complete_scan_record(
+                        scan_id=str(scan_record.id),
+                        status="completed",
+                        listings_created=stats.get("created", 0),
+                        listings_updated=stats.get("updated", 0),
+                        listings_changed_byn=stats.get("changed_byn", 0),
+                        listings_deleted=stats.get("deleted", 0),
+                        listings_restored=stats.get("restored", 0),
+                        listings_unchanged=stats.get("unchanged", 0),
+                        pages_scraped=pages_scraped,
+                        duration_seconds=int((end_time - start_time).total_seconds()),
+                    )
+
+                    logger.info(
+                        f"Scheduled scan completed for {city}: {stats}, "
+                        f"duration: {int((end_time - start_time).total_seconds())}s"
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        f"[Scan {scan_record.id}] Error in transaction: {e}"
+                    )
+                    await db.rollback()
+                    logger.info(
+                        f"[Scan {scan_record.id}] Transaction rolled back for {city}"
+                    )
+                    raise
 
         except Exception as e:
             logger.error(f"Scheduled scan error: {e}")
             import traceback
 
             traceback.print_exc()
+            
+            # Откат транзакции при ошибке
             async with async_session_maker() as db:
                 scan_history_service = ScanHistoryService(db)
                 await scan_history_service.complete_scan_record(
-                    scan_id=str(scan_record.id), status="error", error_message=str(e)
+                    scan_id=str(scan_record.id),
+                    status="error",
+                    error_message=f"{type(e).__name__}: {str(e)}"
                 )
+            
             # Отправить ошибку через WebSocket
             if city in self.scanning_cities:
                 await self._update_city_progress(
