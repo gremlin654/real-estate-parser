@@ -122,3 +122,16 @@ class ScanSettings(Base):
     enabled = Column(Boolean, default=False, nullable=False)
     scan_interval_minutes = Column(Integer, default=30, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class ScanStats(Base):
+    """Статистика сканирований по городам для валидации аномалий."""
+
+    __tablename__ = "scan_stats"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    city = Column(String, unique=True, nullable=False, index=True)
+    avg_listings_count = Column(Integer, default=0, nullable=False)
+    last_updated = Column(DateTime, default=utc_now, onupdate=utc_now)
+    # Хранит последние 10 значений для расчёта среднего
+    recent_counts = Column(JSONB, default=list, nullable=False)
