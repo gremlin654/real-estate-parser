@@ -328,6 +328,154 @@ class TestListingServiceUpsert:
         assert existing.status == ListingStatus.active
         assert existing.deleted_at is None
 
+    async def test_preserve_updated_status_on_subsequent_scan(self, db_mock):
+        """Проверка сохранения статуса updated при последующем сканировании без изменений цены.
+        
+        Сценарий:
+        1. Объявление имеет статус updated (цена USD изменилась в предыдущем сканировании)
+        2. Следующее сканирование: цена не изменилась
+        3. Ожидаем: статус остаётся updated, а не сбрасывается на active
+        """
+        service = ListingService(db_mock)
+
+        # Существующее объявление со статусом updated
+        existing = MagicMock(spec=Listing)
+        existing.price_usd = 40000  # Цена после изменения
+        existing.price = 120000
+        existing.status = ListingStatus.updated  # Статус из предыдущего сканирования
+        existing.id = uuid4()
+        existing.kufar_id = "test_123"
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = existing
+        db_mock.execute.return_value = mock_result
+
+        # Данные текущего сканирования (цена не изменилась)
+        scan_data = {
+            "kufar_id": "test_123",
+            "url": "https://re.kufar.by/vi/123456",
+            "title": "Test Apartment",
+            "price": 120000,  # Same
+            "price_usd": 40000,  # Same
+            "currency": "BYN",
+            "city": "minsk",
+            "address": "Test Street 1",
+            "rooms": 2,
+            "area": 55.0,
+            "floor": 3,
+            "total_floors": 9,
+            "category": "apartments",
+        }
+
+        async def mock_refresh(obj):
+            pass
+
+        db_mock.refresh.side_effect = mock_refresh
+
+        result, action = await service.upsert(scan_data)
+
+        assert result is not None
+        assert action == 'unchanged'
+        assert existing.status == ListingStatus.updated  # Статус сохранён!
+
+    async def test_preserve_price_changed_byn_status_on_subsequent_scan(self, db_mock):
+        """Проверка сохранения статуса price_changed_byn при последующем сканировании.
+        
+        Сценарий:
+        1. Объявление имеет статус price_changed_byn
+        2. Следующее сканирование: цена не изменилась
+        3. Ожидаем: статус остаётся price_changed_byn
+        """
+        service = ListingService(db_mock)
+
+        # Существующее объявление со статусом price_changed_byn
+        existing = MagicMock(spec=Listing)
+        existing.price_usd = 35000
+        existing.price = 110000
+        existing.status = ListingStatus.price_changed_byn
+        existing.id = uuid4()
+        existing.kufar_id = "test_456"
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = existing
+        db_mock.execute.return_value = mock_result
+
+        scan_data = {
+            "kufar_id": "test_456",
+            "url": "https://re.kufar.by/vi/456789",
+            "title": "Test Apartment 2",
+            "price": 110000,  # Same
+            "price_usd": 35000,  # Same
+            "currency": "BYN",
+            "city": "minsk",
+            "address": "Test Street 2",
+            "rooms": 3,
+            "area": 65.0,
+            "floor": 5,
+            "total_floors": 12,
+            "category": "apartments",
+        }
+
+        async def mock_refresh(obj):
+            pass
+
+        db_mock.refresh.side_effect = mock_refresh
+
+        result, action = await service.upsert(scan_data)
+
+        assert result is not None
+        assert action == 'unchanged'
+        assert existing.status == ListingStatus.price_changed_byn  # Статус сохранён!
+
+    async def test_reset_new_status_to_active_on_subsequent_scan(self, db_mock):
+        """Проверка сброса статуса new на active при последующем сканировании.
+        
+        Сценарий:
+        1. Объявление имеет статус new (только что создано)
+        2. Следующее сканирование: цена не изменилась
+        3. Ожидаем: статус сбрасывается на active
+        """
+        service = ListingService(db_mock)
+
+        # Существующее объявление со статусом new
+        existing = MagicMock(spec=Listing)
+        existing.price_usd = 35000
+        existing.price = 100000
+        existing.status = ListingStatus.new
+        existing.id = uuid4()
+        existing.kufar_id = "test_789"
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = existing
+        db_mock.execute.return_value = mock_result
+
+        scan_data = {
+            "kufar_id": "test_789",
+            "url": "https://re.kufar.by/vi/789012",
+            "title": "Test Apartment 3",
+            "price": 100000,  # Same
+            "price_usd": 35000,  # Same
+            "currency": "BYN",
+            "city": "minsk",
+            "address": "Test Street 3",
+            "rooms": 1,
+            "area": 40.0,
+            "floor": 2,
+            "total_floors": 5,
+            "category": "apartments",
+        }
+
+        async def mock_refresh(obj):
+            pass
+
+        db_mock.refresh.side_effect = mock_refresh
+
+        result, action = await service.upsert(scan_data)
+
+        assert result is not None
+        assert action == 'unchanged'
+        assert existing.status == ListingStatus.active  # Статус сброшен на active!
+
 
 @pytest.mark.asyncio
 class TestListingServiceUpsertListings:

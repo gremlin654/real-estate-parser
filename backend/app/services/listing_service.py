@@ -132,8 +132,11 @@ class ListingService:
                 await self.db.refresh(existing)
                 return existing, "changed_byn"
             else:
-                # Оставляем статус active - никаких значимых изменений
-                existing.status = ListingStatus.active
+                # Сохраняем существующий статус если это updated/price_changed_byn
+                # Сбрасываем на active только если статус был new
+                if existing.status in [ListingStatus.new]:
+                    existing.status = ListingStatus.active
+                # Иначе сохраняем updated/price_changed_byn до следующего изменения цены
                 # НЕ создаём событие истории для обычных изменений
                 await self.db.commit()
                 await self.db.refresh(existing)
@@ -454,8 +457,11 @@ class ListingService:
                 # БЕЗ commit()
                 return existing, "changed_byn"
             else:
-                # Оставляем статус active - никаких значимых изменений
-                existing.status = ListingStatus.active
+                # Сохраняем существующий статус если это updated/price_changed_byn
+                # Сбрасываем на active только если статус был new
+                if existing.status in [ListingStatus.new]:
+                    existing.status = ListingStatus.active
+                # Иначе сохраняем updated/price_changed_byn до следующего изменения цены
                 # НЕ создаём событие истории для обычных изменений
                 # БЕЗ commit()
                 return existing, "unchanged"
