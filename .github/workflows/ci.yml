@@ -93,6 +93,13 @@ jobs:
             sleep 1
           done
 
+      - name: Set Redis environment variables
+        run: |
+          echo "REDIS_TEST_URL=redis://localhost:6379/1" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+          echo "TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor_test" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           cd backend
@@ -101,8 +108,6 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Run tests with coverage
-        env:
-          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor_test
         run: |
           cd backend
           python -m pytest tests/ --cov=app --cov-report=xml --cov-report=html -v
