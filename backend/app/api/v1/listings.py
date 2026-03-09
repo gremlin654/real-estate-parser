@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func, and_, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -7,12 +7,20 @@ from datetime import datetime
 from app.db.database import get_db
 from app.models.listing import Listing, ListingStatus
 from app.schemas.listing import ListingResponse, PaginatedResponse
+from app.decorators.cache import cache_response
+from app.config import settings
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 
 
 @router.get("", response_model=PaginatedResponse)
+@cache_response(
+    prefix="cache:listings",
+    ttl=settings.CACHE_TTL_LISTINGS,
+    key_params=["page", "size", "status", "city", "rooms", "sort_order", "currency"],
+)
 async def get_listings(
+    request: Request,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
@@ -47,12 +55,12 @@ async def get_listings(
     # Фильтр currency НЕ фильтрует объявления, а только влияет на отображение
     # Поэтому убираем эту логику
 
-    if price_from:
+    if price_from is not None:
         conditions.append(
             or_(Listing.price >= price_from, Listing.price_usd >= price_from)
         )
 
-    if price_to:
+    if price_to is not None:
         conditions.append(or_(Listing.price <= price_to, Listing.price_usd <= price_to))
 
     # Фильтр по комнатам

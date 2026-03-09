@@ -1,18 +1,22 @@
 import asyncio
 import math
+import time
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query, Depends
 from pydantic import BaseModel, Field, field_validator
+import redis.asyncio as redis
 
 from app.config import settings, CITY_NAMES
 from app.scraper.scheduler import get_scheduler
 from app.services.scan_history_service import ScanHistoryService
 from app.services.scan_settings_service import ScanSettingsService
 from app.db.database import async_session_maker
+from app.core.redis_client import get_redis
+from app.core.redis_lock import RedisLock, RedisLockError, get_scan_lock_key
 from loguru import logger
 
 router = APIRouter(prefix="/scan", tags=["scan"])
@@ -358,22 +362,46 @@ async def get_scan_history(
 
 
 @router.post("/trigger", response_model=ScanTriggerResponse)
-async def trigger_scan(request: ScanTriggerRequest, background_tasks: BackgroundTasks):
+async def trigger_scan(
+    request: ScanTriggerRequest,
+    background_tasks: BackgroundTasks,
+    redis_client: redis.Redis = Depends(get_redis),
+):
     """Запуск ручного сканирования - асинхронное выполнение в background
 
+    Использует Redis distributed lock для предотвращения дублирования сканирования.
     Поддерживает параллельные сканирования для разных городов.
     Если город уже сканируется - вернёт 409 Conflict.
+
+    Redis lock:
+    - Ключ: lock:scan:{city}
+    - TTL: 3600 секунд (1 час)
+    - Атомарный захват через SETNX
+    - Проверка owner при релизе
     """
     if request.city not in CITY_NAMES:
         raise HTTPException(status_code=400, detail=f"Invalid city: {request.city}")
 
     scheduler = get_scheduler()
+    lock_key = get_scan_lock_key(request.city)
+    scan_id = f"{request.city}:{time.time_ns()}"  # Уникальный ID
 
-    # Проверка: если город уже сканируется - вернуть 409
-    if scheduler._is_city_scanning(request.city):
-        raise HTTPException(
-            status_code=409, detail=f"Scanning already in progress for {request.city}"
+    # Попытка захватить Redis lock
+    lock = RedisLock(redis_client, lock_key, timeout=3600)
+    acquired = await lock.acquire()
+
+    if not acquired:
+        # Проверяем кто держит lock
+        current_lock = await redis_client.get(lock_key)
+        logger.warning(
+            f"Scan lock conflict for {request.city}. Lock holder: {current_lock}"
         )
+        raise HTTPException(
+            status_code=409,
+            detail=f"Scanning already in progress for {request.city}. Lock: {current_lock}",
+        )
+
+    logger.info(f"Scan lock acquired for {request.city}, scan_id={scan_id}")
 
     # Создаем запись истории сканирования
     async with async_session_maker() as db:
@@ -384,10 +412,10 @@ async def trigger_scan(request: ScanTriggerRequest, background_tasks: Background
             trigger_type="manual",
         )
 
-    # Запускаем сканирование в background
+    # Запускаем сканирование в background с передачей lock для освобождения
     logger.info(f"Starting manual scan for {request.city}, scan_id: {scan_record.id}")
     background_tasks.add_task(
-        _run_manual_scan, scheduler, request.city, str(scan_record.id)
+        _run_manual_scan, scheduler, request.city, str(scan_record.id), lock
     )
 
     # Возвращаем статус сразу
@@ -399,8 +427,15 @@ async def trigger_scan(request: ScanTriggerRequest, background_tasks: Background
     )
 
 
-async def _run_manual_scan(scheduler, city: str, scan_id: str):
-    """Запуск ручного сканирования"""
+async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock):
+    """Запуск ручного сканирования
+
+    Args:
+        scheduler: Экземпляр scheduler
+        city: Код города
+        scan_id: ID записи сканирования
+        lock: Redis lock для освобождения после завершения
+    """
     from app.scraper.kufar_scraper import KufarScraper
     from app.services.listing_service import ListingService
     from app.services.scan_stats_service import ScanStatsService
@@ -678,3 +713,9 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str):
             await periodic_task
         except asyncio.CancelledError:
             pass
+        # === ОСВОБОДИТЬ REDIS LOCK ===
+        try:
+            await lock.release()
+            logger.info(f"Scan lock released for {city}, scan_id={scan_id}")
+        except Exception as e:
+            logger.error(f"Failed to release scan lock for {city}: {e}")

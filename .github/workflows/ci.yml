@@ -58,6 +58,15 @@ jobs:
           --health-timeout 3s
           --health-retries 10
           --health-start-period 10s
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     needs: lint-backend
     steps:
@@ -76,6 +85,33 @@ jobs:
             sleep 1
           done
 
+      - name: Wait for Redis
+        run: |
+          python3 << 'EOF'
+          import socket
+          import time
+          for i in range(1, 31):
+              try:
+                  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  s.settimeout(1)
+                  result = s.connect_ex(('localhost', 6379))
+                  s.close()
+                  if result == 0:
+                      print('Redis is available')
+                      break
+              except Exception:
+                  pass
+              print(f'Waiting for Redis... ({i}/30)')
+              time.sleep(1)
+          EOF
+
+      - name: Set Redis environment variables
+        run: |
+          echo "REDIS_TEST_URL=redis://localhost:6379/1" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379/0" >> $GITHUB_ENV
+          echo "TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor_test" >> $GITHUB_ENV
+          echo "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           cd backend
@@ -84,8 +120,6 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Run tests with coverage
-        env:
-          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/kufar_monitor_test
         run: |
           cd backend
           python -m pytest tests/ --cov=app --cov-report=xml --cov-report=html -v

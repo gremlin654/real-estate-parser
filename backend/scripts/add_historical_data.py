@@ -32,7 +32,7 @@ async def add_historical_data():
         # Get all active listings
         result = await session.execute(
             select(Listing).where(
-                Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated]),
+                Listing.status.in_([ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]),
                 Listing.price_usd > 0
             )
         )

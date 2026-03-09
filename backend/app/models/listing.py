@@ -85,7 +85,7 @@ class ListingHistory(Base):
     price_before = Column(Integer)
     price_after = Column(Integer)
     price_before_usd = Column(Integer)  # Цена до изменения в USD (копейках)
-    price_after_usd = Column(Integer)   # Цена после изменения в USD (копейках)
+    price_after_usd = Column(Integer)  # Цена после изменения в USD (копейках)
     changed_fields = Column(JSONB)
     snapshot = Column(JSONB)
     created_at = Column(DateTime, default=utc_now)

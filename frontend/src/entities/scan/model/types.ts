@@ -38,16 +38,17 @@ export const getScanStageProgress = (stage: string, progress: ScanProgress): num
 
   const [min, max] = stageProgress[stage] || [0, 100];
 
+  // Fetching: прогресс на основе страниц (плавный рост без сброса)
   if (stage === 'fetching' && progress.pages_scraped > 0) {
-    return min + ((progress.pages_scraped % 20) / 20) * (max - min);
+    // Ограничиваем максимум 100 страницами для плавного прогресса
+    const cappedPages = Math.min(progress.pages_scraped, 100);
+    return min + (cappedPages / 100) * (max - min);
   }
 
-  if (stage === 'parsing' && progress.listings_fetched > 0) {
-    return min + ((progress.listings_processed / progress.listings_fetched) || 0) * (max - min);
-  }
-
-  if (stage === 'upserting') {
-    return min + ((progress.listings_processed / (progress.listings_fetched || 1)) || 0) * (max - min);
+  // Parsing: прогресс на основе обработанных объявлений
+  if ((stage === 'parsing' || stage === 'upserting') && progress.listings_fetched > 0) {
+    const ratio = progress.listings_processed / progress.listings_fetched;
+    return min + Math.min(ratio, 1) * (max - min);
   }
 
   return stage === 'done' ? 100 : min;

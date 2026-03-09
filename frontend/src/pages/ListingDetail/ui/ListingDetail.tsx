@@ -325,15 +325,32 @@ export function ListingDetail() {
                         )}
                         {event.changed_fields && Object.keys(event.changed_fields).length > 0 && (
                           <div className="mt-2 text-xs text-muted-foreground">
-                            {Object.entries(event.changed_fields).map(([field, values]) => (
-                              <div key={field} className="flex items-center gap-1">
-                                <Eye className="w-3 h-3" />
-                                <span>{field}:</span>
-                                <span className="line-through opacity-50">{String(values[0])}</span>
-                                <span>→</span>
-                                <span className="font-medium">{String(values[1])}</span>
-                              </div>
-                            ))}
+                            {Object.entries(event.changed_fields)
+                              .filter(([field]) => field !== 'raw_data') // Исключаем raw_data из отображения
+                              .map(([field, values]) => {
+                              // Helper to safely convert value to string
+                              const formatValue = (val: any) => {
+                                if (val === null || val === undefined) return '—';
+                                if (typeof val === 'object') {
+                                  try {
+                                    return JSON.stringify(val).slice(0, 100) + (JSON.stringify(val).length > 100 ? '...' : '');
+                                  } catch {
+                                    return '[Object]';
+                                  }
+                                }
+                                return String(val);
+                              };
+
+                              return (
+                                <div key={field} className="flex items-center gap-1 mb-1">
+                                  <Eye className="w-3 h-3" />
+                                  <span className="font-medium">{field}:</span>
+                                  <span className="line-through opacity-50">{formatValue(values[0])}</span>
+                                  <span>→</span>
+                                  <span className="font-medium">{formatValue(values[1])}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">

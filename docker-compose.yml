@@ -37,6 +37,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     depends_on:
@@ -44,9 +57,12 @@ services:
         condition: service_healthy
       db_test:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:secret@db/kufar_monitor
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:secret@db_test/kufar_monitor_test
+      REDIS_URL: redis://redis:6379/0
       SCAN_INTERVAL_MINUTES: 30
       KUFAR_CITY: mogilev
     volumes:
@@ -75,3 +91,4 @@ services:
 
 volumes:
   pgdata:
+  redis_data:

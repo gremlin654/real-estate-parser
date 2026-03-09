@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
@@ -6,12 +6,21 @@ from typing import Optional, List
 
 from app.db.database import get_db
 from app.models.listing import Listing, ListingStatus, ListingHistory
+from app.decorators.cache import cache_response
+from app.config import settings
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("/summary")
-async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db)):
+@cache_response(
+    prefix="cache:stats:summary",
+    ttl=settings.CACHE_TTL_STATS_SUMMARY,
+    key_params=["city"],
+)
+async def get_summary(
+    request: Request, city: str = Query(None), db: AsyncSession = Depends(get_db)
+):
     today = datetime.utcnow().date()
 
     # Build base query with optional city filter
@@ -53,7 +62,12 @@ async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db
     active_result = await db.execute(
         select(func.count(Listing.id)).where(
             Listing.status.in_(
-                [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+                [
+                    ListingStatus.active,
+                    ListingStatus.new,
+                    ListingStatus.updated,
+                    ListingStatus.price_changed_byn,
+                ]
             ),
             *base_filters,
         )
@@ -71,7 +85,13 @@ async def get_summary(city: str = Query(None), db: AsyncSession = Depends(get_db
 
 
 @router.get("/price-trends")
+@cache_response(
+    prefix="cache:stats:price-trends",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city", "rooms", "period_months"],
+)
 async def get_price_trends(
+    request: Request,
     city: str = Query(...),
     rooms: int = Query(2),
     period_months: int = Query(12, ge=1, le=24),
@@ -135,9 +155,13 @@ async def get_price_trends(
 
 
 @router.get("/room-distribution")
+@cache_response(
+    prefix="cache:stats:room-distribution",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city"],
+)
 async def get_room_distribution(
-    city: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+    request: Request, city: str = Query(...), db: AsyncSession = Depends(get_db)
 ):
     """Распределение по комнатам"""
     query = (
@@ -149,7 +173,12 @@ async def get_room_distribution(
         .where(
             Listing.city == city,
             Listing.status.in_(
-                [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+                [
+                    ListingStatus.active,
+                    ListingStatus.new,
+                    ListingStatus.updated,
+                    ListingStatus.price_changed_byn,
+                ]
             ),
             Listing.rooms >= 1,  # Все комнаты от 1 и больше
         )
@@ -180,7 +209,13 @@ async def get_room_distribution(
 
 
 @router.get("/daily-activity")
+@cache_response(
+    prefix="cache:stats:daily-activity",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city", "period_days"],
+)
 async def get_daily_activity(
+    request: Request,
     city: str = Query(...),
     period_days: int = Query(30, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
