@@ -58,6 +58,15 @@ jobs:
           --health-timeout 3s
           --health-retries 10
           --health-start-period 10s
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     needs: lint-backend
     steps:
@@ -73,6 +82,14 @@ jobs:
           for i in {1..30}; do
             pg_isready -h localhost -p 5432 -U postgres && break
             echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 1
+          done
+
+      - name: Wait for Redis
+        run: |
+          for i in {1..30}; do
+            redis-cli -h localhost -p 6379 ping && break
+            echo "Waiting for Redis... ($i/30)"
             sleep 1
           done
 
