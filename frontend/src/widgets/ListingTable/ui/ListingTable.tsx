@@ -172,15 +172,15 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
 }
 
 function formatPricePerM2(listing: Listing, currency: 'BYN' | 'USD'): string {
-  const pricePerM2 = currency === 'USD' 
-    ? listing.price_per_m2_usd 
+  const pricePerM2 = currency === 'USD'
+    ? listing.price_per_m2_usd
     : listing.price_per_m2_byn;
-  
+
   if (pricePerM2 === null || pricePerM2 === undefined) {
     return '—';
   }
-  
-  return `${pricePerM2.toLocaleString()} ${currency}/м²`;
+
+  return `${Math.floor(pricePerM2).toLocaleString()} ${currency}/м²`;
 }
 
 function StatusBadge({ status }: { status: string }) {

@@ -21,7 +21,7 @@ interface PricePerM2DistributionChartProps {
 
 export function PricePerM2DistributionChart({ data, currency }: PricePerM2DistributionChartProps) {
   const formatLabel = (bin: PricePerM2DistributionBin) => {
-    return `${bin.range_min.toLocaleString()} - ${bin.range_max.toLocaleString()}`;
+    return `${Math.floor(bin.range_min).toLocaleString()} - ${Math.floor(bin.range_max).toLocaleString()}`;
   };
 
   const formatCurrency = (value: number) => {
@@ -99,5 +99,56 @@ export function PricePerM2DistributionChart({ data, currency }: PricePerM2Distri
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+export function PricePerM2DistributionChartWithStyles(props: PricePerM2DistributionChartProps) {
+  return (
+    <>
+      <PricePerM2DistributionChart {...props} />
+      <style>{`
+        .recharts-surface,
+        .recharts-surface *,
+        .recharts-bar,
+        .recharts-bar path,
+        .recharts-rectangle,
+        .recharts-rectangle path,
+        .recharts-active-bar,
+        .recharts-active-rectangle {
+          outline: none !important;
+          outline-width: 0 !important;
+          outline-color: transparent !important;
+          box-shadow: none !important;
+        }
+        .recharts-surface:focus,
+        .recharts-surface:focus-visible,
+        .recharts-bar:focus,
+        .recharts-bar:focus-visible,
+        .recharts-rectangle:focus,
+        .recharts-rectangle:focus-visible,
+        .recharts-active-bar:focus,
+        .recharts-active-bar:focus-visible,
+        .recharts-active-rectangle:focus,
+        .recharts-active-rectangle:focus-visible {
+          outline: none !important;
+          outline-width: 0 !important;
+          outline-color: transparent !important;
+          box-shadow: none !important;
+        }
+        .recharts-cartesian-axis-tick-value {
+          fill: white !important;
+        }
+        .recharts-cartesian-axis-tick-value text {
+          fill: white !important;
+        }
+        .recharts-cartesian-axis-tick-value tspan {
+          fill: white !important;
+        }
+        .recharts-active-bar,
+        .recharts-active-rectangle {
+          fill-opacity: 1 !important;
+        }
+      `}</style>
+    </>
   );
 }

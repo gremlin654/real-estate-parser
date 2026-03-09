@@ -105,3 +105,45 @@ export function PricePerM2TrendChart({ data, currency, period = 30 }: PricePerM2
     </ResponsiveContainer>
   );
 }
+
+export function PricePerM2TrendChartWithStyles(props: PricePerM2TrendChartProps) {
+  return (
+    <>
+      <PricePerM2TrendChart {...props} />
+      <style>{`
+        .recharts-surface,
+        .recharts-surface *,
+        .recharts-curve,
+        .recharts-curve path,
+        .recharts-area,
+        .recharts-area path,
+        .recharts-line,
+        .recharts-line path,
+        .recharts-dot,
+        .recharts-active-dot {
+          outline: none !important;
+          outline-width: 0 !important;
+          outline-color: transparent !important;
+          box-shadow: none !important;
+        }
+        .recharts-surface:focus,
+        .recharts-surface:focus-visible,
+        .recharts-curve:focus,
+        .recharts-curve:focus-visible,
+        .recharts-area:focus,
+        .recharts-area:focus-visible,
+        .recharts-line:focus,
+        .recharts-line:focus-visible,
+        .recharts-dot:focus,
+        .recharts-dot:focus-visible,
+        .recharts-active-dot:focus,
+        .recharts-active-dot:focus-visible {
+          outline: none !important;
+          outline-width: 0 !important;
+          outline-color: transparent !important;
+          box-shadow: none !important;
+        }
+      `}</style>
+    </>
+  );
+}

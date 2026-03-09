@@ -9,8 +9,8 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { Badge } from '@/shared/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
 import { TrendingUp, BarChart3, DollarSign, ArrowDownUp, Building } from 'lucide-react';
-import { PricePerM2TrendChart } from '@/components/stats/PricePerM2TrendChart';
-import { PricePerM2DistributionChart } from '@/components/stats/PricePerM2DistributionChart';
+import { PricePerM2TrendChartWithStyles as PricePerM2TrendChart } from '@/components/stats/PricePerM2TrendChart';
+import { PricePerM2DistributionChartWithStyles as PricePerM2DistributionChart } from '@/components/stats/PricePerM2DistributionChart';
 import { FilterByCity } from '@/features/listings/filter-by-city';
 import { FilterByCurrency } from '@/features/listings/filter-by-currency';
 import { FilterByRooms } from '@/features/listings/filter-by-rooms';
@@ -45,8 +45,8 @@ export function PricePerM2AnalyticsPage() {
     currency: currency.toLowerCase() as 'byn' | 'usd',
   });
 
-  const trends = trendsData?.data || [];
-  const distribution = distributionData?.data || [];
+  const trends = trendsData || [];
+  const distribution = distributionData || [];
 
   // Проверка на 404 ошибку
   const hasError = isStatsError || isTrendsError || isDistributionError;
@@ -156,25 +156,25 @@ export function PricePerM2AnalyticsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Средняя цена за м²"
-            value={stats ? `${stats.average.toLocaleString()} ${currency}/м²` : '-'}
+            value={stats ? `${Math.floor(stats.average).toLocaleString()} ${currency}/м²` : '-'}
             icon={TrendingUp}
             isLoading={statsLoading}
           />
           <StatCard
             title="Медиана"
-            value={stats ? `${stats.median.toLocaleString()} ${currency}/м²` : '-'}
+            value={stats ? `${Math.floor(stats.median).toLocaleString()} ${currency}/м²` : '-'}
             icon={DollarSign}
             isLoading={statsLoading}
           />
           <StatCard
             title="Минимум"
-            value={stats ? `${stats.min.toLocaleString()} ${currency}/м²` : '-'}
+            value={stats ? `${Math.floor(stats.min).toLocaleString()} ${currency}/м²` : '-'}
             icon={ArrowDownUp}
             isLoading={statsLoading}
           />
           <StatCard
             title="Максимум"
-            value={stats ? `${stats.max.toLocaleString()} ${currency}/м²` : '-'}
+            value={stats ? `${Math.floor(stats.max).toLocaleString()} ${currency}/м²` : '-'}
             icon={Building}
             isLoading={statsLoading}
           />

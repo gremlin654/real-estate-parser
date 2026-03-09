@@ -192,9 +192,9 @@ export function ListingDetail() {
               {((currency === 'USD' && listing.price_per_m2_usd) || (currency === 'BYN' && listing.price_per_m2_byn)) && (
                 <div className="text-sm text-muted-foreground flex items-center gap-2">
                   <span className="px-2 py-1 bg-muted rounded-md">
-                    {currency === 'USD' 
-                      ? `${listing.price_per_m2_usd?.toLocaleString()} $/м²`
-                      : `${listing.price_per_m2_byn?.toLocaleString()} BYN/м²`
+                    {currency === 'USD'
+                      ? `${Math.floor(listing.price_per_m2_usd)} $/м²`
+                      : `${Math.floor(listing.price_per_m2_byn)} BYN/м²`
                     }
                   </span>
                 </div>

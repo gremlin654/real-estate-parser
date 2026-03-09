@@ -602,7 +602,7 @@ export const usePricePerM2Trends = (filters: {
   interval?: 'day' | 'week' | 'month';
   currency?: 'byn' | 'usd';
 }) => {
-  return useQuery<PricePerM2TrendsResponse>({
+  return useQuery<PricePerM2Trend[]>({
     queryKey: ['pricePerM2Trends', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -630,7 +630,7 @@ export const usePricePerM2Distribution = (filters: {
   bins?: number;
   currency?: 'byn' | 'usd';
 }) => {
-  return useQuery<PricePerM2DistributionResponse>({
+  return useQuery<PricePerM2DistributionBin[]>({
     queryKey: ['pricePerM2Distribution', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
