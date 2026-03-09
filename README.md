@@ -258,6 +258,38 @@ curl "http://localhost:8000/monitoring/redis/slowlog"
 - [Redis Keys Reference](docs/REDIS_KEYS.md) — полная документация ключей
 - [Redis Dashboard](docs/REDIS_DASHBOARD.md) — мониторинг и метрики
 
+## 📊 Версии
+
+### v3.3 (текущая)
+
+- ✅ Запушены изменения в GitHub — коммит `825ac95` в ветке `main`
+- 🔴 Redis Integration — кэширование, distributed locking, rate limiting
+- 📊 Monitoring API — 5 endpoints для мониторинга Redis
+- ⚡ Ускорение API — в 20-40 раз для stats endpoints
+- 🧪 Тесты Redis — 100 тестов, 94% coverage
+
+### v3.2
+
+- 🔴 Redis Integration — кэширование, distributed locking, WebSocket state, rate limiting
+- 📊 Monitoring API — 5 endpoints для мониторинга Redis
+- ⚡ Ускорение API — в 20-40 раз для stats endpoints
+- 🔒 Distributed Locking — защита от дублирования сканирования
+- 🔄 Rate Limiting — Token Bucket для scraper (10 запросов/сек)
+
+### v3.1
+
+- Исправлена статистика сканирования
+- График распределения по комнатам 1, 2, 3, 4, 5+
+- TriggerManualScanAlert — алерт под кнопками
+- Анимация кнопки сканирования
+
+### v3.0
+
+- WebSocket real-time прогресс
+- Статус `updated` при изменении цены USD
+- Восстановление `deleted` объявлений
+- Фильтр валюты USD/BYN
+
 ## 📝 Лицензия
 
 MIT

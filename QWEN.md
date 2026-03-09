@@ -662,7 +662,18 @@ docker-compose logs backend
 
 ## Версии
 
-### v3.2 (текущая)
+### v3.3 (текущая)
+
+- **✅ Запушены изменения в GitHub** — коммит `825ac95` в ветке `main`
+- **🔴 Redis Integration (v3.2)** — кэширование, distributed locking, WebSocket state, rate limiting
+- **📊 Monitoring API** — 5 endpoints для мониторинга Redis
+- **⚡ Ускорение API** — в 20-40 раз для stats endpoints
+- **🔒 Distributed Locking** — защита от дублирования сканирования
+- **🔄 Rate Limiting** — Token Bucket для scraper (10 запросов/сек)
+- **📚 Документация** — REDIS_KEYS.md, REDIS_DASHBOARD.md
+- **🧪 Тесты Redis** — 100 тестов, 94% coverage
+
+### v3.2
 
 - **🔴 Redis Integration** — кэширование, distributed locking, WebSocket state, rate limiting
 - **📊 Monitoring API** — 5 endpoints для мониторинга Redis
