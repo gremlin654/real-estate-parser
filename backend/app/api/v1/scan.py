@@ -380,9 +380,7 @@ async def trigger_scan(
     - Проверка owner при релизе
     """
     if request.city not in CITY_NAMES:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid city: {request.city}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid city: {request.city}")
 
     scheduler = get_scheduler()
     lock_key = get_scan_lock_key(request.city)
@@ -429,9 +427,7 @@ async def trigger_scan(
     )
 
 
-async def _run_manual_scan(
-    scheduler, city: str, scan_id: str, lock: RedisLock
-):
+async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock):
     """Запуск ручного сканирования
 
     Args:

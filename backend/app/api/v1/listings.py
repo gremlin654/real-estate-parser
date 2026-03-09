@@ -14,7 +14,11 @@ router = APIRouter(prefix="/listings", tags=["listings"])
 
 
 @router.get("", response_model=PaginatedResponse)
-@cache_response(prefix="cache:listings", ttl=settings.CACHE_TTL_LISTINGS, key_params=["page", "size", "status", "city", "rooms", "sort_order", "currency"])
+@cache_response(
+    prefix="cache:listings",
+    ttl=settings.CACHE_TTL_LISTINGS,
+    key_params=["page", "size", "status", "city", "rooms", "sort_order", "currency"],
+)
 async def get_listings(
     request: Request,
     page: int = Query(1, ge=1),

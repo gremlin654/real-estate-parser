@@ -25,20 +25,22 @@ class KufarScraper:
     async def initialize(self, redis_client: redis.Redis):
         """
         Инициализация rate limiter после запуска приложения.
-        
+
         Args:
             redis_client: Redis client instance
         """
         from app.core.rate_limiter import get_rate_limiter
         from app.config import settings
-        
+
         self.rate_limiter = await get_rate_limiter(
             redis_client,
             key_prefix="ratelimit:kufar",
             capacity=settings.RATE_LIMIT_CAPACITY,
-            refill_rate=settings.RATE_LIMIT_REFILL_RATE
+            refill_rate=settings.RATE_LIMIT_REFILL_RATE,
         )
-        logger.info(f"Kufar scraper rate limiter initialized: capacity={settings.RATE_LIMIT_CAPACITY}, refill_rate={settings.RATE_LIMIT_REFILL_RATE}/s")
+        logger.info(
+            f"Kufar scraper rate limiter initialized: capacity={settings.RATE_LIMIT_CAPACITY}, refill_rate={settings.RATE_LIMIT_REFILL_RATE}/s"
+        )
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session with browser-like headers."""
@@ -264,7 +266,7 @@ class KufarScraper:
             # Rate limiting - ждём доступности токенов
             if self.rate_limiter:
                 await self.rate_limiter.wait_and_acquire(f"city:{city}", tokens=1)
-            
+
             session = await self._get_session()
 
             logger.info(f"Fetching via HTTP: {url}")

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 @router.get("/redis")
 async def redis_monitoring(
-    redis_client: redis.Redis = Depends(get_redis)
+    redis_client: redis.Redis = Depends(get_redis),
 ) -> Dict[str, Any]:
     """
     Мониторинг Redis: метрики, статистика, использование памяти.
@@ -118,16 +118,17 @@ async def redis_monitoring(
     except Exception as e:
         logger.error(f"Redis monitoring error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Redis monitoring data: {str(e)}"
+            status_code=500, detail=f"Failed to get Redis monitoring data: {str(e)}"
         )
 
 
 @router.get("/redis/keys")
 async def redis_keys(
-    pattern: str = Query("*", description="Шаблон ключей (например, 'cache:*', 'lock:*')"),
+    pattern: str = Query(
+        "*", description="Шаблон ключей (например, 'cache:*', 'lock:*')"
+    ),
     limit: int = Query(100, description="Максимум ключей для возврата", ge=1, le=1000),
-    redis_client: redis.Redis = Depends(get_redis)
+    redis_client: redis.Redis = Depends(get_redis),
 ) -> Dict[str, Any]:
     """
     Список ключей Redis по шаблону.
@@ -181,19 +182,23 @@ async def redis_keys(
                 key_type = await redis_client.type(key)
                 ttl = await redis_client.ttl(key)
 
-                key_details.append({
-                    "key": key,
-                    "type": key_type,
-                    "ttl": ttl if ttl > 0 else -1,  # -1 если нет TTL
-                })
+                key_details.append(
+                    {
+                        "key": key,
+                        "type": key_type,
+                        "ttl": ttl if ttl > 0 else -1,  # -1 если нет TTL
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Error getting details for key {key}: {e}")
-                key_details.append({
-                    "key": key,
-                    "type": "unknown",
-                    "ttl": -1,
-                    "error": str(e),
-                })
+                key_details.append(
+                    {
+                        "key": key,
+                        "type": "unknown",
+                        "ttl": -1,
+                        "error": str(e),
+                    }
+                )
 
         return {
             "count": len(key_details),
@@ -205,15 +210,14 @@ async def redis_keys(
     except Exception as e:
         logger.error(f"Redis keys error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Redis keys: {str(e)}"
+            status_code=500, detail=f"Failed to get Redis keys: {str(e)}"
         )
 
 
 @router.get("/redis/slowlog")
 async def redis_slowlog(
     limit: int = Query(10, description="Количество записей", ge=1, le=100),
-    redis_client: redis.Redis = Depends(get_redis)
+    redis_client: redis.Redis = Depends(get_redis),
 ) -> Dict[str, Any]:
     """
     Журнал медленных запросов Redis.
@@ -249,7 +253,7 @@ async def redis_slowlog(
     try:
         # Получаем slowlog записи
         slowlog_data = await redis_client.slowlog_get(limit)
-        
+
         # slowlog_get может возвращать dict или list в зависимости от версии redis-py
         if isinstance(slowlog_data, dict):
             slowlog = slowlog_data.get("value", [])
@@ -265,19 +269,23 @@ async def redis_slowlog(
                     "id": entry[0],
                     "timestamp": entry[1],
                     "duration_us": entry[2],  # Длительность в микросекундах
-                    "command": entry[3] if isinstance(entry[3], list) else str(entry[3]),
+                    "command": (
+                        entry[3] if isinstance(entry[3], list) else str(entry[3])
+                    ),
                     "client": entry[4] if len(entry) > 4 else "N/A",
                 }
                 entries.append(formatted_entry)
             elif isinstance(entry, dict):
                 # Если entry уже dict (новая версия redis-py)
-                entries.append({
-                    "id": entry.get("id"),
-                    "timestamp": entry.get("start_time"),
-                    "duration_us": entry.get("duration_microseconds"),
-                    "command": entry.get("command"),
-                    "client": entry.get("client_address", "N/A"),
-                })
+                entries.append(
+                    {
+                        "id": entry.get("id"),
+                        "timestamp": entry.get("start_time"),
+                        "duration_us": entry.get("duration_microseconds"),
+                        "command": entry.get("command"),
+                        "client": entry.get("client_address", "N/A"),
+                    }
+                )
 
         return {
             "count": len(entries),
@@ -288,14 +296,13 @@ async def redis_slowlog(
     except Exception as e:
         logger.error(f"Redis slowlog error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Redis slowlog: {str(e)}"
+            status_code=500, detail=f"Failed to get Redis slowlog: {str(e)}"
         )
 
 
 @router.get("/redis/memory")
 async def redis_memory(
-    redis_client: redis.Redis = Depends(get_redis)
+    redis_client: redis.Redis = Depends(get_redis),
 ) -> Dict[str, Any]:
     """
     Детальная информация об использовании памяти Redis.
@@ -357,15 +364,12 @@ async def redis_memory(
     except Exception as e:
         logger.error(f"Redis memory error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Redis memory info: {str(e)}"
+            status_code=500, detail=f"Failed to get Redis memory info: {str(e)}"
         )
 
 
 @router.get("/redis/stats")
-async def redis_stats(
-    redis_client: redis.Redis = Depends(get_redis)
-) -> Dict[str, Any]:
+async def redis_stats(redis_client: redis.Redis = Depends(get_redis)) -> Dict[str, Any]:
     """
     Статистика операций Redis.
 
@@ -424,6 +428,5 @@ async def redis_stats(
     except Exception as e:
         logger.error(f"Redis stats error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get Redis stats: {str(e)}"
+            status_code=500, detail=f"Failed to get Redis stats: {str(e)}"
         )

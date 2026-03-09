@@ -20,7 +20,11 @@ from app.api.v1 import (
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
 from app.core.redis_client import get_redis, close_redis, health_check_redis
-from app.core.redis_watchdog import start_lock_watchdog, stop_lock_watchdog, RedisLockWatchdog
+from app.core.redis_watchdog import (
+    start_lock_watchdog,
+    stop_lock_watchdog,
+    RedisLockWatchdog,
+)
 
 setup_logging()
 logger = get_logger(__name__)
@@ -61,17 +65,20 @@ async def lifespan(app: FastAPI):
 
         # Инициализация rate limiter в scraper
         from app.scraper.kufar_scraper import kufar_scraper
+
         await kufar_scraper.initialize(redis_client)
         logger.info("Kufar scraper rate limiter initialized")
 
         # Инициализация scan_state в scheduler
         from app.scraper.scheduler import get_scheduler
+
         scheduler = get_scheduler()
         await scheduler.initialize(redis_client)
         logger.info("Scan scheduler initialized with Redis state")
 
         # Инициализация WebSocket manager с Redis
         from app.api.v1.ws import get_scan_manager
+
         ws_manager = get_scan_manager()
         await ws_manager.initialize(redis_client)
         logger.info("WebSocket manager initialized with Redis state")

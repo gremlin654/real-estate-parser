@@ -61,9 +61,7 @@ class RedisLockWatchdog:
         self._running = False
         self._cleanup_task: Optional[asyncio.Task] = None
 
-    async def cleanup_stale_locks(
-        self, max_age_seconds: int = 3700
-    ) -> Dict[str, int]:
+    async def cleanup_stale_locks(self, max_age_seconds: int = 3700) -> Dict[str, int]:
         """
         Очистить lock которые старше max_age_seconds.
 
@@ -98,7 +96,11 @@ class RedisLockWatchdog:
             logger.info(f"Checking {len(lock_keys)} scan locks for staleness")
 
             for key_bytes in lock_keys:
-                key = key_bytes.decode("utf-8") if isinstance(key_bytes, bytes) else key_bytes
+                key = (
+                    key_bytes.decode("utf-8")
+                    if isinstance(key_bytes, bytes)
+                    else key_bytes
+                )
 
                 try:
                     # Получить TTL ключа
@@ -205,7 +207,11 @@ class RedisLockWatchdog:
             lock_keys: List[bytes] = await self.redis.keys(self.lock_pattern)
 
             for key_bytes in lock_keys:
-                key = key_bytes.decode("utf-8") if isinstance(key_bytes, bytes) else key_bytes
+                key = (
+                    key_bytes.decode("utf-8")
+                    if isinstance(key_bytes, bytes)
+                    else key_bytes
+                )
                 info = await self.get_lock_info(key)
                 if info:
                     locks.append(info)
@@ -228,9 +234,7 @@ class RedisLockWatchdog:
             asyncio.create_task(watchdog.run_periodically(600))
         """
         self._running = True
-        logger.info(
-            f"Lock watchdog started: cleaning every {interval_seconds} seconds"
-        )
+        logger.info(f"Lock watchdog started: cleaning every {interval_seconds} seconds")
 
         try:
             while self._running:

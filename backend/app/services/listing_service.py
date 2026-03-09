@@ -509,7 +509,12 @@ class ListingService:
                     Listing.kufar_id.not_in(kufar_ids),
                     Listing.city == city,
                     Listing.status.in_(
-                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
+                        [
+                            ListingStatus.active,
+                            ListingStatus.new,
+                            ListingStatus.updated,
+                            ListingStatus.price_changed_byn,
+                        ]
                     ),
                 )
             )
@@ -538,7 +543,12 @@ class ListingService:
                     Listing.kufar_id.not_in(kufar_ids),
                     Listing.city == city,
                     Listing.status.in_(
-                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
+                        [
+                            ListingStatus.active,
+                            ListingStatus.new,
+                            ListingStatus.updated,
+                            ListingStatus.price_changed_byn,
+                        ]
                     ),
                 )
             )

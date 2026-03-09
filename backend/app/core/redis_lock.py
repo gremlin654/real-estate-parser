@@ -109,7 +109,9 @@ class RedisLock:
         try:
             # Генерируем уникальный идентификатор (owner)
             # Формат: {lock_name}:{timestamp}:{uuid}
-            self.lock_value = f"{self.lock_name}:{time.time_ns()}:{uuid.uuid4().hex[:8]}"
+            self.lock_value = (
+                f"{self.lock_name}:{time.time_ns()}:{uuid.uuid4().hex[:8]}"
+            )
 
             # SETNX с TTL — атомарная операция
             # nx=True — установить только если не существует
@@ -122,7 +124,9 @@ class RedisLock:
             )
 
             if acquired:
-                logger.debug(f"Lock acquired: {self.lock_name}, value={self.lock_value}")
+                logger.debug(
+                    f"Lock acquired: {self.lock_name}, value={self.lock_value}"
+                )
             else:
                 logger.debug(f"Lock busy: {self.lock_name}")
 
@@ -160,7 +164,9 @@ class RedisLock:
 
             if current_value == self.lock_value:
                 await self.redis.delete(self.lock_name)
-                logger.debug(f"Lock released: {self.lock_name}, value={self.lock_value}")
+                logger.debug(
+                    f"Lock released: {self.lock_name}, value={self.lock_value}"
+                )
                 self.lock_value = None
                 return True
             else:
@@ -207,14 +213,10 @@ class RedisLock:
             if current_value == self.lock_value:
                 extend_time = additional_time or self.timeout
                 await self.redis.expire(self.lock_name, extend_time)
-                logger.debug(
-                    f"Lock extended: {self.lock_name}, new TTL={extend_time}s"
-                )
+                logger.debug(f"Lock extended: {self.lock_name}, new TTL={extend_time}s")
                 return True
             else:
-                logger.warning(
-                    f"Lock extend skipped: {self.lock_name} - not owner"
-                )
+                logger.warning(f"Lock extend skipped: {self.lock_name} - not owner")
                 return False
 
         except RedisError as e:
@@ -292,8 +294,7 @@ async def acquire_scan_lock(
         # Проверяем кто держит lock
         current_lock = await redis_client.get(lock_key)
         raise RedisLockError(
-            f"Failed to acquire scan lock for {city}. "
-            f"Lock holder: {current_lock}"
+            f"Failed to acquire scan lock for {city}. " f"Lock holder: {current_lock}"
         )
 
     logger.info(f"Scan lock acquired for {city}, scan_id={scan_id}")

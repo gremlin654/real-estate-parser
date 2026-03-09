@@ -13,8 +13,14 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("/summary")
-@cache_response(prefix="cache:stats:summary", ttl=settings.CACHE_TTL_STATS_SUMMARY, key_params=["city"])
-async def get_summary(request: Request, city: str = Query(None), db: AsyncSession = Depends(get_db)):
+@cache_response(
+    prefix="cache:stats:summary",
+    ttl=settings.CACHE_TTL_STATS_SUMMARY,
+    key_params=["city"],
+)
+async def get_summary(
+    request: Request, city: str = Query(None), db: AsyncSession = Depends(get_db)
+):
     today = datetime.utcnow().date()
 
     # Build base query with optional city filter
@@ -56,7 +62,12 @@ async def get_summary(request: Request, city: str = Query(None), db: AsyncSessio
     active_result = await db.execute(
         select(func.count(Listing.id)).where(
             Listing.status.in_(
-                [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
+                [
+                    ListingStatus.active,
+                    ListingStatus.new,
+                    ListingStatus.updated,
+                    ListingStatus.price_changed_byn,
+                ]
             ),
             *base_filters,
         )
@@ -74,8 +85,18 @@ async def get_summary(request: Request, city: str = Query(None), db: AsyncSessio
 
 
 @router.get("/price-trends")
-@cache_response(prefix="cache:stats:price-trends", ttl=settings.CACHE_TTL_STATS_OTHER, key_params=["city", "rooms", "period_months"])
-async def get_price_trends(request: Request, city: str = Query(...), rooms: int = Query(2), period_months: int = Query(12, ge=1, le=24), db: AsyncSession = Depends(get_db)):
+@cache_response(
+    prefix="cache:stats:price-trends",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city", "rooms", "period_months"],
+)
+async def get_price_trends(
+    request: Request,
+    city: str = Query(...),
+    rooms: int = Query(2),
+    period_months: int = Query(12, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+):
     """Динамика цен по месяцам для выбранной комнаты"""
     from sqlalchemy import text, Numeric
 
@@ -134,8 +155,14 @@ async def get_price_trends(request: Request, city: str = Query(...), rooms: int 
 
 
 @router.get("/room-distribution")
-@cache_response(prefix="cache:stats:room-distribution", ttl=settings.CACHE_TTL_STATS_OTHER, key_params=["city"])
-async def get_room_distribution(request: Request, city: str = Query(...), db: AsyncSession = Depends(get_db)):
+@cache_response(
+    prefix="cache:stats:room-distribution",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city"],
+)
+async def get_room_distribution(
+    request: Request, city: str = Query(...), db: AsyncSession = Depends(get_db)
+):
     """Распределение по комнатам"""
     query = (
         select(
@@ -146,7 +173,12 @@ async def get_room_distribution(request: Request, city: str = Query(...), db: As
         .where(
             Listing.city == city,
             Listing.status.in_(
-                [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
+                [
+                    ListingStatus.active,
+                    ListingStatus.new,
+                    ListingStatus.updated,
+                    ListingStatus.price_changed_byn,
+                ]
             ),
             Listing.rooms >= 1,  # Все комнаты от 1 и больше
         )
@@ -177,8 +209,17 @@ async def get_room_distribution(request: Request, city: str = Query(...), db: As
 
 
 @router.get("/daily-activity")
-@cache_response(prefix="cache:stats:daily-activity", ttl=settings.CACHE_TTL_STATS_OTHER, key_params=["city", "period_days"])
-async def get_daily_activity(request: Request, city: str = Query(...), period_days: int = Query(30, ge=1, le=90), db: AsyncSession = Depends(get_db)):
+@cache_response(
+    prefix="cache:stats:daily-activity",
+    ttl=settings.CACHE_TTL_STATS_OTHER,
+    key_params=["city", "period_days"],
+)
+async def get_daily_activity(
+    request: Request,
+    city: str = Query(...),
+    period_days: int = Query(30, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+):
     """Ежедневная активность (новые, удалённые, изменения цены)"""
     from sqlalchemy import case, text
 

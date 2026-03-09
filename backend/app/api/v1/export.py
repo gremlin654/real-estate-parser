@@ -85,7 +85,12 @@ async def export_summary(
     result = await db.execute(
         select(func.count(Listing.id)).where(
             Listing.status.in_(
-                [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
+                [
+                    ListingStatus.active,
+                    ListingStatus.new,
+                    ListingStatus.updated,
+                    ListingStatus.price_changed_byn,
+                ]
             )
         )
     )
