@@ -134,19 +134,29 @@ class TestScanEndpointParallel:
     async def test_trigger_scan_city_already_scanning(self):
         """Попытка запустить сканирование для уже сканируемого города → 409."""
         from fastapi import HTTPException
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock, patch, AsyncMock
 
         # Создать mock scheduler
         mock_scheduler = MagicMock()
         mock_scheduler._is_city_scanning = MagicMock(return_value=True)
+
+        # Mock redis client
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+
+        # Mock RedisLock который возвращает False (lock не захвачен)
+        mock_lock = AsyncMock()
+        mock_lock.acquire = AsyncMock(return_value=False)
 
         request = MagicMock()
         request.city = "minsk"
         background_tasks = MagicMock()
 
         with patch('app.api.v1.scan.get_scheduler', return_value=mock_scheduler):
-            with pytest.raises(HTTPException) as exc_info:
-                await trigger_scan(request, background_tasks)
+            with patch('app.api.v1.scan.get_redis', return_value=mock_redis):
+                with patch('app.api.v1.scan.RedisLock', return_value=mock_lock):
+                    with pytest.raises(HTTPException) as exc_info:
+                        await trigger_scan(request, background_tasks)
 
         assert exc_info.value.status_code == 409
         assert "Scanning already in progress for minsk" in exc_info.value.detail
@@ -161,6 +171,13 @@ class TestScanEndpointParallel:
         mock_scheduler = MagicMock()
         mock_scheduler._is_city_scanning = MagicMock(return_value=False)
 
+        # Mock redis client
+        mock_redis = AsyncMock()
+
+        # Mock RedisLock который возвращает True (lock захвачен)
+        mock_lock = AsyncMock()
+        mock_lock.acquire = AsyncMock(return_value=True)
+
         # Mock для scan_record
         mock_scan_record = MagicMock()
         mock_scan_record.id = "scan-123"
@@ -173,10 +190,12 @@ class TestScanEndpointParallel:
         background_tasks = MagicMock()
 
         with patch('app.api.v1.scan.get_scheduler', return_value=mock_scheduler):
-            with patch('app.api.v1.scan.async_session_maker'):
-                with patch('app.api.v1.scan.ScanHistoryService', return_value=mock_scan_history_service):
-                    with patch('app.api.v1.scan._run_manual_scan'):
-                        response = await trigger_scan(request, background_tasks)
+            with patch('app.api.v1.scan.get_redis', return_value=mock_redis):
+                with patch('app.api.v1.scan.RedisLock', return_value=mock_lock):
+                    with patch('app.api.v1.scan.async_session_maker'):
+                        with patch('app.api.v1.scan.ScanHistoryService', return_value=mock_scan_history_service):
+                            with patch('app.api.v1.scan._run_manual_scan'):
+                                response = await trigger_scan(request, background_tasks)
 
         assert response.status == "started"
         assert response.city == "mogilev"
