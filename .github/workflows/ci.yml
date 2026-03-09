@@ -87,23 +87,23 @@ jobs:
 
       - name: Wait for Redis
         run: |
-          python3 -c "
-import socket
-import time
-for i in range(1, 31):
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1)
-        result = s.connect_ex(('localhost', 6379))
-        s.close()
-        if result == 0:
-            print('Redis is available')
-            break
-    except Exception:
-        pass
-    print(f'Waiting for Redis... ({i}/30)')
-    time.sleep(1)
-"
+          python3 << 'EOF'
+          import socket
+          import time
+          for i in range(1, 31):
+              try:
+                  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                  s.settimeout(1)
+                  result = s.connect_ex(('localhost', 6379))
+                  s.close()
+                  if result == 0:
+                      print('Redis is available')
+                      break
+              except Exception:
+                  pass
+              print(f'Waiting for Redis... ({i}/30)')
+              time.sleep(1)
+          EOF
 
       - name: Set Redis environment variables
         run: |
