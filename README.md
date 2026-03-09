@@ -24,6 +24,7 @@ docker-compose up --build
 - ✅ Графики и аналитика
 - ✅ CI/CD pipeline
 - ✅ Тесты (E2E + Unit + API)
+- ✅ Redis integration (кэширование, distributed locking, rate limiting)
 
 ## 🔗 Доступ к сервисам
 
@@ -33,6 +34,7 @@ docker-compose up --build
 | Backend API | http://localhost:8000 |
 | API Docs | http://localhost:8000/docs |
 | PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
 
 ## 🛠 Технологии
 
@@ -47,10 +49,12 @@ docker-compose up --build
 - Alembic (миграции)
 - Pytest (API тесты)
 - APScheduler (планировщик)
+- Redis (кэширование, distributed locking, rate limiting)
 
 ### Infrastructure
 - Docker, Docker Compose
 - GitHub Actions (CI/CD)
+- Redis
 
 ## 📖 Использование
 
@@ -114,6 +118,13 @@ GET /api/v1/scan/schedule
 PUT /api/v1/scan/schedule
 ```
 
+### Monitoring
+```bash
+GET /monitoring/redis
+GET /monitoring/redis/keys?pattern=cache:*
+GET /monitoring/redis/slowlog
+```
+
 ## 🧪 Тестирование
 
 ### Backend
@@ -174,6 +185,78 @@ POSTGRES_DB=kufar_monitor
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=secret
 ```
+
+## 🔴 Redis Integration
+
+Проект использует Redis для кэширования, distributed locking, state management и rate limiting.
+
+### Архитектура
+
+```
+Frontend ↔ Backend (FastAPI) ↔ Redis
+                          ↓
+                      PostgreSQL
+```
+
+### Компоненты
+
+| Компонент | Описание | TTL |
+|-----------|----------|-----|
+| **Кэширование API** | Stats и Listings endpoints | 30-300 сек |
+| **Distributed Lock** | Блокировка сканирования городов | 3600 сек |
+| **WebSocket State** | Прогресс сканирования (Hash + Pub/Sub) | 7200 сек |
+| **Rate Limiting** | Token Bucket для scraper | 3600 сек |
+
+### Запуск Redis
+
+```bash
+docker-compose up -d redis
+```
+
+### Проверка подключения
+
+```bash
+# Ping Redis
+docker-compose exec redis redis-cli ping
+# PONG
+
+# Проверка ключей
+docker-compose exec redis redis-cli KEYS "*"
+
+# Статистика
+docker-compose exec redis redis-cli INFO stats
+```
+
+### Конфигурация
+
+| Переменная | Значение | Описание |
+|------------|----------|----------|
+| `REDIS_URL` | `redis://redis:6379/0` | Production БД |
+| `REDIS_TEST_URL` | `redis://redis:6379/1` | Test БД |
+| `CACHE_TTL_STATS_SUMMARY` | 60 | Кэш сводной статистики |
+| `CACHE_TTL_STATS_OTHER` | 300 | Кэш остальной статистики |
+| `CACHE_TTL_LISTINGS` | 30 | Кэш объявлений |
+| `SCAN_LOCK_TIMEOUT` | 3600 | Блокировка сканирования |
+| `RATE_LIMIT_CAPACITY` | 10 | Burst запросов |
+| `RATE_LIMIT_REFILL_RATE` | 10.0 | Токенов/секунду |
+
+### Мониторинг
+
+```bash
+# Health check
+curl http://localhost:8000/monitoring/redis
+
+# Список ключей
+curl "http://localhost:8000/monitoring/redis/keys?pattern=cache:*"
+
+# Slowlog
+curl "http://localhost:8000/monitoring/redis/slowlog"
+```
+
+### Документация
+
+- [Redis Keys Reference](docs/REDIS_KEYS.md) — полная документация ключей
+- [Redis Dashboard](docs/REDIS_DASHBOARD.md) — мониторинг и метрики
 
 ## 📝 Лицензия
 

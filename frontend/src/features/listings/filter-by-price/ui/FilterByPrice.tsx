@@ -2,7 +2,7 @@
 
 import { Input } from '@/shared/ui/input';
 import { Button } from '@/shared/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface FilterByPriceProps {
   priceFrom?: number | null;
@@ -13,6 +13,15 @@ interface FilterByPriceProps {
 export function FilterByPrice({ priceFrom, priceTo, onChange }: FilterByPriceProps) {
   const [localFrom, setLocalFrom] = useState(priceFrom?.toString() || '');
   const [localTo, setLocalTo] = useState(priceTo?.toString() || '');
+
+  // Синхронизация локального state с props
+  useEffect(() => {
+    setLocalFrom(priceFrom?.toString() || '');
+  }, [priceFrom]);
+
+  useEffect(() => {
+    setLocalTo(priceTo?.toString() || '');
+  }, [priceTo]);
 
   const handleApply = () => {
     onChange(

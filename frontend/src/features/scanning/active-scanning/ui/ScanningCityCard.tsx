@@ -5,6 +5,7 @@ import { formatStage, formatDuration } from '@/shared/lib/scan-progress';
 import type { ScanningCity } from '@/store/filterStore';
 import { cn } from '@/shared/lib/utils';
 import { Clock, FileText, Database, RefreshCw } from 'lucide-react';
+import { memo } from 'react';
 
 interface ScanningCityCardProps {
   city: ScanningCity;
@@ -20,7 +21,7 @@ interface ScanningCityCardProps {
  * - Время elapsed
  * - Метрики (страницы, объявления)
  */
-export function ScanningCityCard({ city, className }: ScanningCityCardProps) {
+export const ScanningCityCard = memo(function ScanningCityCard({ city, className }: ScanningCityCardProps) {
   const isManual = city.trigger_type === 'manual';
   const isError = city.stage === 'error';
   const isComplete = city.stage === 'done';
@@ -105,4 +106,4 @@ export function ScanningCityCard({ city, className }: ScanningCityCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

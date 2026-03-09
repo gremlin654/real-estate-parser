@@ -11,10 +11,26 @@ from app.main import app
 from app.config import settings
 from app.models.listing import Base, ScanHistory, Listing, ListingStatus
 from app.db.database import async_session_maker
+from app.core.redis_client import get_redis, close_redis, RedisClient
+
+
+@pytest.fixture(scope="function", autouse=True)
+async def init_redis():
+    """Инициализация Redis перед каждым тестом."""
+    try:
+        # Пытаемся подключиться к Redis
+        redis_client = await get_redis()
+        await redis_client.ping()
+        yield redis_client
+        # Очищаем Redis после теста (удаляем все ключи)
+        await redis_client.flushdb()
+    except Exception:
+        # Если Redis недоступен — пропускаем тесты которые требуют Redis
+        yield None
 
 
 @pytest.fixture(scope="function")
-async def client(test_session):
+async def client(test_session, init_redis):
     """Create async client for testing API endpoints with test DB session."""
     from httpx import ASGITransport
     from unittest.mock import AsyncMock, patch, MagicMock

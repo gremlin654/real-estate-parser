@@ -216,8 +216,12 @@ export const useListings = (filters: {
       if (filters.page) params.set('page', String(filters.page));
       if (filters.size) params.set('size', String(filters.size));
       if (filters.status) params.set('status', filters.status);
-      if (filters.priceFrom) params.set('price_from', String(filters.priceFrom));
-      if (filters.priceTo) params.set('price_to', String(filters.priceTo));
+      if (filters.priceFrom !== null && filters.priceFrom !== undefined) {
+        params.set('price_from', String(filters.priceFrom));
+      }
+      if (filters.priceTo !== null && filters.priceTo !== undefined) {
+        params.set('price_to', String(filters.priceTo));
+      }
       if (filters.rooms && filters.rooms.length > 0) {
         filters.rooms.forEach((room) => params.append('rooms', String(room)));
       }

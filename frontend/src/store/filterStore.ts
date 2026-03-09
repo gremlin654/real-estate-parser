@@ -86,10 +86,21 @@ export const useFilterStore = create<FilterState>()(
       },
       
       updateScanningCity: (city, progress) => {
+        // Throttle: обновляем только если изменились значимые данные
         set((state) => {
           const newMap = new Map(state.scanningCities);
           const existing = newMap.get(city);
+          
           if (existing) {
+            // Не обновляем если прогресс не изменился (защита от лишних ре-рендеров)
+            if (
+              existing.progress === progress.progress &&
+              existing.stage === progress.stage &&
+              existing.elapsed_seconds === progress.elapsed_seconds
+            ) {
+              return state; // Нет изменений
+            }
+            
             newMap.set(city, { ...existing, ...progress });
           }
           return { scanningCities: newMap };

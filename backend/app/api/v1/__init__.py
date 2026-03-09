@@ -4,6 +4,8 @@ from app.api.v1.stats import router as stats_router
 from app.api.v1.scan import router as scan_router
 from app.api.v1.export import router as export_router
 from app.api.v1.ws import router as ws_router
+from app.api.v1.cache import router as cache_router
+from app.api.v1.monitoring import router as monitoring_router
 
 __all__ = [
     "listings_router",
@@ -12,4 +14,6 @@ __all__ = [
     "scan_router",
     "export_router",
     "ws_router",
+    "cache_router",
+    "monitoring_router",
 ]

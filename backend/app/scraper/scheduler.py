@@ -38,6 +38,11 @@ class ScraperScheduler:
         self._lock = asyncio.Lock()
         self._ws_manager = None
 
+    async def initialize(self, redis_client):
+        """Инициализация scheduler (для совместимости с main.py)."""
+        # Метод пустой так как scheduler не требует дополнительной инициализации
+        logger.debug("ScraperScheduler initialized")
+
     async def _add_scanning_city(self, city: str, trigger_type: str, scan_id: str):
         """Добавить город в сканирование (thread-safe)."""
         async with self._lock:

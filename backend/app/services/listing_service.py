@@ -52,10 +52,10 @@ class ListingService:
             old_price_byn = existing.price
             was_deleted = existing.status == ListingStatus.deleted
 
-            # Собираем изменённые поля
+            # Собираем изменённые поля (исключаем raw_data - он не нужен для отображения)
             changed_fields = {}
             for key, value in listing_data.items():
-                if key != "kufar_id":
+                if key not in ("kufar_id", "raw_data"):
                     old_value = getattr(existing, key, None)
                     if old_value != value:
                         changed_fields[key] = [old_value, value]
@@ -380,10 +380,10 @@ class ListingService:
             old_price_byn = existing.price
             was_deleted = existing.status == ListingStatus.deleted
 
-            # Собираем изменённые поля
+            # Собираем изменённые поля (исключаем raw_data - он не нужен для отображения)
             changed_fields = {}
             for key, value in listing_data.items():
-                if key != "kufar_id":
+                if key not in ("kufar_id", "raw_data"):
                     old_value = getattr(existing, key, None)
                     if old_value != value:
                         changed_fields[key] = [old_value, value]
@@ -509,7 +509,7 @@ class ListingService:
                     Listing.kufar_id.not_in(kufar_ids),
                     Listing.city == city,
                     Listing.status.in_(
-                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
                     ),
                 )
             )
@@ -538,7 +538,7 @@ class ListingService:
                     Listing.kufar_id.not_in(kufar_ids),
                     Listing.city == city,
                     Listing.status.in_(
-                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated]
+                        [ListingStatus.active, ListingStatus.new, ListingStatus.updated, ListingStatus.price_changed_byn]
                     ),
                 )
             )
