@@ -21,6 +21,8 @@ interface FilterState {
   currency: 'BYN' | 'USD';
   priceFrom: number | null;
   priceTo: number | null;
+  pricePerM2Min: number | null;
+  pricePerM2Max: number | null;
   rooms: number[];
   roomsOther: boolean;
   sort: string;
@@ -32,6 +34,7 @@ interface FilterState {
   setStatus: (status: string) => void;
   setCurrency: (currency: 'BYN' | 'USD') => void;
   setPriceRange: (from: number | null, to: number | null) => void;
+  setPricePerM2Range: (min: number | null, max: number | null) => void;
   setRooms: (rooms: number[], other?: boolean) => void;
   setFilters: (filters: Partial<FilterState>) => void;
   setPage: (page: number) => void;
@@ -52,6 +55,8 @@ export const useFilterStore = create<FilterState>()(
       currency: 'USD',
       priceFrom: null,
       priceTo: null,
+      pricePerM2Min: null,
+      pricePerM2Max: null,
       rooms: [],
       roomsOther: false,
       sort: 'newest',
@@ -64,6 +69,7 @@ export const useFilterStore = create<FilterState>()(
       setStatus: (status) => set({ status, page: 1 }),
       setCurrency: (currency) => set({ currency }),
       setPriceRange: (from, to) => set({ priceFrom: from, priceTo: to, page: 1 }),
+      setPricePerM2Range: (min, max) => set({ pricePerM2Min: min, pricePerM2Max: max, page: 1 }),
       setRooms: (rooms, other) => set({ rooms, roomsOther: other ?? false, page: 1 }),
       setFilters: (filters) => set({ ...filters, page: 1 }),
       setPage: (page) => set({ page }),
@@ -122,6 +128,8 @@ export const useFilterStore = create<FilterState>()(
           currency: 'USD',
           priceFrom: null,
           priceTo: null,
+          pricePerM2Min: null,
+          pricePerM2Max: null,
           rooms: [],
           roomsOther: false,
           sort: 'newest',

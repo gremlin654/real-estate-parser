@@ -185,8 +185,20 @@ export function ListingDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-3xl font-bold text-primary">
-              {price.toLocaleString()} {displayCurrency}
+            <div className="space-y-2">
+              <div className="text-3xl font-bold text-primary">
+                {price.toLocaleString()} {displayCurrency}
+              </div>
+              {((currency === 'USD' && listing.price_per_m2_usd) || (currency === 'BYN' && listing.price_per_m2_byn)) && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <span className="px-2 py-1 bg-muted rounded-md">
+                    {currency === 'USD' 
+                      ? `${listing.price_per_m2_usd?.toLocaleString()} $/м²`
+                      : `${listing.price_per_m2_byn?.toLocaleString()} BYN/м²`
+                    }
+                  </span>
+                </div>
+              )}
             </div>
 
             <Separator />

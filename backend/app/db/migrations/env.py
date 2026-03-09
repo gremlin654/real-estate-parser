@@ -1,5 +1,5 @@
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, create_engine
+from sqlalchemy import engine_from_config, create_engine, MetaData
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from alembic import context
@@ -8,10 +8,10 @@ from os.path import abspath, dirname
 
 sys.path.insert(0, abspath(dirname(dirname(dirname(__file__)))))
 
-from app.db.database import Base
+# Не импортируем Base с моделями - они используют ENUM с create_type=False
+# что вызывает ошибки при миграциях. Используем пустую метадату.
+# from app.db.database import Base
 
-# Не импортируем модели напрямую - они используют create_type=False
-# и типы должны быть созданы через миграции
 from app.config import settings
 
 config = context.config
@@ -21,7 +21,8 @@ config.set_main_option("sqlalchemy.url", DB_URL)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+# Пустая метадата чтобы избежать автоматического создания ENUM типов
+target_metadata = MetaData()
 
 
 def run_migrations_offline() -> None:

@@ -2,7 +2,7 @@ import { test as base } from '@playwright/test';
 
 export const test = base.extend({
   page: async ({ page }, use) => {
-    await page.goto('/');
+    // Не переходим автоматически на '/', это делается в каждом тесте явно
     await use(page);
   },
 });

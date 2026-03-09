@@ -14,6 +14,9 @@ import type {
   ScanHistoryResponse,
   CitySettingsResponse,
   CitySettingsUpdateRequest,
+  PricePerM2Stats,
+  PricePerM2TrendsResponse,
+  PricePerM2DistributionResponse,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
@@ -203,6 +206,8 @@ export const useListings = (filters: {
   status?: string;
   priceFrom?: number | null;
   priceTo?: number | null;
+  pricePerM2Min?: number | null;
+  pricePerM2Max?: number | null;
   rooms?: number[];
   roomsOther?: boolean;
   currency?: string;
@@ -221,6 +226,12 @@ export const useListings = (filters: {
       }
       if (filters.priceTo !== null && filters.priceTo !== undefined) {
         params.set('price_to', String(filters.priceTo));
+      }
+      if (filters.pricePerM2Min !== null && filters.pricePerM2Min !== undefined) {
+        params.set('price_per_m2_min', String(filters.pricePerM2Min));
+      }
+      if (filters.pricePerM2Max !== null && filters.pricePerM2Max !== undefined) {
+        params.set('price_per_m2_max', String(filters.pricePerM2Max));
       }
       if (filters.rooms && filters.rooms.length > 0) {
         filters.rooms.forEach((room) => params.append('rooms', String(room)));
@@ -553,5 +564,86 @@ export const useScanStatus = () => {
     refetchInterval: 5000, // Polling каждые 5 секунд
     retry: 2,
     retryDelay: 1000,
+  });
+};
+
+/**
+ * Hook для получения статистики цены за м²
+ */
+export const usePricePerM2Stats = (filters: {
+  city: string;
+  rooms?: number;
+  currency?: 'byn' | 'usd';
+}) => {
+  return useQuery<PricePerM2Stats>({
+    queryKey: ['pricePerM2Stats', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.rooms) params.set('rooms', String(filters.rooms));
+      if (filters.currency) params.set('currency', filters.currency);
+
+      const response = await fetch(`${API_BASE}/stats/price-per-m2?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch price per m² stats');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * Hook для получения трендов цены за м²
+ */
+export const usePricePerM2Trends = (filters: {
+  city: string;
+  rooms?: number;
+  period_days?: number;
+  interval?: 'day' | 'week' | 'month';
+  currency?: 'byn' | 'usd';
+}) => {
+  return useQuery<PricePerM2TrendsResponse>({
+    queryKey: ['pricePerM2Trends', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.rooms) params.set('rooms', String(filters.rooms));
+      if (filters.period_days) params.set('period_days', String(filters.period_days));
+      if (filters.interval) params.set('interval', filters.interval);
+      if (filters.currency) params.set('currency', filters.currency);
+
+      const response = await fetch(`${API_BASE}/stats/price-per-m2-trends?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch price per m² trends');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * Hook для получения распределения цены за м²
+ */
+export const usePricePerM2Distribution = (filters: {
+  city: string;
+  rooms?: number;
+  bins?: number;
+  currency?: 'byn' | 'usd';
+}) => {
+  return useQuery<PricePerM2DistributionResponse>({
+    queryKey: ['pricePerM2Distribution', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.rooms) params.set('rooms', String(filters.rooms));
+      if (filters.bins) params.set('bins', String(filters.bins));
+      if (filters.currency) params.set('currency', filters.currency);
+
+      const response = await fetch(`${API_BASE}/stats/price-per-m2-distribution?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch price per m² distribution');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
   });
 };

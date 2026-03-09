@@ -17,7 +17,7 @@ router = APIRouter(prefix="/listings", tags=["listings"])
 @cache_response(
     prefix="cache:listings",
     ttl=settings.CACHE_TTL_LISTINGS,
-    key_params=["page", "size", "status", "city", "rooms", "sort_order", "currency"],
+    key_params=["page", "size", "status", "city", "rooms", "sort_order", "currency", "price_per_m2_min", "price_per_m2_max"],
 )
 async def get_listings(
     request: Request,
@@ -28,6 +28,8 @@ async def get_listings(
     city: Optional[str] = None,
     price_from: Optional[int] = None,
     price_to: Optional[int] = None,
+    price_per_m2_min: Optional[float] = Query(None, description="Минимальная цена за м²"),
+    price_per_m2_max: Optional[float] = Query(None, description="Максимальная цена за м²"),
     rooms: Optional[list[int]] = Query(None, description="Room counts to filter"),
     rooms_other: Optional[bool] = Query(
         None, description="Include listings with rooms outside 1-4 range"
@@ -62,6 +64,21 @@ async def get_listings(
 
     if price_to is not None:
         conditions.append(or_(Listing.price <= price_to, Listing.price_usd <= price_to))
+
+    # Фильтр по цене за м²
+    if price_per_m2_min is not None and price_per_m2_max is not None:
+        if price_per_m2_min > price_per_m2_max:
+            raise HTTPException(
+                status_code=400,
+                detail="price_per_m2_min не может быть больше price_per_m2_max"
+            )
+    
+    if price_per_m2_min is not None:
+        # Используем price_per_m2_usd по умолчанию если currency не указан
+        conditions.append(Listing.price_per_m2_usd >= price_per_m2_min)
+
+    if price_per_m2_max is not None:
+        conditions.append(Listing.price_per_m2_usd <= price_per_m2_max)
 
     # Фильтр по комнатам
     if rooms and len(rooms) > 0:
