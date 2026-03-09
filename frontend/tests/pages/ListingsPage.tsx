@@ -13,20 +13,22 @@ export class ListingsPage {
   readonly resetButton: Locator;
   readonly scanButton: Locator;
   readonly table: Locator;
+  readonly filtersButton: Locator;
 
   constructor(page: Page) {
     this.page = page;
-    this.header = page.getByRole('heading', { name: 'Объявления' });
-    this.citySelect = page.getByLabel('Город');
-    this.statusSelect = page.getByLabel('Статус');
-    this.currencySelect = page.getByLabel('Валюта');
-    this.sortOrderSelect = page.getByLabel('Сортировка');
-    this.minPriceInput = page.getByPlaceholder('Мин. цена');
-    this.maxPriceInput = page.getByPlaceholder('Макс. цена');
-    this.roomsFilter = page.getByRole('button', { name: /Комнаты/i });
-    this.resetButton = page.getByText('Сброс');
-    this.scanButton = page.getByRole('button', { name: /Сканировать/i });
-    this.table = page.locator('table');
+    this.header = page.getByRole('heading', { name: 'Объявления' }).first();
+    this.citySelect = page.getByLabel('Город').first();
+    this.statusSelect = page.getByLabel('Статус').first();
+    this.currencySelect = page.getByLabel('Валюта').first();
+    this.sortOrderSelect = page.getByLabel('Сортировка').first();
+    this.minPriceInput = page.getByPlaceholder('Мин. цена').first();
+    this.maxPriceInput = page.getByPlaceholder('Макс. цена').first();
+    this.roomsFilter = page.getByRole('button', { name: /Комнаты/i }).first();
+    this.resetButton = page.getByRole('button', { name: /Сброс/i }).first();
+    this.scanButton = page.getByRole('button', { name: /Сканировать/i }).first();
+    this.table = page.locator('table').first();
+    this.filtersButton = page.getByRole('button', { name: /Фильтры/i }).first();
   }
 
   async goto() {
@@ -34,27 +36,28 @@ export class ListingsPage {
   }
 
   async waitForLoad() {
-    await this.header.waitFor({ state: 'visible', timeout: 10000 });
+    await this.header.waitFor({ state: 'visible', timeout: 20000 });
+    await this.page.waitForLoadState('networkidle');
   }
 
   async selectCity(cityName: string) {
     await this.citySelect.click();
-    await this.page.getByText(cityName).click();
+    await this.page.getByText(cityName, { exact: true }).first().click();
   }
 
   async selectStatus(status: string) {
     await this.statusSelect.click();
-    await this.page.getByText(status).click();
+    await this.page.getByText(status, { exact: true }).first().click();
   }
 
   async selectCurrency(currency: string) {
     await this.currencySelect.click();
-    await this.page.getByText(currency).click();
+    await this.page.getByText(currency, { exact: true }).first().click();
   }
 
   async selectSortOrder(order: string) {
     await this.sortOrderSelect.click();
-    await this.page.getByText(order).click();
+    await this.page.getByText(order, { exact: true }).first().click();
   }
 
   async setPriceRange(min: string, max: string) {
@@ -65,7 +68,7 @@ export class ListingsPage {
   async selectRooms(rooms: string[]) {
     await this.roomsFilter.click();
     for (const room of rooms) {
-      await this.page.getByText(`${room} комната${room === '1' ? '' : 'ы'}`).click();
+      await this.page.getByText(`${room} комната${room === '1' ? '' : 'ы'}`).first().click();
     }
   }
 

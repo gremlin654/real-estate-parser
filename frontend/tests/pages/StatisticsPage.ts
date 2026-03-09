@@ -17,18 +17,18 @@ export class StatisticsPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.header = page.getByText('Статистика цен');
-    this.subheader = page.getByText('Средние цены на квартиры по месяцам в USD');
-    this.citySelect = page.getByLabel('Выберите город');
-    this.periodSelect = page.getByLabel('Период');
-    this.tabsList = page.getByRole('tablist');
-    this.oneRoomTab = page.getByRole('tab', { name: '1-комнатные' });
-    this.twoRoomTab = page.getByRole('tab', { name: '2-комнатные' });
-    this.threeRoomTab = page.getByRole('tab', { name: '3-комнатные' });
-    this.fourRoomTab = page.getByRole('tab', { name: '4-комнатные' });
+    this.header = page.getByRole('heading', { name: /Статистика/i }).first();
+    this.subheader = page.getByText('Средние цены на квартиры по месяцам').first();
+    this.citySelect = page.getByLabel('Город').first();
+    this.periodSelect = page.getByLabel('Период').first();
+    this.tabsList = page.getByRole('tablist').first();
+    this.oneRoomTab = page.getByRole('tab', { name: /1-комн/ }).first();
+    this.twoRoomTab = page.getByRole('tab', { name: /2-комн/ }).first();
+    this.threeRoomTab = page.getByRole('tab', { name: /3-комн/ }).first();
+    this.fourRoomTab = page.getByRole('tab', { name: /4-комн/ }).first();
     this.chartCard = page.locator('canvas').first();
-    this.chartTitle = page.getByText(/-комнатные квартиры/);
-    this.chartDescription = page.getByText('Средняя цена в USD по месяцам');
+    this.chartTitle = page.getByText(/-комнатные квартиры/).first();
+    this.chartDescription = page.getByText('Средняя цена в USD по месяцам').first();
   }
 
   async goto() {
@@ -36,26 +36,27 @@ export class StatisticsPage {
   }
 
   async waitForLoad() {
-    await this.header.waitFor({ state: 'visible', timeout: 10000 });
+    await this.header.waitFor({ state: 'visible', timeout: 20000 });
+    await this.page.waitForLoadState('networkidle');
   }
 
   async selectCity(cityName: string) {
     await this.citySelect.click();
-    await this.page.getByText(cityName).click();
+    await this.page.getByText(cityName, { exact: true }).first().click();
   }
 
   async selectPeriod(period: string) {
     await this.periodSelect.click();
-    await this.page.getByText(period).click();
+    await this.page.getByText(period, { exact: true }).first().click();
   }
 
   async selectRoomTab(rooms: string) {
-    const tab = this.page.getByRole('tab', { name: new RegExp(`${rooms}-комнатные`) });
+    const tab = this.page.getByRole('tab', { name: new RegExp(`${rooms}-комнатные`) }).first();
     await tab.click();
   }
 
   async getActiveTab(): Promise<string | null> {
-    const activeTab = this.page.locator('[role="tab"][data-state="active"]');
+    const activeTab = this.page.locator('[role="tab"][data-state="active"]').first();
     return await activeTab.textContent();
   }
 

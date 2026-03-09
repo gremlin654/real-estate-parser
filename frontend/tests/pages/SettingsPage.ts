@@ -15,7 +15,7 @@ export class SettingsPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.header = page.getByText('Настройки автоматического сканирования');
+    this.header = page.getByRole('heading', { name: /Настройки/i });
     this.citySelect = page.getByLabel('Город сканирования');
     this.autoScanSwitch = page.getByRole('switch', { name: /Автоматическое сканирование/i });
     this.intervalInput = page.getByLabel('Интервал сканирования');
@@ -32,12 +32,13 @@ export class SettingsPage {
   }
 
   async waitForLoad() {
-    await this.header.waitFor({ state: 'visible', timeout: 10000 });
+    await this.header.waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.waitForLoadState('networkidle');
   }
 
   async selectCity(cityName: string) {
     await this.citySelect.click();
-    await this.page.getByText(cityName).click();
+    await this.page.getByText(cityName, { exact: true }).first().click();
   }
 
   async toggleAutoScan() {

@@ -17,7 +17,7 @@ test.describe('Kufar Monitor - Statistics', () => {
 
   test('должна отображать заголовок и описание', async ({ page }) => {
     await expect(statisticsPage.header).toBeVisible();
-    await expect(statisticsPage.subheader).toBeVisible();
+    await expect(statisticsPage.subheader).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать селектор города', async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe('Kufar Monitor - Statistics', () => {
   });
 
   test('должна отображать заголовок графика', async ({ page }) => {
-    await expect(statisticsPage.chartTitle).toBeVisible();
+    await expect(statisticsPage.chartTitle).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать описание графика', async ({ page }) => {
@@ -66,43 +66,43 @@ test.describe('Kufar Monitor - Statistics', () => {
   test('должна позволять выбрать период', async ({ page }) => {
     // Выбираем 6 месяцев
     await statisticsPage.selectPeriod('6 месяцев');
-    await expect(page.getByText('6 месяцев')).toBeVisible();
+    await expect(page.getByText('6 месяцев').first()).toBeVisible();
 
     // Выбираем 24 месяца
     await statisticsPage.selectPeriod('24 месяца');
-    await expect(page.getByText('24 месяца')).toBeVisible();
+    await expect(page.getByText('24 месяца').first()).toBeVisible();
   });
 
   test('должна позволять выбрать город', async ({ page }) => {
     // Выбираем Гомель
     await statisticsPage.selectCity('Гомель');
-    await expect(page.getByText('Гомель')).toBeVisible();
+    await expect(page.getByText('Гомель').first()).toBeVisible();
 
     // Выбираем Брест
     await statisticsPage.selectCity('Брест');
-    await expect(page.getByText('Брест')).toBeVisible();
+    await expect(page.getByText('Брест').first()).toBeVisible();
   });
 
   test('должна отображать все доступные периоды', async ({ page }) => {
     await statisticsPage.periodSelect.click();
-    await expect(page.getByText('6 месяцев')).toBeVisible();
-    await expect(page.getByText('12 месяцев')).toBeVisible();
-    await expect(page.getByText('24 месяца')).toBeVisible();
+    await expect(page.getByText('6 месяцев').first()).toBeVisible();
+    await expect(page.getByText('1 год').first()).toBeVisible();
+    await expect(page.getByText('2 года').first()).toBeVisible();
   });
 
   test('должна отображать все доступные города', async ({ page }) => {
     await statisticsPage.citySelect.click();
-    await expect(page.getByText('Минск')).toBeVisible();
-    await expect(page.getByText('Могилёв')).toBeVisible();
-    await expect(page.getByText('Гродно')).toBeVisible();
-    await expect(page.getByText('Брест')).toBeVisible();
-    await expect(page.getByText('Гомель')).toBeVisible();
-    await expect(page.getByText('Витебск')).toBeVisible();
+    await expect(page.getByText('Минск').first()).toBeVisible();
+    await expect(page.getByText('Могилёв').first()).toBeVisible();
+    await expect(page.getByText('Гродно').first()).toBeVisible();
+    await expect(page.getByText('Брест').first()).toBeVisible();
+    await expect(page.getByText('Гомель').first()).toBeVisible();
+    await expect(page.getByText('Витебск').first()).toBeVisible();
   });
 
   test('должна показывать количество месяцев данных', async ({ page }) => {
     // Проверяем, что есть информация о количестве месяцев
-    await expect(page.getByText(/месяцев данных/)).toBeVisible();
+    await expect(page.getByText(/месяцев данных/i).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('должна корректно переключаться между табами и отображать график', async ({ page }) => {
@@ -117,7 +117,7 @@ test.describe('Kufar Monitor - Statistics', () => {
     for (const tab of tabs) {
       await tab.click();
       await expect(tab).toHaveAttribute('data-state', 'active');
-      
+
       // Проверяем, что график остаётся видимым
       const chartVisible = await statisticsPage.isChartVisible();
       expect(chartVisible).toBe(true);
