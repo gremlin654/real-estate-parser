@@ -4,15 +4,18 @@ test.describe('Price Per M² Analytics', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/analytics/price-per-m2');
     await page.waitForLoadState('networkidle');
+    // Ждем загрузки заголовка
+    await expect(page.getByTestId('price-per-m2-header')).toBeVisible({ timeout: 20000 });
   });
 
   test('должна загружать страницу аналитики', async ({ page }) => {
-    await expect(page.getByText('Аналитика цены за м²').first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('price-per-m2-header')).toBeVisible();
     await expect(page.getByText('Динамика и распределение цен за квадратный метр').first()).toBeVisible();
   });
 
   test('должна отображать summary карточки', async ({ page }) => {
-    await expect(page.getByText('Средняя цена за м²').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('summary-stats-cards')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Средняя цена за м²').first()).toBeVisible();
     await expect(page.getByText('Минимум').first()).toBeVisible();
     await expect(page.getByText('Максимум').first()).toBeVisible();
   });
@@ -51,19 +54,22 @@ test.describe('Price Per M² Analytics', () => {
   });
 
   test('должна переключать периоды', async ({ page }) => {
-    const periodButtons = page.getByRole('button', { name: /дн\./ }).first();
+    // Используем data-testid для кнопок периодов
+    const period7 = page.getByTestId('period-7');
+    const period30 = page.getByTestId('period-30');
+    const period90 = page.getByTestId('period-90');
 
     // Проверка кнопки "7 дн."
-    await expect(periodButtons.first()).toBeVisible();
-    await periodButtons.first().click();
+    await expect(period7).toBeVisible();
+    await period7.click();
 
     // Проверка кнопки "30 дн."
-    await expect(periodButtons.nth(1)).toBeVisible();
-    await periodButtons.nth(1).click();
+    await expect(period30).toBeVisible();
+    await period30.click();
 
     // Проверка кнопки "90 дн."
-    await expect(periodButtons.nth(2)).toBeVisible();
-    await periodButtons.nth(2).click();
+    await expect(period90).toBeVisible();
+    await period90.click();
   });
 
   test('должна отображать графики', async ({ page }) => {
@@ -78,7 +84,7 @@ test.describe('Price Per M² Analytics', () => {
 
     // Проверка что страница загрузилась
     await expect(page).toHaveURL('/analytics/price-per-m2');
-    await expect(page.getByText('Аналитика цены за м²').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('price-per-m2-header')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('Динамика и распределение цен за квадратный метр').first()).toBeVisible();
   });
 
@@ -96,7 +102,7 @@ test.describe('Price Per M² Analytics', () => {
     // Ждём появления skeleton или контента
     await page.waitForLoadState('networkidle');
     // Проверяем что страница загрузилась
-    await expect(page.getByText('Аналитика цены за м²').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('price-per-m2-header')).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать фильтр по комнатам', async ({ page }) => {

@@ -97,7 +97,7 @@ export function PricePerM2AnalyticsPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
+      <div data-testid="price-per-m2-header">
         <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
           Аналитика цены за м²
         </h1>
@@ -153,7 +153,7 @@ export function PricePerM2AnalyticsPage() {
 
       {/* Summary Stats */}
       {!hasError && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" data-testid="summary-stats-cards">
           <StatCard
             title="Средняя цена за м²"
             value={stats ? `${Math.floor(stats.average).toLocaleString()} ${currency}/м²` : '-'}
@@ -206,7 +206,7 @@ export function PricePerM2AnalyticsPage() {
                   <Badge variant="outline">
                     {CITIES[city as keyof typeof CITIES] || city}
                   </Badge>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1" data-testid="period-buttons">
                     {[7, 30, 90].map((p) => (
                       <Button
                         key={p}
@@ -216,6 +216,7 @@ export function PricePerM2AnalyticsPage() {
                           setPeriod(p as Period);
                           setInterval(p === 7 ? 'day' : p === 30 ? 'day' : 'week');
                         }}
+                        data-testid={`period-${p}`}
                       >
                         {p} дн.
                       </Button>

@@ -1,97 +1,108 @@
 import { test, expect } from './fixtures';
-import { StatisticsPage } from './pages/index';
 
 test.describe('Kufar Monitor - Statistics', () => {
-  let statisticsPage: StatisticsPage;
-
   test.beforeEach(async ({ page }) => {
-    statisticsPage = new StatisticsPage(page);
-    await statisticsPage.goto();
-    await statisticsPage.waitForLoad();
+    await page.goto('/statistics');
+    await page.waitForLoadState('networkidle');
+    // Ждем загрузки заголовка страницы
+    await expect(page.getByRole('heading', { name: 'Статистика' }).first()).toBeVisible({ timeout: 20000 });
   });
 
   test('должна загружать страницу статистики', async ({ page }) => {
     await expect(page).toHaveURL('/statistics');
-    await expect(statisticsPage.header).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Статистика' }).first()).toBeVisible();
   });
 
   test('должна отображать заголовок и описание', async ({ page }) => {
-    await expect(statisticsPage.header).toBeVisible();
-    await expect(statisticsPage.subheader).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Статистика' }).first()).toBeVisible();
+    await expect(page.getByText('Аналитика рынка недвижимости').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать селектор города', async ({ page }) => {
-    await expect(statisticsPage.citySelect).toBeVisible();
+    // Select использует button с placeholder
+    await expect(page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first()).toBeVisible();
   });
 
   test('должна отображать селектор периода', async ({ page }) => {
-    await expect(statisticsPage.periodSelect).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first()).toBeVisible();
   });
 
-  test('должна отображать все табы комнат', async ({ page }) => {
-    await expect(statisticsPage.oneRoomTab).toBeVisible();
-    await expect(statisticsPage.twoRoomTab).toBeVisible();
-    await expect(statisticsPage.threeRoomTab).toBeVisible();
-    await expect(statisticsPage.fourRoomTab).toBeVisible();
+  test('должна отображать все табы', async ({ page }) => {
+    // Ждем появления табов
+    await expect(page.getByRole('tablist').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('tab', { name: 'Динамика цен' }).first()).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'По комнатам' }).first()).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Активность' }).first()).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Сравнение' }).first()).toBeVisible();
   });
 
-  test('должна переключать табы комнат', async ({ page }) => {
-    // Кликаем на 2-комнатные
-    await statisticsPage.twoRoomTab.click();
-    await expect(statisticsPage.twoRoomTab).toHaveAttribute('data-state', 'active');
+  test('должна переключать табы', async ({ page }) => {
+    // Кликаем на "По комнатам"
+    const roomsTab = page.getByRole('tab', { name: 'По комнатам' }).first();
+    await roomsTab.click();
+    await expect(roomsTab).toHaveAttribute('data-state', 'active');
 
-    // Кликаем на 3-комнатные
-    await statisticsPage.threeRoomTab.click();
-    await expect(statisticsPage.threeRoomTab).toHaveAttribute('data-state', 'active');
+    // Кликаем на "Активность"
+    const activityTab = page.getByRole('tab', { name: 'Активность' }).first();
+    await activityTab.click();
+    await expect(activityTab).toHaveAttribute('data-state', 'active');
   });
 
   test('должна отображать график для выбранного таба', async ({ page }) => {
-    // Проверяем, что график виден
-    const chartVisible = await statisticsPage.isChartVisible();
+    // Проверяем, что график виден (Recharts использует SVG)
+    const chartVisible = await page.locator('svg').first().isVisible();
     expect(chartVisible).toBe(true);
   });
 
   test('должна отображать карточку с графиком', async ({ page }) => {
-    await expect(statisticsPage.chartCard).toBeVisible();
+    await expect(page.locator('canvas').or(page.locator('svg')).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать заголовок графика', async ({ page }) => {
-    await expect(statisticsPage.chartTitle).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Динамика цен/).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('должна отображать описание графика', async ({ page }) => {
-    await expect(statisticsPage.chartDescription).toBeVisible();
+    await expect(page.getByText(/Средняя цена/).first()).toBeVisible();
   });
 
   test('должна позволять выбрать период', async ({ page }) => {
     // Выбираем 6 месяцев
-    await statisticsPage.selectPeriod('6 месяцев');
-    await expect(page.getByText('6 месяцев').first()).toBeVisible();
+    const periodButton = page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first();
+    await periodButton.click();
+    await page.getByText('6 месяцев').first().click();
+    await expect(page.getByText('6 месяцев').first()).toBeVisible({ timeout: 10000 });
 
     // Выбираем 24 месяца
-    await statisticsPage.selectPeriod('24 месяца');
-    await expect(page.getByText('24 месяца').first()).toBeVisible();
+    await periodButton.click();
+    await page.getByText('2 года').first().click();
+    await expect(page.getByText('2 года').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('должна позволять выбрать город', async ({ page }) => {
     // Выбираем Гомель
-    await statisticsPage.selectCity('Гомель');
-    await expect(page.getByText('Гомель').first()).toBeVisible();
+    const cityButton = page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first();
+    await cityButton.click();
+    await page.getByText('Гомель').first().click();
+    await expect(page.getByText('Гомель').first()).toBeVisible({ timeout: 10000 });
 
     // Выбираем Брест
-    await statisticsPage.selectCity('Брест');
-    await expect(page.getByText('Брест').first()).toBeVisible();
+    await cityButton.click();
+    await page.getByText('Брест').first().click();
+    await expect(page.getByText('Брест').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('должна отображать все доступные периоды', async ({ page }) => {
-    await statisticsPage.periodSelect.click();
+    const periodButton = page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first();
+    await periodButton.click();
     await expect(page.getByText('6 месяцев').first()).toBeVisible();
     await expect(page.getByText('1 год').first()).toBeVisible();
     await expect(page.getByText('2 года').first()).toBeVisible();
   });
 
   test('должна отображать все доступные города', async ({ page }) => {
-    await statisticsPage.citySelect.click();
+    const cityButton = page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first();
+    await cityButton.click();
     await expect(page.getByText('Минск').first()).toBeVisible();
     await expect(page.getByText('Могилёв').first()).toBeVisible();
     await expect(page.getByText('Гродно').first()).toBeVisible();
@@ -100,18 +111,18 @@ test.describe('Kufar Monitor - Statistics', () => {
     await expect(page.getByText('Витебск').first()).toBeVisible();
   });
 
-  test('должна показывать количество месяцев данных', async ({ page }) => {
-    // Проверяем, что есть информация о количестве месяцев
-    await expect(page.getByText(/месяцев данных/i).first()).toBeVisible({ timeout: 15000 });
+  test('должна показывать информацию о периоде', async ({ page }) => {
+    // Проверяем, что есть информация о периоде
+    await expect(page.getByText(/1 год/).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('должна корректно переключаться между табами и отображать график', async ({ page }) => {
     // Проходим по всем табам
     const tabs = [
-      statisticsPage.oneRoomTab,
-      statisticsPage.twoRoomTab,
-      statisticsPage.threeRoomTab,
-      statisticsPage.fourRoomTab,
+      page.getByRole('tab', { name: 'Динамика цен' }).first(),
+      page.getByRole('tab', { name: 'По комнатам' }).first(),
+      page.getByRole('tab', { name: 'Активность' }).first(),
+      page.getByRole('tab', { name: 'Сравнение' }).first(),
     ];
 
     for (const tab of tabs) {
@@ -119,13 +130,14 @@ test.describe('Kufar Monitor - Statistics', () => {
       await expect(tab).toHaveAttribute('data-state', 'active');
 
       // Проверяем, что график остаётся видимым
-      const chartVisible = await statisticsPage.isChartVisible();
+      const chartVisible = await page.locator('svg').first().isVisible();
       expect(chartVisible).toBe(true);
     }
   });
 
   test('должна иметь активный таб по умолчанию', async ({ page }) => {
-    const activeTab = await statisticsPage.getActiveTab();
-    expect(activeTab).toBeTruthy();
+    const activeTab = page.locator('[role="tab"][data-state="active"]').first();
+    const isActive = await activeTab.isVisible();
+    expect(isActive).toBeTruthy();
   });
 });

@@ -15,10 +15,10 @@ test.describe('Dashboard', () => {
   });
 
   test('displays stats cards', async ({ page }) => {
-    await expect(page.getByText('Новых сегодня').first()).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText('Удалено сегодня').first()).toBeVisible();
-    await expect(page.getByText('Изменилась цена').first()).toBeVisible();
-    await expect(page.getByText('Активных всего').first()).toBeVisible();
+    await expect(page.getByText('Активные объявления').first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('Новые сегодня').first()).toBeVisible();
+    await expect(page.getByText('Удалены сегодня').first()).toBeVisible();
+    await expect(page.getByText('Изменения цены (USD)').first()).toBeVisible();
   });
 
   test('allows changing city', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('Dashboard', () => {
 
   test('displays quick action cards', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Объявления' }).first()).toBeVisible();
-    await expect(page.getByText('Сводка').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Мониторинг недвижимости Kufar.by').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('navigates to listings page', async ({ page }) => {
