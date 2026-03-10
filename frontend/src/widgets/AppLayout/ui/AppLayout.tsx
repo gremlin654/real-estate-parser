@@ -18,6 +18,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { path: '/', icon: Home, label: 'Панель управления' },
     { path: '/listings', icon: List, label: 'Объявления' },
     { path: '/statistics', icon: BarChart3, label: 'Статистика' },
+    { path: '/analytics/price-per-m2', icon: BarChart3, label: 'Аналитика цены за м²' },
     { path: '/settings', icon: Settings, label: 'Настройки' },
   ];
 

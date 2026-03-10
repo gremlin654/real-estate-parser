@@ -22,6 +22,8 @@ export interface Listing {
   first_seen_at: string;
   last_seen_at: string;
   deleted_at?: string | null;
+  price_per_m2_byn?: number | null;
+  price_per_m2_usd?: number | null;
 }
 
 export interface PaginatedResponse {

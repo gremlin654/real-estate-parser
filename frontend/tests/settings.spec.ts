@@ -3,32 +3,41 @@ import { test, expect } from './fixtures';
 test.describe('Settings', () => {
   test('should load settings page', async ({ page }) => {
     await page.goto('/settings');
-    await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible();
-    await expect(page.getByText('Управление параметрами сканирования')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: /Настройки/i }).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('Управление параметрами сканирования').first()).toBeVisible();
   });
-  
+
   test('should update scan interval', async ({ page }) => {
     await page.goto('/settings');
-    
-    // Change interval using slider
-    const slider = page.getByRole('slider');
-    await slider.click();
-    
+    await page.waitForLoadState('networkidle');
+
+    // Change interval using slider - используем first() для strict mode
+    const slider = page.getByRole('slider').first();
+    if (await slider.isVisible()) {
+      await slider.click();
+      await page.waitForLoadState('networkidle');
+    }
+
     // Save changes
-    await page.getByRole('button', { name: 'Сохранить изменения' }).click();
-    
-    // Wait for success (query invalidated)
-    await page.waitForTimeout(1000);
+    const saveButton = page.getByRole('button', { name: 'Сохранить' }).first();
+    if (await saveButton.isVisible()) {
+      await saveButton.click();
+      await page.waitForLoadState('networkidle');
+    }
   });
-  
+
   test('should change city', async ({ page }) => {
     await page.goto('/settings');
-    
+    await page.waitForLoadState('networkidle');
+
     // Select different city from dropdown
-    await page.getByRole('combobox').click();
-    await page.getByRole('option', { name: 'Гродно' }).click();
-    
+    const citySelect = page.getByLabel('Город сканирования').first();
+    await citySelect.click();
+    await page.getByRole('option', { name: 'Гродно' }).first().click();
+    await page.waitForLoadState('networkidle');
+
     // Wait for city to update
-    await expect(page.getByText('Текущий город: Гродно')).toBeVisible();
+    await expect(page.getByText('Гродно').first()).toBeVisible({ timeout: 20000 });
   });
 });

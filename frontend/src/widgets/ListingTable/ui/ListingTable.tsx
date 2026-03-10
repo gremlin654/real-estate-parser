@@ -29,14 +29,14 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[250px]">Изображение</TableHead>
-              <TableHead>Название</TableHead>
-              <TableHead>Цена</TableHead>
-              <TableHead>Комнаты</TableHead>
-              <TableHead>Площадь</TableHead>
-              <TableHead>Город</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead className="w-[100px]">Действия</TableHead>
+              <TableHead className="w-[250px] text-center">Изображение</TableHead>
+              <TableHead className="text-center">Название</TableHead>
+              <TableHead className="text-center">Цена</TableHead>
+              <TableHead className="text-center">Цена за м²</TableHead>
+              <TableHead className="text-center">Комнаты</TableHead>
+              <TableHead className="text-center">Площадь</TableHead>
+              <TableHead className="text-center">Статус</TableHead>
+              <TableHead className="w-[100px] text-center">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -52,13 +52,13 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
                   <div className="h-4 w-20 bg-muted rounded" />
                 </TableCell>
                 <TableCell>
+                  <div className="h-4 w-20 bg-muted rounded" />
+                </TableCell>
+                <TableCell>
                   <div className="h-4 w-8 bg-muted rounded" />
                 </TableCell>
                 <TableCell>
                   <div className="h-4 w-16 bg-muted rounded" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-24 bg-muted rounded" />
                 </TableCell>
                 <TableCell>
                   <div className="h-6 w-20 bg-muted rounded" />
@@ -90,6 +90,7 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
             <TableHead className="w-[250px] text-center">Изображение</TableHead>
             <TableHead className="text-center">Название</TableHead>
             <TableHead className="text-center">Цена</TableHead>
+            <TableHead className="text-center">Цена за м²</TableHead>
             <TableHead className="text-center">Комнаты</TableHead>
             <TableHead className="text-center">Площадь</TableHead>
             <TableHead className="text-center">Статус</TableHead>
@@ -126,7 +127,7 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
               </TableCell>
               <TableCell className="text-center">
                 <div className="font-semibold">
-                  {currency === 'USD' 
+                  {currency === 'USD'
                     ? (listing.price_usd ?? listing.price).toLocaleString()
                     : listing.price.toLocaleString()
                   }
@@ -134,6 +135,9 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
                     {currency}
                   </span>
                 </div>
+              </TableCell>
+              <TableCell className="text-center">
+                {formatPricePerM2(listing, currency)}
               </TableCell>
               <TableCell className="text-center">
                 <span className="text-sm font-medium">{listing.rooms ?? 0}</span>
@@ -165,6 +169,18 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
       </Table>
     </Card>
   );
+}
+
+function formatPricePerM2(listing: Listing, currency: 'BYN' | 'USD'): string {
+  const pricePerM2 = currency === 'USD'
+    ? listing.price_per_m2_usd
+    : listing.price_per_m2_byn;
+
+  if (pricePerM2 === null || pricePerM2 === undefined) {
+    return '—';
+  }
+
+  return `${Math.floor(pricePerM2).toLocaleString()} ${currency}/м²`;
 }
 
 function StatusBadge({ status }: { status: string }) {

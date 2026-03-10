@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.exc import SQLAlchemyError
 from app.models.listing import Listing, ListingStatus, EventType, ListingHistory
+from app.utils.json_serializer import serialize_for_snapshot, listing_to_dict
 from datetime import datetime, timedelta
 from loguru import logger
 from typing import Optional, Set
@@ -46,6 +47,24 @@ class ListingService:
         kufar_id = listing_data["kufar_id"]
         existing = await self.get_by_kufar_id(kufar_id)
 
+        # Рассчитываем цену за м²
+        area = listing_data.get("area")
+        price_byn = listing_data.get("price")
+        price_usd = listing_data.get("price_usd")
+
+        if area and area > 0 and price_byn:
+            price_per_m2_byn = round(price_byn / area, 2)
+            price_per_m2_usd = round(price_usd / area, 2) if price_usd else None
+            listing_data["price_per_m2_byn"] = price_per_m2_byn
+            listing_data["price_per_m2_usd"] = price_per_m2_usd
+        else:
+            listing_data["price_per_m2_byn"] = None
+            listing_data["price_per_m2_usd"] = None
+            if area and area <= 0:
+                logger.warning(
+                    f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2"
+                )
+
         if existing:
             # Сохраняем старые значения для истории
             old_price_usd = existing.price_usd
@@ -71,9 +90,7 @@ class ListingService:
                 await self._create_history_event(
                     listing_id=existing.id,
                     event_type=EventType.restored,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
-                    ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(f"Listing {kufar_id} restored after deletion")
                 await self.db.commit()
@@ -94,10 +111,12 @@ class ListingService:
                     price_after=existing.price_usd,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
                     ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(
                     f"Price USD changed for {kufar_id}: {old_price_usd} -> {existing.price_usd}"
@@ -120,10 +139,12 @@ class ListingService:
                     price_after=existing.price,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
                     ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(
                     f"Price BYN changed for {kufar_id}: {old_price_byn} -> {existing.price} (USD unchanged)"
@@ -152,9 +173,7 @@ class ListingService:
             await self._create_history_event(
                 listing_id=new_listing.id,
                 event_type=EventType.created,
-                snapshot=json.loads(
-                    json.dumps(new_listing.__dict__, default=str, skipkeys=True)
-                ),
+                snapshot=listing_to_dict(new_listing),
             )
             logger.info(f"New listing created: {kufar_id}")
 
@@ -372,6 +391,25 @@ class ListingService:
         Использует self.db сессию которая должна быть передана извне.
         """
         kufar_id = listing_data["kufar_id"]
+
+        # Рассчитываем цену за м²
+        area = listing_data.get("area")
+        price_byn = listing_data.get("price")
+        price_usd = listing_data.get("price_usd")
+
+        if area and area > 0 and price_byn:
+            price_per_m2_byn = round(price_byn / area, 2)
+            price_per_m2_usd = round(price_usd / area, 2) if price_usd else None
+            listing_data["price_per_m2_byn"] = price_per_m2_byn
+            listing_data["price_per_m2_usd"] = price_per_m2_usd
+        else:
+            listing_data["price_per_m2_byn"] = None
+            listing_data["price_per_m2_usd"] = None
+            if area and area <= 0:
+                logger.warning(
+                    f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2"
+                )
+
         existing = await self.get_by_kufar_id(kufar_id)
 
         if existing:
@@ -399,9 +437,7 @@ class ListingService:
                 await self._create_history_event(
                     listing_id=existing.id,
                     event_type=EventType.restored,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
-                    ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(f"Listing {kufar_id} restored after deletion")
                 # БЕЗ commit()
@@ -421,10 +457,12 @@ class ListingService:
                     price_after=existing.price_usd,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
                     ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(
                     f"Price USD changed for {kufar_id}: {old_price_usd} -> {existing.price_usd}"
@@ -446,10 +484,12 @@ class ListingService:
                     price_after=existing.price,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=changed_fields if changed_fields else None,
-                    snapshot=json.loads(
-                        json.dumps(existing.__dict__, default=str, skipkeys=True)
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
                     ),
+                    snapshot=listing_to_dict(existing),
                 )
                 logger.info(
                     f"Price BYN changed for {kufar_id}: {old_price_byn} -> {existing.price} (USD unchanged)"
@@ -476,9 +516,7 @@ class ListingService:
             await self._create_history_event(
                 listing_id=new_listing.id,
                 event_type=EventType.created,
-                snapshot=json.loads(
-                    json.dumps(new_listing.__dict__, default=str, skipkeys=True)
-                ),
+                snapshot=listing_to_dict(new_listing),
             )
             logger.info(f"New listing created: {kufar_id}")
 
@@ -528,9 +566,7 @@ class ListingService:
             await temp_service._create_history_event(
                 listing_id=listing.id,
                 event_type=EventType.deleted,
-                snapshot=json.loads(
-                    json.dumps(listing.__dict__, default=str, skipkeys=True)
-                ),
+                snapshot=listing_to_dict(listing),
             )
 
         # БЕЗ commit()
@@ -562,9 +598,7 @@ class ListingService:
             await self._create_history_event(
                 listing_id=listing.id,
                 event_type=EventType.deleted,
-                snapshot=json.loads(
-                    json.dumps(listing.__dict__, default=str, skipkeys=True)
-                ),
+                snapshot=listing_to_dict(listing),
             )
 
         await self.db.commit()

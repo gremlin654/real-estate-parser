@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SQLEnum,
     Boolean,
+    Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -70,6 +71,8 @@ class Listing(Base):
     first_seen_at = Column(DateTime, default=utc_now)
     last_seen_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime)
+    price_per_m2_byn = Column(Numeric(12, 2), nullable=True)
+    price_per_m2_usd = Column(Numeric(12, 2), nullable=True)
 
     history = relationship(
         "ListingHistory", back_populates="listing", cascade="all, delete-orphan"

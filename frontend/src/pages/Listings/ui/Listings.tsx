@@ -25,6 +25,7 @@ import { ListingTable } from '@/widgets/ListingTable';
 import { FilterByCity } from '@/features/listings/filter-by-city';
 import { FilterByStatus } from '@/features/listings/filter-by-status';
 import { FilterByPrice } from '@/features/listings/filter-by-price';
+import { FilterByPricePerM2 } from '@/features/listings/filter-by-price-per-m2';
 import { FilterByRooms } from '@/features/listings/filter-by-rooms';
 import { FilterByCurrency } from '@/features/listings/filter-by-currency';
 import { SortListings } from '@/features/listings/sort-listings';
@@ -43,6 +44,8 @@ export function Listings() {
     status,
     priceFrom,
     priceTo,
+    pricePerM2Min,
+    pricePerM2Max,
     rooms,
     roomsOther,
     sort,
@@ -64,6 +67,8 @@ export function Listings() {
     status: status === 'all' ? undefined : status,
     priceFrom,
     priceTo,
+    pricePerM2Min,
+    pricePerM2Max,
     rooms,
     roomsOther,
     currency,
@@ -161,14 +166,30 @@ export function Listings() {
           </div>
 
           {showFilters && (
-            <FilterByPrice
-              priceFrom={priceFrom}
-              priceTo={priceTo}
-              onChange={(from, to) => {
-                setFilters({ priceFrom: from, priceTo: to });
-                setPage(1);
-              }}
-            />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Фильтр по цене:</p>
+                <FilterByPrice
+                  priceFrom={priceFrom}
+                  priceTo={priceTo}
+                  onChange={(from, to) => {
+                    setFilters({ priceFrom: from, priceTo: to });
+                    setPage(1);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Фильтр по цене за м²:</p>
+                <FilterByPricePerM2
+                  pricePerM2Min={pricePerM2Min}
+                  pricePerM2Max={pricePerM2Max}
+                  onChange={(min, max) => {
+                    setFilters({ pricePerM2Min: min, pricePerM2Max: max });
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
           )}
         </div>
       </Card>

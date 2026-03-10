@@ -44,25 +44,25 @@ export function Statistics() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={selectedCity} onValueChange={setSelectedCity}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid="statistics-city-select">
               <SelectValue placeholder="Город" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent data-testid="statistics-city-content">
               {Object.entries(CITIES).map(([code, name]) => (
-                <SelectItem key={code} value={code}>
+                <SelectItem key={code} value={code} data-testid={`city-option-${code}`}>
                   {name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={period.toString()} onValueChange={(v) => setPeriod(parseInt(v))}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px]" data-testid="statistics-period-select">
               <SelectValue placeholder="Период" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="6">6 месяцев</SelectItem>
-              <SelectItem value="12">1 год</SelectItem>
-              <SelectItem value="24">2 года</SelectItem>
+            <SelectContent data-testid="statistics-period-content">
+              <SelectItem value="6" data-testid="period-option-6">6 месяцев</SelectItem>
+              <SelectItem value="12" data-testid="period-option-12">1 год</SelectItem>
+              <SelectItem value="24" data-testid="period-option-24">2 года</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -105,14 +105,14 @@ export function Statistics() {
                   value={selectedRooms.toString()}
                   onValueChange={(v) => setSelectedRooms(parseInt(v))}
                 >
-                  <SelectTrigger className="w-[120px]">
+                  <SelectTrigger className="w-[120px]" data-testid="statistics-rooms-select">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1-комн</SelectItem>
-                    <SelectItem value="2">2-комн</SelectItem>
-                    <SelectItem value="3">3-комн</SelectItem>
-                    <SelectItem value="4">4+ комн</SelectItem>
+                  <SelectContent data-testid="statistics-rooms-content">
+                    <SelectItem value="1" data-testid="rooms-option-1">1-комн</SelectItem>
+                    <SelectItem value="2" data-testid="rooms-option-2">2-комн</SelectItem>
+                    <SelectItem value="3" data-testid="rooms-option-3">3-комн</SelectItem>
+                    <SelectItem value="4" data-testid="rooms-option-4">4+ комн</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

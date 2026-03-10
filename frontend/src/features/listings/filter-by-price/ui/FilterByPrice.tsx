@@ -44,6 +44,7 @@ export function FilterByPrice({ priceFrom, priceTo, onChange }: FilterByPricePro
         className="w-[100px]"
         value={localFrom}
         onChange={(e) => setLocalFrom(e.target.value)}
+        data-testid="price-min-input"
       />
       <Input
         type="number"
@@ -51,6 +52,7 @@ export function FilterByPrice({ priceFrom, priceTo, onChange }: FilterByPricePro
         className="w-[100px]"
         value={localTo}
         onChange={(e) => setLocalTo(e.target.value)}
+        data-testid="price-max-input"
       />
       <Button size="sm" onClick={handleApply}>
         Применить

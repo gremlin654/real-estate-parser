@@ -10,12 +10,12 @@ interface FilterByCurrencyProps {
 export function FilterByCurrency({ value, onChange }: FilterByCurrencyProps) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[100px] h-9">
+      <SelectTrigger className="w-[100px] h-9" data-testid="currency-select">
         <SelectValue placeholder="Валюта" />
       </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="USD">USD</SelectItem>
-        <SelectItem value="BYN">BYN</SelectItem>
+      <SelectContent data-testid="currency-select-content">
+        <SelectItem value="USD" data-testid="currency-option-usd">USD $</SelectItem>
+        <SelectItem value="BYN" data-testid="currency-option-byn">Цена BYN</SelectItem>
       </SelectContent>
     </Select>
   );

@@ -12,13 +12,14 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from '@/shared/ui/sidebar';
-import { LayoutDashboard, List, PanelLeftClose, PanelLeftOpen, BarChart3, Database } from 'lucide-react';
+import { LayoutDashboard, List, PanelLeftClose, PanelLeftOpen, BarChart3, Database, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 const navigation = [
   { name: 'Панель управления', href: '/', icon: LayoutDashboard },
   { name: 'Объявления', href: '/listings', icon: List },
   { name: 'Статистика', href: '/statistics', icon: BarChart3 },
+  { name: 'Аналитика цены за м²', href: '/analytics/price-per-m2', icon: TrendingUp },
 ];
 
 export function Sidebar() {

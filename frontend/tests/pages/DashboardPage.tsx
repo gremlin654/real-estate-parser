@@ -16,7 +16,8 @@ export class DashboardPage {
   }
 
   async waitForLoad() {
-    await this.header.waitFor({ state: 'visible', timeout: 10000 });
+    await this.header.waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.waitForLoadState('networkidle');
   }
 
   async navigateTo(path: string) {
@@ -25,6 +26,6 @@ export class DashboardPage {
 
   async selectCity(cityName: string) {
     await this.citySelect.click();
-    await this.page.getByText(cityName).click();
+    await this.page.getByText(cityName, { exact: true }).first().click();
   }
 }

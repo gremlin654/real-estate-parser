@@ -21,6 +21,8 @@ class ListingBase(BaseModel):
     description: Optional[str] = None
     images: List[str] = Field(default_factory=list)
     raw_data: Optional[dict] = None
+    price_per_m2_byn: Optional[float] = None
+    price_per_m2_usd: Optional[float] = None
 
 
 class ListingResponse(ListingBase):
