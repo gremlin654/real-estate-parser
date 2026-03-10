@@ -288,7 +288,9 @@ async def get_daily_activity(
 )
 async def get_price_per_m2_stats(
     request: Request,
-    city: str = Query(..., description="Город (minsk, mogilev, grodno, brest, gomel, vitebsk)"),
+    city: str = Query(
+        ..., description="Город (minsk, mogilev, grodno, brest, gomel, vitebsk)"
+    ),
     rooms: Optional[int] = Query(None, ge=1, le=10, description="Количество комнат"),
     date_from: Optional[datetime] = Query(None, description="Дата от"),
     date_to: Optional[datetime] = Query(None, description="Дата до"),
@@ -297,7 +299,7 @@ async def get_price_per_m2_stats(
 ):
     """
     Получить статистику цены за м²: average, median, min, max, count.
-    
+
     - **city**: Город для анализа
     - **rooms**: Фильтр по количеству комнат (опционально)
     - **date_from**: Дата начала периода (опционально)
@@ -305,29 +307,33 @@ async def get_price_per_m2_stats(
     - **currency**: Валюта для расчёта (byn или usd)
     """
     # Определяем колонку цены в зависимости от валюты
-    price_col = Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
-    
+    price_col = (
+        Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
+    )
+
     # Базовые фильтры
     filters = [
         price_col.isnot(None),
         Listing.city == city,
-        Listing.status.in_([
-            ListingStatus.active,
-            ListingStatus.new,
-            ListingStatus.updated,
-            ListingStatus.price_changed_byn,
-        ]),
+        Listing.status.in_(
+            [
+                ListingStatus.active,
+                ListingStatus.new,
+                ListingStatus.updated,
+                ListingStatus.price_changed_byn,
+            ]
+        ),
     ]
-    
+
     if rooms is not None:
         filters.append(Listing.rooms == rooms)
-    
+
     if date_from is not None:
         filters.append(Listing.first_seen_at >= date_from)
-    
+
     if date_to is not None:
         filters.append(Listing.first_seen_at <= date_to)
-    
+
     # Запрос статистики
     query = select(
         func.avg(price_col).label("average"),
@@ -336,13 +342,15 @@ async def get_price_per_m2_stats(
         func.max(price_col).label("max"),
         func.count(Listing.id).label("count"),
     ).where(*filters)
-    
+
     result = await db.execute(query)
     row = result.first()
-    
+
     if not row or row.count == 0:
-        raise HTTPException(status_code=404, detail="Нет данных для указанных параметров")
-    
+        raise HTTPException(
+            status_code=404, detail="Нет данных для указанных параметров"
+        )
+
     return PricePerM2Stats(
         average=round(float(row.average), 2) if row.average else 0,
         median=round(float(row.median), 2) if row.median else 0,
@@ -364,34 +372,40 @@ async def get_price_per_m2_trends(
     city: str = Query(..., description="Город"),
     rooms: Optional[int] = Query(None, ge=1, le=10, description="Количество комнат"),
     period_days: int = Query(30, ge=1, le=365, description="Период в днях"),
-    interval: Literal["day", "week", "month"] = Query("day", description="Интервал группировки"),
+    interval: Literal["day", "week", "month"] = Query(
+        "day", description="Интервал группировки"
+    ),
     currency: Literal["byn", "usd"] = Query("usd", description="Валюта"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Динамика изменения цены за м² по времени.
-    
+
     - **interval**: day - по дням, week - по неделям, month - по месяцам
     """
     # Определяем колонку цены
-    price_col = Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
-    
+    price_col = (
+        Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
+    )
+
     # Базовые фильтры
     filters = [
         price_col.isnot(None),
         Listing.city == city,
-        Listing.status.in_([
-            ListingStatus.active,
-            ListingStatus.new,
-            ListingStatus.updated,
-            ListingStatus.price_changed_byn,
-        ]),
+        Listing.status.in_(
+            [
+                ListingStatus.active,
+                ListingStatus.new,
+                ListingStatus.updated,
+                ListingStatus.price_changed_byn,
+            ]
+        ),
         Listing.first_seen_at >= text(f"NOW() - INTERVAL '{period_days} days'"),
     ]
-    
+
     if rooms is not None:
         filters.append(Listing.rooms == rooms)
-    
+
     # Определяем функцию для группировки по времени
     if interval == "day":
         date_trunc = func.date(Listing.first_seen_at).label("date")
@@ -399,18 +413,23 @@ async def get_price_per_m2_trends(
         date_trunc = func.date_trunc("week", Listing.first_seen_at).label("date")
     else:  # month
         date_trunc = func.date_trunc("month", Listing.first_seen_at).label("date")
-    
+
     # Запрос трендов
-    query = select(
-        date_trunc,
-        func.avg(price_col).label("average"),
-        func.percentile_cont(0.5).within_group(price_col.asc()).label("median"),
-        func.count(Listing.id).label("count"),
-    ).where(*filters).group_by(date_trunc).order_by(text("date ASC"))
-    
+    query = (
+        select(
+            date_trunc,
+            func.avg(price_col).label("average"),
+            func.percentile_cont(0.5).within_group(price_col.asc()).label("median"),
+            func.count(Listing.id).label("count"),
+        )
+        .where(*filters)
+        .group_by(date_trunc)
+        .order_by(text("date ASC"))
+    )
+
     result = await db.execute(query)
     rows = result.all()
-    
+
     return [
         PricePerM2Trend(
             date=str(row.date),
@@ -438,42 +457,48 @@ async def get_price_per_m2_distribution(
 ):
     """
     Распределение цены за м² (гистограмма).
-    
+
     Разбивает диапазон цен на равные интервалы (бины) и показывает количество объявлений в каждом.
     """
     # Определяем колонку цены
-    price_col = Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
-    
+    price_col = (
+        Listing.price_per_m2_byn if currency == "byn" else Listing.price_per_m2_usd
+    )
+
     # Базовые фильтры
     filters = [
         price_col.isnot(None),
         Listing.city == city,
-        Listing.status.in_([
-            ListingStatus.active,
-            ListingStatus.new,
-            ListingStatus.updated,
-            ListingStatus.price_changed_byn,
-        ]),
+        Listing.status.in_(
+            [
+                ListingStatus.active,
+                ListingStatus.new,
+                ListingStatus.updated,
+                ListingStatus.price_changed_byn,
+            ]
+        ),
     ]
-    
+
     if rooms is not None:
         filters.append(Listing.rooms == rooms)
-    
+
     # Получаем все значения цены
     query = select(price_col).where(*filters)
     result = await db.execute(query)
     prices = [row[0] for row in result.all() if row[0] is not None]
-    
+
     if not prices:
-        raise HTTPException(status_code=404, detail="Нет данных для указанных параметров")
-    
+        raise HTTPException(
+            status_code=404, detail="Нет данных для указанных параметров"
+        )
+
     price_min = min(prices)
     price_max = max(prices)
     total_count = len(prices)
-    
+
     # Рассчитываем размер бина
     bin_size = (price_max - price_min) / bins if price_max > price_min else 1
-    
+
     # Распределяем по бинам
     bin_counts = [0] * bins
     for price in prices:
@@ -483,21 +508,23 @@ async def get_price_per_m2_distribution(
         if bin_index >= bins:
             bin_index = bins - 1
         bin_counts[bin_index] += 1
-    
+
     # Формируем результат
     distribution = []
     for i in range(bins):
         bin_min = price_min + (i * bin_size)
         bin_max = price_min + ((i + 1) * bin_size)
         count = bin_counts[i]
-        
+
         distribution.append(
             PricePerM2Distribution(
                 range_min=round(bin_min, 2),
                 range_max=round(bin_max, 2),
                 count=count,
-                percentage=round((count / total_count) * 100, 2) if total_count > 0 else 0,
+                percentage=(
+                    round((count / total_count) * 100, 2) if total_count > 0 else 0
+                ),
             )
         )
-    
+
     return distribution

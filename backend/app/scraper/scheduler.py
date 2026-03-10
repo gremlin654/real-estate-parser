@@ -340,18 +340,26 @@ class ScraperScheduler:
                     # === ВАЛИДАЦИЯ ПЕРЕД MARK DELETED ===
                     # Проверяем аномалии перед тем как помечать объявления удалёнными
                     try:
-                        is_valid, validation_message, expected_count = await scan_stats_service.validate_listings_count(
-                            city, total_listings_fetched, use_lock=True
+                        is_valid, validation_message, expected_count = (
+                            await scan_stats_service.validate_listings_count(
+                                city, total_listings_fetched, use_lock=True
+                            )
                         )
                         if not is_valid:
                             # Аномалия обнаружена - отменяем сканирование
-                            logger.error(f"[{city}] Validation failed: {validation_message}")
-                            raise Exception(f"Listing count anomaly: {validation_message}")
+                            logger.error(
+                                f"[{city}] Validation failed: {validation_message}"
+                            )
+                            raise Exception(
+                                f"Listing count anomaly: {validation_message}"
+                            )
                     except Exception as validation_error:
                         # Валидация не прошла - откатываем upsert и отменяем сканирование
-                        logger.error(f"[{city}] Aborting scan due to validation failure: {validation_error}")
+                        logger.error(
+                            f"[{city}] Aborting scan due to validation failure: {validation_error}"
+                        )
                         await db.rollback()
-                        
+
                         # Обновляем статус сканирования как error
                         await self._update_city_progress(
                             city,
@@ -362,7 +370,7 @@ class ScraperScheduler:
                             },
                         )
                         await self._broadcast_progress()
-                        
+
                         # Завершаем сканирование с ошибкой
                         end_time = datetime.now(timezone.utc).replace(tzinfo=None)
                         await scan_history_service.complete_scan_record(
@@ -375,7 +383,9 @@ class ScraperScheduler:
                             listings_restored=0,
                             listings_unchanged=0,
                             pages_scraped=pages_scraped,
-                            duration_seconds=int((end_time - start_time).total_seconds()),
+                            duration_seconds=int(
+                                (end_time - start_time).total_seconds()
+                            ),
                         )
                         return
 

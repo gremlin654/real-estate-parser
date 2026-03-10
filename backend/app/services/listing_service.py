@@ -51,7 +51,7 @@ class ListingService:
         area = listing_data.get("area")
         price_byn = listing_data.get("price")
         price_usd = listing_data.get("price_usd")
-        
+
         if area and area > 0 and price_byn:
             price_per_m2_byn = round(price_byn / area, 2)
             price_per_m2_usd = round(price_usd / area, 2) if price_usd else None
@@ -61,7 +61,9 @@ class ListingService:
             listing_data["price_per_m2_byn"] = None
             listing_data["price_per_m2_usd"] = None
             if area and area <= 0:
-                logger.warning(f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2")
+                logger.warning(
+                    f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2"
+                )
 
         if existing:
             # Сохраняем старые значения для истории
@@ -109,7 +111,11 @@ class ListingService:
                     price_after=existing.price_usd,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=serialize_for_snapshot(changed_fields) if changed_fields else None,
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
+                    ),
                     snapshot=listing_to_dict(existing),
                 )
                 logger.info(
@@ -133,7 +139,11 @@ class ListingService:
                     price_after=existing.price,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=serialize_for_snapshot(changed_fields) if changed_fields else None,
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
+                    ),
                     snapshot=listing_to_dict(existing),
                 )
                 logger.info(
@@ -381,12 +391,12 @@ class ListingService:
         Использует self.db сессию которая должна быть передана извне.
         """
         kufar_id = listing_data["kufar_id"]
-        
+
         # Рассчитываем цену за м²
         area = listing_data.get("area")
         price_byn = listing_data.get("price")
         price_usd = listing_data.get("price_usd")
-        
+
         if area and area > 0 and price_byn:
             price_per_m2_byn = round(price_byn / area, 2)
             price_per_m2_usd = round(price_usd / area, 2) if price_usd else None
@@ -396,8 +406,10 @@ class ListingService:
             listing_data["price_per_m2_byn"] = None
             listing_data["price_per_m2_usd"] = None
             if area and area <= 0:
-                logger.warning(f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2")
-        
+                logger.warning(
+                    f"Listing {kufar_id}: area={area}, cannot calculate price_per_m2"
+                )
+
         existing = await self.get_by_kufar_id(kufar_id)
 
         if existing:
@@ -445,7 +457,11 @@ class ListingService:
                     price_after=existing.price_usd,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=serialize_for_snapshot(changed_fields) if changed_fields else None,
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
+                    ),
                     snapshot=listing_to_dict(existing),
                 )
                 logger.info(
@@ -468,7 +484,11 @@ class ListingService:
                     price_after=existing.price,
                     price_before_usd=old_price_usd,
                     price_after_usd=existing.price_usd,
-                    changed_fields=serialize_for_snapshot(changed_fields) if changed_fields else None,
+                    changed_fields=(
+                        serialize_for_snapshot(changed_fields)
+                        if changed_fields
+                        else None
+                    ),
                     snapshot=listing_to_dict(existing),
                 )
                 logger.info(

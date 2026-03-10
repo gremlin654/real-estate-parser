@@ -15,10 +15,10 @@ from sqlalchemy.orm import class_mapper
 def serialize_value(value: Any) -> Any:
     """
     Конвертирует отдельное значение в JSON-сериализуемый формат.
-    
+
     Args:
         value: Значение для конвертации
-        
+
     Returns:
         JSON-сериализуемое значение
     """
@@ -39,35 +39,39 @@ def serialize_value(value: Any) -> Any:
 def listing_to_dict(listing: Any) -> dict:
     """
     Конвертирует SQLAlchemy модель Listing в dict с корректной сериализацией Decimal.
-    
+
     Args:
         listing: Экземпляр модели Listing
-    
+
     Returns:
         Словарь с данными объявления, готовый к JSON сериализации
     """
     # Проверка на MagicMock (для тестов)
-    if type(listing).__name__ == 'MagicMock':
-        return {key: value for key, value in listing.__dict__.items() if not key.startswith('_')}
-    
+    if type(listing).__name__ == "MagicMock":
+        return {
+            key: value
+            for key, value in listing.__dict__.items()
+            if not key.startswith("_")
+        }
+
     result = {}
-    
+
     # Получаем все колонки модели
     for column in class_mapper(listing.__class__).columns:
         key = column.key
         value = getattr(listing, key, None)
         result[key] = serialize_value(value)
-    
+
     return result
 
 
 def serialize_for_snapshot(data: dict) -> dict:
     """
     Рекурсивно конвертирует все Decimal значения в словаре в float.
-    
+
     Args:
         data: Словарь для конвертации
-        
+
     Returns:
         Словарь с конвертированными значениями
     """
@@ -77,11 +81,11 @@ def serialize_for_snapshot(data: dict) -> dict:
 class DecimalEncoder(json.JSONEncoder):
     """
     Кастомный JSON encoder для обработки Decimal и других специальных типов.
-    
+
     Использование:
         json.dumps(data, cls=DecimalEncoder)
     """
-    
+
     def default(self, obj: Any) -> Any:
         if isinstance(obj, Decimal):
             return float(obj)
