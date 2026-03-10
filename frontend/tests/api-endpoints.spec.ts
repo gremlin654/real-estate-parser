@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 
 // Глобальная проверка доступности backend
 let backendAvailable = false;
-let backendUrl = 'http://localhost:8000';
+const backendUrl = 'http://localhost:8000';
 
 test.beforeAll(async () => {
   try {
