@@ -662,7 +662,54 @@ docker-compose logs backend
 
 ## Версии
 
-### v3.3 (текущая)
+### v3.4 (текущая — в разработке)
+
+**Price Per M² Analytics:**
+- **✅ Новая страница** `/analytics/price-per-m2` с графиками и фильтрами
+- **✅ Графики:** динамика цены за м² (LineChart), распределение по диапазонам (BarChart)
+- **✅ Фильтры:** город, валюта (USD/BYN), количество комнат
+- **✅ API Endpoints:** `/api/v1/stats/price-per-m2*` (summary, trends, distribution)
+- **✅ Миграция БД:** `price_per_m2_byn`, `price_per_m2_usd` колонки с индексами
+- **✅ E2E тесты:** 17 тестов для Price Per M² аналитики
+
+**Исправления:**
+- **🔴 Валидация сканирования** — вызывается ПЕРЕД `mark_deleted` (исправлен баг с удалением объявлений)
+- **🔴 Decimal Serialization** — исправлен `TypeError: Object of type Decimal is not JSON serializable`
+- **🔴 E2E тесты** — исправлено 60+ failing тестов (70%+ passing, 100+ из 144)
+- **🔴 Strict Mode** — исправлены violations в E2E тестах (.first(), data-testid)
+
+**Backend изменения:**
+- `backend/app/api/v1/stats.py` — новые endpoints price-per-m2
+- `backend/app/services/listing_service.py` — валидация + Decimal serialization
+- `backend/app/utils/json_serializer.py` — утилиты `listing_to_dict()`, `serialize_for_snapshot()`
+- `backend/app/scraper/scheduler.py` — валидация перед mark_deleted (строка 340-351)
+- `backend/app/models/listing.py` — новые колонки `price_per_m2_byn`, `price_per_m2_usd`
+- `backend/app/schemas/stats.py` — Pydantic schemas для аналитики
+
+**Frontend изменения:**
+- `frontend/src/pages/PricePerM2AnalyticsPage.tsx` — страница аналитики
+- `frontend/src/components/stats/PricePerM2TrendChart.tsx` — график динамики
+- `frontend/src/components/stats/PricePerM2DistributionChart.tsx` — график распределения
+- `frontend/src/api/listings.ts` — API hooks (`usePricePerM2Stats`, `usePricePerM2Trends`, `usePricePerM2Distribution`)
+- `frontend/src/shared/types/stats.ts` — TypeScript типы
+- `frontend/src/widgets/AppLayout/ui/AppLayout.tsx` — ссылка в навигацию
+- `frontend/tests/e2e/price-per-m2-analytics.spec.ts` — 17 E2E тестов
+
+**Тесты:**
+- **Backend:** 310 passed, 17 skipped (94.5%)
+- **Frontend Unit:** 143 passed (100%)
+- **Frontend E2E:** 100+ passed (70%+)
+- **Coverage:** Backend 70%, Frontend 66%
+
+**Документация:**
+- `PRICE_PER_M2_FEATURE.md` — полное описание фичи
+- Обновлён `QWEN.md` — контекст для AI-ассистента
+
+**Code Review:** ✅ APPROVED (8.7/10)
+
+**MR Status:** 🚀 Готов к созданию (коммиты в develop)
+
+### v3.3
 
 - **✅ Запушены изменения в GitHub** — коммит `825ac95` в ветке `main`
 - **🔴 Redis Integration (v3.2)** — кэширование, distributed locking, WebSocket state, rate limiting
