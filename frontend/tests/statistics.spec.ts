@@ -19,12 +19,11 @@ test.describe('Kufar Monitor - Statistics', () => {
   });
 
   test('должна отображать селектор города', async ({ page }) => {
-    // Select использует button с placeholder
-    await expect(page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first()).toBeVisible();
+    await expect(page.getByTestId('statistics-city-select')).toBeVisible();
   });
 
   test('должна отображать селектор периода', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first()).toBeVisible();
+    await expect(page.getByTestId('statistics-period-select')).toBeVisible();
   });
 
   test('должна отображать все табы', async ({ page }) => {
@@ -68,47 +67,43 @@ test.describe('Kufar Monitor - Statistics', () => {
 
   test('должна позволять выбрать период', async ({ page }) => {
     // Выбираем 6 месяцев
-    const periodButton = page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first();
-    await periodButton.click();
-    await page.getByText('6 месяцев').first().click();
-    await expect(page.getByText('6 месяцев').first()).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('statistics-period-select').click();
+    await page.getByTestId('period-option-6').click();
+    await page.waitForTimeout(500);
 
     // Выбираем 24 месяца
-    await periodButton.click();
-    await page.getByText('2 года').first().click();
-    await expect(page.getByText('2 года').first()).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('statistics-period-select').click();
+    await page.getByTestId('period-option-24').click();
+    await page.waitForTimeout(500);
   });
 
   test('должна позволять выбрать город', async ({ page }) => {
     // Выбираем Гомель
-    const cityButton = page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first();
-    await cityButton.click();
-    await page.getByText('Гомель').first().click();
-    await expect(page.getByText('Гомель').first()).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('statistics-city-select').click();
+    await page.getByTestId('city-option-gomel').click();
+    await page.waitForTimeout(500);
 
     // Выбираем Брест
-    await cityButton.click();
-    await page.getByText('Брест').first().click();
-    await expect(page.getByText('Брест').first()).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('statistics-city-select').click();
+    await page.getByTestId('city-option-brest').click();
+    await page.waitForTimeout(500);
   });
 
   test('должна отображать все доступные периоды', async ({ page }) => {
-    const periodButton = page.getByRole('button', { name: 'Период' }).or(page.getByText('1 год').first()).first();
-    await periodButton.click();
-    await expect(page.getByText('6 месяцев').first()).toBeVisible();
-    await expect(page.getByText('1 год').first()).toBeVisible();
-    await expect(page.getByText('2 года').first()).toBeVisible();
+    await page.getByTestId('statistics-period-select').click();
+    await expect(page.getByTestId('period-option-6')).toBeVisible();
+    await expect(page.getByTestId('period-option-12')).toBeVisible();
+    await expect(page.getByTestId('period-option-24')).toBeVisible();
   });
 
   test('должна отображать все доступные города', async ({ page }) => {
-    const cityButton = page.getByRole('button', { name: 'Город' }).or(page.getByText('Минск').first()).first();
-    await cityButton.click();
-    await expect(page.getByText('Минск').first()).toBeVisible();
-    await expect(page.getByText('Могилёв').first()).toBeVisible();
-    await expect(page.getByText('Гродно').first()).toBeVisible();
-    await expect(page.getByText('Брест').first()).toBeVisible();
-    await expect(page.getByText('Гомель').first()).toBeVisible();
-    await expect(page.getByText('Витебск').first()).toBeVisible();
+    await page.getByTestId('statistics-city-select').click();
+    await expect(page.getByTestId('city-option-minsk')).toBeVisible();
+    await expect(page.getByTestId('city-option-mogilev')).toBeVisible();
+    await expect(page.getByTestId('city-option-grodno')).toBeVisible();
+    await expect(page.getByTestId('city-option-brest')).toBeVisible();
+    await expect(page.getByTestId('city-option-gomel')).toBeVisible();
+    await expect(page.getByTestId('city-option-vitebsk')).toBeVisible();
   });
 
   test('должна показывать информацию о периоде', async ({ page }) => {

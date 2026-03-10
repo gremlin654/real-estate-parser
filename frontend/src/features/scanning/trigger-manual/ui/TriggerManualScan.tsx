@@ -73,6 +73,7 @@ export function TriggerManualScan({ city, onSuccess }: TriggerManualScanProps) {
               onClick={() => mutation.mutate()}
               disabled={isScanDisabled}
               className="min-w-[140px]"
+              data-testid="scan-button"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isCityCurrentlyScanning ? 'animate-spin' : ''}`} />
               {isCityCurrentlyScanning ? 'Сканируется...' : 'Сканировать'}

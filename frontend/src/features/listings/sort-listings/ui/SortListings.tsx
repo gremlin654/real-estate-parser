@@ -10,14 +10,14 @@ interface SortListingsProps {
 export function SortListings({ value, onChange }: SortListingsProps) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="w-[200px]">
+      <SelectTrigger className="w-[200px]" data-testid="sort-select">
         <SelectValue placeholder="Сортировка" />
       </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="newest">Сначала новые</SelectItem>
-        <SelectItem value="oldest">Сначала старые</SelectItem>
-        <SelectItem value="price_asc">Цена: по возрастанию</SelectItem>
-        <SelectItem value="price_desc">Цена: по убыванию</SelectItem>
+      <SelectContent data-testid="sort-select-content">
+        <SelectItem value="newest" data-testid="sort-option-newest">Сначала новые</SelectItem>
+        <SelectItem value="oldest" data-testid="sort-option-oldest">Сначала старые</SelectItem>
+        <SelectItem value="price_asc" data-testid="sort-option-asc">Цена ↑</SelectItem>
+        <SelectItem value="price_desc" data-testid="sort-option-desc">Цена ↓</SelectItem>
       </SelectContent>
     </Select>
   );

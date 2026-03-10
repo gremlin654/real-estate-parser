@@ -14,7 +14,7 @@ test.describe('Listings - Filters and Sorting', () => {
   });
 
   test('displays scan button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /Сканировать/i }).first()).toBeVisible();
+    await expect(page.getByTestId('scan-button')).toBeVisible();
   });
 
   test('clicking scan button starts scanning', async ({ page }) => {
@@ -37,49 +37,43 @@ test.describe('Listings - Filters and Sorting', () => {
   });
 
   test('all main filter buttons are visible', async ({ page }) => {
-    // Select components use buttons with placeholders
-    await expect(page.getByRole('button', { name: /Все города|Город/ }).or(page.getByText('Все города').first()).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Все статусы|Статус/ }).or(page.getByText('Все статусы').first()).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Цена USD|Валюта/ }).or(page.getByText('Цена USD').first()).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Сортировка/ }).or(page.getByText('По дате').first()).first()).toBeVisible();
+    await expect(page.getByTestId('city-select')).toBeVisible();
+    await expect(page.getByTestId('status-select')).toBeVisible();
+    await expect(page.getByTestId('currency-select')).toBeVisible();
+    await expect(page.getByTestId('sort-select')).toBeVisible();
   });
 
   test('filters by city', async ({ page }) => {
-    const cityButton = page.getByRole('button', { name: /Все города|Город/ }).or(page.getByText('Все города').first()).first();
-    await cityButton.click();
-    await page.getByText('Могилёв').first().click();
+    await page.getByTestId('city-select').click();
+    await page.getByTestId('city-option-mogilev').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('filters by status', async ({ page }) => {
-    const statusButton = page.getByRole('button', { name: /Все статусы|Статус/ }).or(page.getByText('Все статусы').first()).first();
-    await statusButton.click();
-    await page.getByText('Новые').first().click();
+    await page.getByTestId('status-select').click();
+    await page.getByTestId('status-option-new').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('filters by currency', async ({ page }) => {
-    const currencyButton = page.getByRole('button', { name: /Цена USD|Валюта/ }).or(page.getByText('Цена USD').first()).first();
-    await currencyButton.click();
-    await page.getByText('Цена USD').first().click();
+    await page.getByTestId('currency-select').click();
+    await page.getByTestId('currency-option-byn').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('sorts by price ascending', async ({ page }) => {
-    const sortButton = page.getByRole('button', { name: /Сортировка/ }).or(page.getByText('По дате').first()).first();
-    await sortButton.click();
-    await page.getByText('Цена ↑').first().click();
+    await page.getByTestId('sort-select').click();
+    await page.getByTestId('sort-option-asc').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('sorts by price descending', async ({ page }) => {
-    const sortButton = page.getByRole('button', { name: /Сортировка/ }).or(page.getByText('По дате').first()).first();
-    await sortButton.click();
-    await page.getByText('Цена ↓').first().click();
+    await page.getByTestId('sort-select').click();
+    await page.getByTestId('sort-option-desc').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
@@ -88,39 +82,34 @@ test.describe('Listings - Filters and Sorting', () => {
     // Open filters panel
     const filterButton = page.getByRole('button', { name: /Фильтры/i }).first();
     await filterButton.click();
-    
+    await page.waitForTimeout(300);
+
     // Fill price range
-    const minPriceInput = page.getByPlaceholder('Мин. цена').first();
-    const maxPriceInput = page.getByPlaceholder('Макс. цена').first();
-    
-    await minPriceInput.fill('100000');
-    await maxPriceInput.fill('500000');
-    
+    await page.getByTestId('price-min-input').fill('100000');
+    await page.getByTestId('price-max-input').fill('500000');
+
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('filters by rooms', async ({ page }) => {
-    const roomsButton = page.getByRole('button', { name: /Комнаты/i }).first();
-    await roomsButton.click();
-    await page.getByText('2 комнаты').first().click();
+    await page.getByTestId('rooms-select').click();
+    await page.getByTestId('room-option-2').click();
     await page.waitForLoadState('networkidle');
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('resets all filters', async ({ page }) => {
-    const cityButton = page.getByRole('button', { name: /Все города|Город/ }).or(page.getByText('Все города').first()).first();
-    await cityButton.click();
-    await page.getByText('Могилёв').first().click();
-    
-    const statusButton = page.getByRole('button', { name: /Все статусы|Статус/ }).or(page.getByText('Все статусы').first()).first();
-    await statusButton.click();
-    await page.getByText('Новые').first().click();
+    await page.getByTestId('city-select').click();
+    await page.getByTestId('city-option-mogilev').click();
+
+    await page.getByTestId('status-select').click();
+    await page.getByTestId('status-option-new').click();
 
     // Reset by clicking reset button or reloading
     await page.reload();
     await page.waitForLoadState('networkidle');
-    
+
     // After reset, table should be visible
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });
   });
@@ -131,18 +120,16 @@ test.describe('Listings - Filters and Sorting', () => {
   });
 
   test('room filter opens popover', async ({ page }) => {
-    const roomsButton = page.getByRole('button', { name: /Комнаты/i }).first();
-    await roomsButton.click();
-    await expect(page.getByText('1 комната').first()).toBeVisible();
-    await expect(page.getByText('2 комнаты').first()).toBeVisible();
+    await page.getByTestId('rooms-select').click();
+    await expect(page.getByTestId('room-option-1')).toBeVisible();
+    await expect(page.getByTestId('room-option-2')).toBeVisible();
   });
 
   test('selecting room updates filter', async ({ page }) => {
-    const roomsButton = page.getByRole('button', { name: /Комнаты/i }).first();
-    await roomsButton.click();
-    await page.getByText('2 комнаты').first().click();
+    await page.getByTestId('rooms-select').click();
+    await page.getByTestId('room-option-2').click();
 
     // Button should show selection
-    await expect(page.getByRole('button', { name: /Комнаты/i }).first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('rooms-select')).toBeVisible({ timeout: 15000 });
   });
 });

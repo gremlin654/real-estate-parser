@@ -55,6 +55,7 @@ export function RoomsFilter({
           role="combobox"
           aria-expanded={open}
           className="w-[180px] h-9 shadow-sm bg-card border justify-between"
+          data-testid="rooms-select"
         >
           <span className="truncate">
             {hasSelection
@@ -93,6 +94,7 @@ export function RoomsFilter({
                   key={option.value}
                   type="button"
                   onClick={() => toggleRoom(room)}
+                  data-testid={`room-option-${room}`}
                   className={cn(
                     'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors',
                     isSelected && 'bg-accent/50'
@@ -118,6 +120,7 @@ export function RoomsFilter({
             <button
               type="button"
               onClick={toggleOther}
+              data-testid="room-option-other"
               className={cn(
                 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm hover:bg-accent transition-colors',
                 selectedOther && 'bg-accent/50'
