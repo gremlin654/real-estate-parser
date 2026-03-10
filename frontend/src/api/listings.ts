@@ -17,6 +17,8 @@ import type {
   PricePerM2Stats,
   PricePerM2TrendsResponse,
   PricePerM2DistributionResponse,
+  PricePerM2Trend,
+  PricePerM2DistributionBin,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';

@@ -193,8 +193,8 @@ export function ListingDetail() {
                 <div className="text-sm text-muted-foreground flex items-center gap-2">
                   <span className="px-2 py-1 bg-muted rounded-md">
                     {currency === 'USD'
-                      ? `${Math.floor(listing.price_per_m2_usd)} $/м²`
-                      : `${Math.floor(listing.price_per_m2_byn)} BYN/м²`
+                      ? `${Math.floor(listing.price_per_m2_usd!)} $/м²`
+                      : `${Math.floor(listing.price_per_m2_byn!)} BYN/м²`
                     }
                   </span>
                 </div>
