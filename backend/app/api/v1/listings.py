@@ -3,12 +3,14 @@ from sqlalchemy import select, func, and_, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import datetime
+from loguru import logger
 
 from app.db.database import get_db
 from app.models.listing import Listing, ListingStatus
 from app.schemas.listing import ListingResponse, PaginatedResponse
 from app.decorators.cache import cache_response
 from app.config import settings
+from app.services.deal_finder_service import get_deal_finder_service
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 
@@ -27,6 +29,7 @@ router = APIRouter(prefix="/listings", tags=["listings"])
         "currency",
         "price_per_m2_min",
         "price_per_m2_max",
+        "include_deal_metrics",
     ],
 )
 async def get_listings(
@@ -52,6 +55,12 @@ async def get_listings(
         None, description="Sort by price: 'asc' or 'desc'"
     ),
     currency: Optional[str] = Query(None, description="Filter by currency: USD or BYN"),
+    include_deal_metrics: bool = Query(
+        False, description="Включить метрики выгоды (deal_percent, avg_price_per_m2)"
+    ),
+    deal_currency: str = Query(
+        "usd", description="Валюта для расчёта метрик выгоды (byn/usd)"
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     conditions = []
@@ -141,6 +150,79 @@ async def get_listings(
     result = await db.execute(query)
     listings = result.scalars().all()
 
+    # Если запрошены метрики выгоды, добавляем их
+    if include_deal_metrics:
+        logger.info(
+            f"Adding deal metrics for {len(listings)} listings, currency={deal_currency}"
+        )
+        service = get_deal_finder_service(db)
+        
+        # Группируем объявления по city и rooms для эффективного расчёта средней цены
+        from collections import defaultdict
+        avg_prices_cache = {}
+        
+        items_with_metrics = []
+        for listing in listings:
+            # Кэш для средней цены за м²
+            cache_key = (listing.city, listing.rooms, deal_currency)
+            if cache_key not in avg_prices_cache:
+                avg_prices_cache[cache_key] = await service.get_avg_price_per_m2(
+                    city=listing.city,
+                    rooms=listing.rooms,
+                    currency=deal_currency
+                )
+            
+            avg_price_per_m2 = avg_prices_cache[cache_key]
+            
+            # Вычисляем deal_percent
+            if avg_price_per_m2:
+                price_per_m2 = (
+                    float(listing.price_per_m2_byn) if deal_currency == "byn"
+                    else float(listing.price_per_m2_usd) if listing.price_per_m2_usd
+                    else None
+                )
+                
+                if price_per_m2:
+                    deal_percent = service.calculate_deal_percent(price_per_m2, avg_price_per_m2)
+                else:
+                    deal_percent = None
+            else:
+                deal_percent = None
+            
+            # Создаём dict с данными
+            item_dict = {
+                "id": listing.id,
+                "kufar_id": listing.kufar_id,
+                "url": listing.url,
+                "title": listing.title,
+                "price": listing.price,
+                "price_usd": listing.price_usd,
+                "currency": listing.currency,
+                "city": listing.city,
+                "address": listing.address,
+                "rooms": listing.rooms,
+                "area": listing.area,
+                "floor": listing.floor,
+                "total_floors": listing.total_floors,
+                "images": listing.images or [],
+                "price_per_m2_byn": float(listing.price_per_m2_byn) if listing.price_per_m2_byn else None,
+                "price_per_m2_usd": float(listing.price_per_m2_usd) if listing.price_per_m2_usd else None,
+                "status": listing.status.value if hasattr(listing.status, "value") else str(listing.status),
+                "first_seen_at": listing.first_seen_at,
+                "last_seen_at": listing.last_seen_at,
+                "deleted_at": listing.deleted_at,
+                "deal_percent": deal_percent,
+                "avg_price_per_m2": avg_price_per_m2,
+            }
+            items_with_metrics.append(item_dict)
+        
+        return {
+            "items": items_with_metrics,
+            "total": total,
+            "page": page,
+            "size": size,
+        }
+    
     return {
         "items": [ListingResponse.model_validate(l) for l in listings],
         "total": total,

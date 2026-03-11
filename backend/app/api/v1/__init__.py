@@ -6,6 +6,7 @@ from app.api.v1.export import router as export_router
 from app.api.v1.ws import router as ws_router
 from app.api.v1.cache import router as cache_router
 from app.api.v1.monitoring import router as monitoring_router
+from app.api.v1.deals import router as deals_router
 
 __all__ = [
     "listings_router",
@@ -16,4 +17,5 @@ __all__ = [
     "ws_router",
     "cache_router",
     "monitoring_router",
+    "deals_router",
 ]
