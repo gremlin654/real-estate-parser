@@ -689,8 +689,12 @@ export const useDealsQuery = (filters: {
       if (filters.currency) {
         params.set('currency', filters.currency);
       }
-      if (filters.page) params.set('page', String(filters.page));
-      if (filters.size) params.set('size', String(filters.size));
+      // Конвертируем page/size в limit/offset для backend
+      if (filters.page && filters.size) {
+        const offset = (filters.page - 1) * filters.size;
+        params.set('limit', String(filters.size));
+        params.set('offset', String(offset));
+      }
 
       const response = await fetch(`${API_BASE}/deals?${params}`);
       if (!response.ok) throw new Error('Failed to fetch deals');
