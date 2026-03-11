@@ -156,39 +156,44 @@ async def get_listings(
             f"Adding deal metrics for {len(listings)} listings, currency={deal_currency}"
         )
         service = get_deal_finder_service(db)
-        
+
         # Группируем объявления по city и rooms для эффективного расчёта средней цены
         from collections import defaultdict
+
         avg_prices_cache = {}
-        
+
         items_with_metrics = []
         for listing in listings:
             # Кэш для средней цены за м²
             cache_key = (listing.city, listing.rooms, deal_currency)
             if cache_key not in avg_prices_cache:
                 avg_prices_cache[cache_key] = await service.get_avg_price_per_m2(
-                    city=listing.city,
-                    rooms=listing.rooms,
-                    currency=deal_currency
+                    city=listing.city, rooms=listing.rooms, currency=deal_currency
                 )
-            
+
             avg_price_per_m2 = avg_prices_cache[cache_key]
-            
+
             # Вычисляем deal_percent
             if avg_price_per_m2:
                 price_per_m2 = (
-                    float(listing.price_per_m2_byn) if deal_currency == "byn"
-                    else float(listing.price_per_m2_usd) if listing.price_per_m2_usd
-                    else None
+                    float(listing.price_per_m2_byn)
+                    if deal_currency == "byn"
+                    else (
+                        float(listing.price_per_m2_usd)
+                        if listing.price_per_m2_usd
+                        else None
+                    )
                 )
-                
+
                 if price_per_m2:
-                    deal_percent = service.calculate_deal_percent(price_per_m2, avg_price_per_m2)
+                    deal_percent = service.calculate_deal_percent(
+                        price_per_m2, avg_price_per_m2
+                    )
                 else:
                     deal_percent = None
             else:
                 deal_percent = None
-            
+
             # Создаём dict с данными
             item_dict = {
                 "id": listing.id,
@@ -205,9 +210,21 @@ async def get_listings(
                 "floor": listing.floor,
                 "total_floors": listing.total_floors,
                 "images": listing.images or [],
-                "price_per_m2_byn": float(listing.price_per_m2_byn) if listing.price_per_m2_byn else None,
-                "price_per_m2_usd": float(listing.price_per_m2_usd) if listing.price_per_m2_usd else None,
-                "status": listing.status.value if hasattr(listing.status, "value") else str(listing.status),
+                "price_per_m2_byn": (
+                    float(listing.price_per_m2_byn)
+                    if listing.price_per_m2_byn
+                    else None
+                ),
+                "price_per_m2_usd": (
+                    float(listing.price_per_m2_usd)
+                    if listing.price_per_m2_usd
+                    else None
+                ),
+                "status": (
+                    listing.status.value
+                    if hasattr(listing.status, "value")
+                    else str(listing.status)
+                ),
                 "first_seen_at": listing.first_seen_at,
                 "last_seen_at": listing.last_seen_at,
                 "deleted_at": listing.deleted_at,
@@ -215,14 +232,14 @@ async def get_listings(
                 "avg_price_per_m2": avg_price_per_m2,
             }
             items_with_metrics.append(item_dict)
-        
+
         return {
             "items": items_with_metrics,
             "total": total,
             "page": page,
             "size": size,
         }
-    
+
     return {
         "items": [ListingResponse.model_validate(l) for l in listings],
         "total": total,
