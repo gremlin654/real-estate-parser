@@ -30,6 +30,8 @@ interface FilterState {
   page: number;
   isManualScanning: boolean;
   scanningCities: Map<string, ScanningCity>;
+  dealsOnly: boolean;
+  discountPercent: number;
   setCity: (city: string) => void;
   setStatus: (status: string) => void;
   setCurrency: (currency: 'BYN' | 'USD') => void;
@@ -39,6 +41,8 @@ interface FilterState {
   setFilters: (filters: Partial<FilterState>) => void;
   setPage: (page: number) => void;
   setManualScanning: (scanning: boolean) => void;
+  setDealsOnly: (dealsOnly: boolean) => void;
+  setDiscountPercent: (percent: number) => void;
   addScanningCity: (city: ScanningCity) => void;
   removeScanningCity: (city: string) => void;
   updateScanningCity: (city: string, progress: Partial<ScanningCity>) => void;
@@ -64,6 +68,8 @@ export const useFilterStore = create<FilterState>()(
       page: 1,
       isManualScanning: false,
       scanningCities: new Map(),
+      dealsOnly: false,
+      discountPercent: -10,
 
       setCity: (city) => set({ city, page: 1 }),
       setStatus: (status) => set({ status, page: 1 }),
@@ -74,6 +80,8 @@ export const useFilterStore = create<FilterState>()(
       setFilters: (filters) => set({ ...filters, page: 1 }),
       setPage: (page) => set({ page }),
       setManualScanning: (scanning) => set({ isManualScanning: scanning }),
+      setDealsOnly: (dealsOnly) => set({ dealsOnly, page: 1 }),
+      setDiscountPercent: (percent) => set({ discountPercent: percent, page: 1 }),
       
       addScanningCity: (cityData) => {
         set((state) => {
@@ -137,6 +145,8 @@ export const useFilterStore = create<FilterState>()(
           page: 1,
           isManualScanning: false,
           scanningCities: new Map(),
+          dealsOnly: false,
+          discountPercent: -10,
         }),
     }),
     {

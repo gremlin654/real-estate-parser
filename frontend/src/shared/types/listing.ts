@@ -24,6 +24,8 @@ export interface Listing {
   deleted_at?: string | null;
   price_per_m2_byn?: number | null;
   price_per_m2_usd?: number | null;
+  deal_percent?: number | null;
+  avg_price_per_m2?: number | null;
 }
 
 export interface PaginatedResponse {

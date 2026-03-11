@@ -19,6 +19,8 @@ import type {
   PricePerM2DistributionResponse,
   PricePerM2Trend,
   PricePerM2DistributionBin,
+  DealListing,
+  DealsResponse,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
@@ -214,6 +216,8 @@ export const useListings = (filters: {
   roomsOther?: boolean;
   currency?: string;
   sort?: string;
+  dealsOnly?: boolean;
+  includeDealMetrics?: boolean;
 }) => {
   return useQuery<PaginatedResponse>({
     queryKey: ['listings', filters],
@@ -240,6 +244,12 @@ export const useListings = (filters: {
       }
       if (filters.roomsOther) {
         params.set('rooms_other', 'true');
+      }
+      if (filters.dealsOnly) {
+        params.set('deals_only', 'true');
+      }
+      if (filters.includeDealMetrics) {
+        params.set('include_deal_metrics', 'true');
       }
       // currency используется только для отображения на frontend, не передаём на backend
 
@@ -643,6 +653,43 @@ export const usePricePerM2Distribution = (filters: {
 
       const response = await fetch(`${API_BASE}/stats/price-per-m2-distribution?${params}`);
       if (!response.ok) throw new Error('Failed to fetch price per m² distribution');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * Hook для получения выгодных объявлений (Deal Finder)
+ */
+export const useDealsQuery = (filters: {
+  city?: string;
+  rooms?: number[];
+  roomsOther?: boolean;
+  discountThreshold?: number;
+  currency?: 'byn' | 'usd';
+}) => {
+  return useQuery<DealsResponse>({
+    queryKey: ['deals', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.rooms && filters.rooms.length > 0) {
+        filters.rooms.forEach((room) => params.append('rooms', String(room)));
+      }
+      if (filters.roomsOther) {
+        params.set('rooms_other', 'true');
+      }
+      if (filters.discountThreshold) {
+        params.set('discount_threshold', String(filters.discountThreshold));
+      }
+      if (filters.currency) {
+        params.set('currency', filters.currency);
+      }
+
+      const response = await fetch(`${API_BASE}/deals?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch deals');
       return response.json();
     },
     enabled: !!filters.city,
