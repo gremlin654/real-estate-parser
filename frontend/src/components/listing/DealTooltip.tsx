@@ -54,27 +54,27 @@ export const DealTooltip: React.FC<DealTooltipProps> = ({
   const absoluteSavings = calculateAbsoluteSavings();
 
   const content = (
-    <div className={cn('space-y-1.5 text-xs', className)}>
+    <div className={cn('space-y-1.5 text-xs text-white', className)}>
       <div className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Средняя цена за м²:</span>
+        <span className="text-white/70">Средняя цена за м²:</span>
         <span className="font-medium">{formatCurrency(avgPricePerM2)}</span>
       </div>
       <div className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Цена этой квартиры:</span>
+        <span className="text-white/70">Цена этой квартиры:</span>
         <span className="font-medium">{formatCurrency(currentPricePerM2)}</span>
       </div>
       {absoluteSavings !== null && (
-        <div className="flex justify-between gap-4 pt-1 border-t">
-          <span className="text-muted-foreground">Выгода:</span>
-          <span className="font-bold text-green-600">
+        <div className="flex justify-between gap-4 pt-1 border-t border-white/20">
+          <span className="text-white/70">Выгода:</span>
+          <span className="font-bold text-green-400">
             {dealPercent.toFixed(0)}% ({formatCurrency(absoluteSavings)} на квартиру {area} м²)
           </span>
         </div>
       )}
       {!absoluteSavings && (
-        <div className="flex justify-between gap-4 pt-1 border-t">
-          <span className="text-muted-foreground">Выгода:</span>
-          <span className="font-bold text-green-600">
+        <div className="flex justify-between gap-4 pt-1 border-t border-white/20">
+          <span className="text-white/70">Выгода:</span>
+          <span className="font-bold text-green-400">
             {dealPercent.toFixed(0)}%
           </span>
         </div>
