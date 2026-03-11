@@ -132,7 +132,12 @@ export function DealsPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Лучшая выгода</p>
-                  <p className="text-2xl font-bold">до 30%</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {dealsData.items.length > 0 
+                      ? `${Math.min(...dealsData.items.map(d => d.deal_percent)).toFixed(0)}%`
+                      : '0%'
+                    }
+                  </p>
                 </div>
               </div>
             </CardContent>
