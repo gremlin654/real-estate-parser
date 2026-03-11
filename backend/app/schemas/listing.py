@@ -32,6 +32,10 @@ class ListingResponse(ListingBase):
     last_seen_at: datetime
     deleted_at: Optional[datetime] = None
 
+    # Deal Finder metrics (опционально, добавляется при include_deal_metrics=true)
+    deal_percent: Optional[float] = None
+    avg_price_per_m2: Optional[float] = None
+
     class Config:
         from_attributes = True
 
