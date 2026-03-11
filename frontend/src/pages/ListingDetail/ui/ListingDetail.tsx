@@ -147,7 +147,7 @@ export function ListingDetail() {
                   </div>
                 </div>
                 {listing.images.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto">
+                  <div className="flex gap-2 overflow-x-auto overflow-y-hidden">
                     {listing.images.map((img, idx) => (
                       <button
                         key={idx}
