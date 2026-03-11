@@ -79,64 +79,70 @@ async def get_summary(
     avg_price_per_m2_byn = None
     avg_price_per_m2_usd = None
     avg_price_per_m2_by_rooms = None
-    
+
     if city:
         # Средняя цена за м² в BYN
         avg_byn_result = await db.execute(
             select(func.avg(Listing.price_per_m2_byn)).where(
                 Listing.price_per_m2_byn.isnot(None),
                 Listing.city == city,
-                Listing.status.in_([
-                    ListingStatus.active,
-                    ListingStatus.new,
-                    ListingStatus.updated,
-                    ListingStatus.price_changed_byn,
-                ]),
+                Listing.status.in_(
+                    [
+                        ListingStatus.active,
+                        ListingStatus.new,
+                        ListingStatus.updated,
+                        ListingStatus.price_changed_byn,
+                    ]
+                ),
             )
         )
         avg_byn = avg_byn_result.scalar()
         if avg_byn:
             avg_price_per_m2_byn = round(float(avg_byn), 2)
-        
+
         # Средняя цена за м² в USD
         avg_usd_result = await db.execute(
             select(func.avg(Listing.price_per_m2_usd)).where(
                 Listing.price_per_m2_usd.isnot(None),
                 Listing.city == city,
-                Listing.status.in_([
-                    ListingStatus.active,
-                    ListingStatus.new,
-                    ListingStatus.updated,
-                    ListingStatus.price_changed_byn,
-                ]),
+                Listing.status.in_(
+                    [
+                        ListingStatus.active,
+                        ListingStatus.new,
+                        ListingStatus.updated,
+                        ListingStatus.price_changed_byn,
+                    ]
+                ),
             )
         )
         avg_usd = avg_usd_result.scalar()
         if avg_usd:
             avg_price_per_m2_usd = round(float(avg_usd), 2)
-        
+
         # Средняя цена за м² по комнатам
         rooms_result = await db.execute(
-            select(
-                Listing.rooms,
-                func.avg(Listing.price_per_m2_usd).label("avg_price")
-            ).where(
+            select(Listing.rooms, func.avg(Listing.price_per_m2_usd).label("avg_price"))
+            .where(
                 Listing.price_per_m2_usd.isnot(None),
                 Listing.city == city,
-                Listing.status.in_([
-                    ListingStatus.active,
-                    ListingStatus.new,
-                    ListingStatus.updated,
-                    ListingStatus.price_changed_byn,
-                ]),
+                Listing.status.in_(
+                    [
+                        ListingStatus.active,
+                        ListingStatus.new,
+                        ListingStatus.updated,
+                        ListingStatus.price_changed_byn,
+                    ]
+                ),
                 Listing.rooms >= 1,
-            ).group_by(Listing.rooms)
+            )
+            .group_by(Listing.rooms)
         )
         rooms_rows = rooms_result.all()
         if rooms_rows:
             avg_price_per_m2_by_rooms = {
-                str(row.rooms): round(float(row.avg_price), 2) 
-                for row in rooms_rows if row.avg_price
+                str(row.rooms): round(float(row.avg_price), 2)
+                for row in rooms_rows
+                if row.avg_price
             }
 
     return {
