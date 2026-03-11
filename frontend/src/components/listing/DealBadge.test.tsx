@@ -15,7 +15,8 @@ describe('DealBadge', () => {
 
   it('отображается при выгоде -11%', () => {
     render(<DealBadge dealPercent={-11} />);
-    expect(screen.getByText('-11%')).toBeInTheDocument();
+    // Текст разбит на элементы (🔥, -11, %), используем regex
+    expect(screen.getByText(/-11/)).toBeInTheDocument();
   });
 
   it('имеет оранжевый градиент при выгоде от -10% до -15%', () => {
@@ -53,15 +54,17 @@ describe('DealBadge', () => {
 
   it('корректно округляет проценты', () => {
     render(<DealBadge dealPercent={-15.7} />);
-    expect(screen.getByText('-16%')).toBeInTheDocument();
+    // Текст разбит на элементы, используем regex
+    expect(screen.getByText(/-16/)).toBeInTheDocument();
   });
 
   it('имеет правильную структуру DOM', () => {
     const { container } = render(<DealBadge dealPercent={-20} />);
     const outerDiv = container.firstChild as HTMLElement;
     const innerDiv = outerDiv?.firstChild as HTMLElement;
-    
-    expect(outerDiv).toHaveClass('absolute', 'top-2', 'right-2', 'z-10');
+
+    // Позиционирование изменено на left-2 для избежания наложения на статус
+    expect(outerDiv).toHaveClass('absolute', 'top-2', 'left-2', 'z-10', 'animate-fade-in');
     expect(innerDiv).toHaveClass('rounded-full', 'px-2', 'py-1', 'text-xs', 'font-bold');
   });
 });

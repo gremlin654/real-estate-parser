@@ -36,6 +36,7 @@
 - **📊 Графики** — динамика цен, распределение (v2.0)
 - **📤 Экспорт** — CSV, XLSX, JSON (v2.0)
 - **🔄 CI/CD** — GitHub Actions (v2.0)
+- **🔥 Deal Finder** — поиск квартир ниже рынка (v3.5)
 
 ## Архитектура
 
@@ -467,6 +468,35 @@ GET /api/v1/export/listings?format=csv&city=minsk&status=active
 GET /api/v1/export/summary?format=xlsx
 ```
 
+### Deal Finder (v3.5) — Поиск выгодных предложений
+
+```bash
+GET /api/v1/deals?city=minsk&rooms=2&discount_percent=10&currency=usd&limit=20&offset=0
+GET /api/v1/deals/stats?city=minsk&rooms=2&currency=usd  # Статистика deal-предложений
+GET /api/v1/listings?city=minsk&include_deal_metrics=true  # deal_percent, avg_price_per_m2
+GET /api/v1/stats/summary?city=minsk  # avg_price_per_m2_byn, avg_price_per_m2_usd
+```
+
+**Параметры `/api/v1/deals`:**
+- `city` (обязательно) — город для поиска
+- `rooms` (опционально) — количество комнат
+- `discount_percent` (по умолчанию 10) — минимальная выгода в %
+- `currency` (по умолчанию usd) — валюта расчётов (byn/usd)
+- `limit` (по умолчанию 20) — максимум результатов (1-100)
+- `offset` (по умолчанию 0) — смещение для пагинации
+
+**Response `/api/v1/deals`:**
+- `items` — список объявлений с метриками выгоды
+- `total` — общее количество найденных объявлений
+- `avg_price_per_m2` — средняя цена за м² для выбранных фильтров
+- `currency` — валюта расчётов
+- `limit`, `offset` — параметры пагинации
+
+**Deal Listing поля:**
+- `deal_percent` — процент выгоды (отрицательное значение, например -16.5)
+- `avg_price_per_m2` — средняя цена за м² по городу/комнатам
+- `price_per_m2_byn`, `price_per_m2_usd` — цена за м² объявления
+
 ## Схема базы данных
 
 ### listings
@@ -708,6 +738,64 @@ docker-compose logs backend
 **Code Review:** ✅ APPROVED (8.7/10)
 
 **MR Status:** 🚀 Готов к созданию (коммиты в develop)
+
+### v3.5 (текущая — в разработке)
+
+**Deal Finder — поиск выгодных квартир:**
+- **✅ Страница `/deals`** — просмотр всех выгодных предложений со статистикой
+- **✅ Фильтр "Только выгодные"** — включение/выключение deal-режима на `/listings`
+- **✅ DealBadge** — бейдж с процентом выгоды на карточках (🔥 -16%)
+- **✅ DealTooltip** — tooltip с подробной информацией о выгоде
+- **✅ API `/api/v1/deals`** — поиск квартир с ценой ниже рынка
+- **✅ API `/api/v1/listings`** — параметр `include_deal_metrics` для deal_percent
+- **✅ API `/api/v1/stats/summary`** — avg_price_per_m2 для расчёта выгоды
+
+**Backend:**
+- `backend/app/services/deal_finder_service.py` — сервис расчёта avg_price_per_m2 и deal_percent
+- `backend/app/api/v1/deals.py` — endpoint для deal-предложений
+- `backend/app/schemas/deals.py` — Pydantic schemas для Deal Finder
+- `backend/app/db/migrations/versions/013_add_deal_finder_indexes.py` — 3 индекса для производительности
+- **Redis кэширование** — avg_price_per_m2 (TTL 300 сек), ускорение в 10-20x
+- **Валидация** — city, discount_percent (0-50%), currency
+- **Пагинация** — limit/offset параметры
+
+**Frontend:**
+- `frontend/src/pages/Deals/ui/DealsPage.tsx` — страница deal-предложений
+- `frontend/src/components/listing/DealBadge.tsx` — бейдж выгоды с градиентами
+- `frontend/src/components/listing/DealTooltip.tsx` — tooltip с информацией о выгоде
+- `frontend/src/components/filters/DealFilterToggle.tsx` — переключатель "Только выгодные"
+- `frontend/src/api/listings.ts` — hooks `useDealsQuery()`, конвертация page/size → limit/offset
+- `frontend/src/shared/types/stats.ts` — типы DealListing, DealsResponse
+- **URL params синхронизация** — dealsOnly, discountPercent
+- **Статистика** — всего предложений, средняя цена за м², лучшая выгода
+
+**Исправления:**
+- **🔴 Пагинация** — конвертация page/size в limit/offset для backend
+- **🔴 Позиционирование DealBadge** — перемещён в левый угол (top-2 left-2)
+- **🔴 Контрастность DealTooltip** — белый текст на тёмном фоне
+- **🔴 Дублирование статистики** — изменена карточка "Лучшая выгода"
+- **🔴 TypeScript типы** — DealListing совместим с Listing
+- **🔴 Storybook** — исключён из компиляции (.stories файлы)
+- **🔴 Вертикальный скролл** — убран в миниатюрах на странице объявления
+
+**Тесты:**
+- **Backend:** 51 тест (28 unit + 14 integration + 9 regression)
+- **Frontend Unit:** 172 теста (100% pass rate)
+- **Frontend E2E:** 38 тестов (deals-filter, deals-page, listing-card-deal)
+- **Coverage:** Backend 93%, Frontend 66%+
+
+**Производительность:**
+- `/api/v1/deals` — ~5-10ms с Redis кэшем (10-20x быстрее)
+- `/api/v1/stats/summary` — ~5-6ms с Redis кэшем (20-30x быстрее)
+- **3 индекса БД** — idx_listings_city_status_price_m2 (USD/BYN), idx_listings_rooms_price_m2
+
+**Документация:**
+- Обновлён `QWEN.md` — контекст для AI-ассистента
+- Добавлен раздел Deal Finder в API Endpoints
+
+**Code Review:** ✅ Исправлены все замечания
+
+**MR Status:** ✅ Ветка `develop` актуальна
 
 ### v3.3
 

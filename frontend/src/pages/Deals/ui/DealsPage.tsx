@@ -32,6 +32,8 @@ export function DealsPage() {
     rooms,
     roomsOther,
     currency: currency === 'USD' ? 'usd' : 'byn',
+    page,
+    size,
   });
 
   const totalPages = Math.ceil((dealsData?.total || 0) / size);
@@ -129,8 +131,13 @@ export function DealsPage() {
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Средняя цена за м²</p>
-                  <p className="text-2xl font-bold">{formatCurrency(dealsData.avg_price_per_m2)}</p>
+                  <p className="text-sm text-muted-foreground">Лучшая выгода</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {dealsData.items.length > 0 
+                      ? `${Math.min(...dealsData.items.map(d => d.deal_percent)).toFixed(0)}%`
+                      : '0%'
+                    }
+                  </p>
                 </div>
               </div>
             </CardContent>
