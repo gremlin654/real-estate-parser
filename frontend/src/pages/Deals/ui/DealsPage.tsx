@@ -32,6 +32,8 @@ export function DealsPage() {
     rooms,
     roomsOther,
     currency: currency === 'USD' ? 'usd' : 'byn',
+    page,
+    size,
   });
 
   const totalPages = Math.ceil((dealsData?.total || 0) / size);

@@ -669,6 +669,8 @@ export const useDealsQuery = (filters: {
   roomsOther?: boolean;
   discountThreshold?: number;
   currency?: 'byn' | 'usd';
+  page?: number;
+  size?: number;
 }) => {
   return useQuery<DealsResponse>({
     queryKey: ['deals', filters],
@@ -687,6 +689,8 @@ export const useDealsQuery = (filters: {
       if (filters.currency) {
         params.set('currency', filters.currency);
       }
+      if (filters.page) params.set('page', String(filters.page));
+      if (filters.size) params.set('size', String(filters.size));
 
       const response = await fetch(`${API_BASE}/deals?${params}`);
       if (!response.ok) throw new Error('Failed to fetch deals');
