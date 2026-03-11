@@ -36,7 +36,7 @@ export const DealBadge: React.FC<DealBadgeProps> = ({ dealPercent, className }) 
   return (
     <div
       className={cn(
-        'absolute top-2 right-2 z-10',
+        'absolute top-2 left-2 z-10',
         'animate-fade-in',
         className
       )}
@@ -55,7 +55,7 @@ export const DealBadge: React.FC<DealBadgeProps> = ({ dealPercent, className }) 
           'md:px-3 md:py-1.5 md:text-base'
         )}
       >
-        {dealPercent.toFixed(0)}%
+        🔥 {dealPercent.toFixed(0)}%
       </div>
     </div>
   );
