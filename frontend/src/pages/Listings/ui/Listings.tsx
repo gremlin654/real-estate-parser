@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { useListings, useManualScan } from '@/api/listings';
 import { useFilterStore } from '@/store/filterStore';
 import { Card } from '@/shared/ui/card';
@@ -28,6 +29,7 @@ import { FilterByPrice } from '@/features/listings/filter-by-price';
 import { FilterByPricePerM2 } from '@/features/listings/filter-by-price-per-m2';
 import { FilterByRooms } from '@/features/listings/filter-by-rooms';
 import { FilterByCurrency } from '@/features/listings/filter-by-currency';
+import { FilterByDeal } from '@/features/listings/filter-by-deals';
 import { SortListings } from '@/features/listings/sort-listings';
 import { ExportListings } from '@/features/listings/export-listings';
 import { TriggerManualScan, TriggerManualScanAlert } from '@/features/scanning/trigger-manual';
@@ -37,6 +39,7 @@ import { Eye } from 'lucide-react';
 import { CITIES } from '@/shared/config';
 
 export function Listings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     city,
     page,
@@ -50,8 +53,12 @@ export function Listings() {
     roomsOther,
     sort,
     currency,
+    dealsOnly,
+    discountPercent,
     setPage,
     setFilters,
+    setDealsOnly,
+    setDiscountPercent,
     getScanningCities,
   } = useFilterStore();
 
@@ -59,6 +66,38 @@ export function Listings() {
   const [showProgressModal, setShowProgressModal] = useState(false);
   const scanningCities = getScanningCities();
   const hasAnyScanning = scanningCities.length > 0;
+
+  // Синхронизация состояния фильтра с URL при загрузке
+  useEffect(() => {
+    const dealsOnlyFromUrl = searchParams.get('dealsOnly') === 'true';
+    const discountPercentFromUrl = searchParams.get('discountPercent');
+    
+    if (dealsOnlyFromUrl !== dealsOnly) {
+      setDealsOnly(dealsOnlyFromUrl);
+    }
+    
+    if (discountPercentFromUrl && !isNaN(parseInt(discountPercentFromUrl, 10))) {
+      const parsedPercent = parseInt(discountPercentFromUrl, 10);
+      if (parsedPercent !== discountPercent) {
+        setDiscountPercent(parsedPercent);
+      }
+    }
+  }, []); // Выполняется только при монтировании
+
+  // Синхронизация URL при изменении состояния фильтра
+  useEffect(() => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (dealsOnly) {
+        newParams.set('dealsOnly', 'true');
+        newParams.set('discountPercent', discountPercent.toString());
+      } else {
+        newParams.delete('dealsOnly');
+        newParams.delete('discountPercent');
+      }
+      return newParams;
+    });
+  }, [dealsOnly, discountPercent, setSearchParams]);
 
   const { data: listingsData, isLoading } = useListings({
     city: city === 'all' ? undefined : city,
@@ -73,6 +112,8 @@ export function Listings() {
     roomsOther,
     currency,
     sort,
+    dealsOnly,
+    includeDealMetrics: true,
   });
 
   const totalPages = Math.ceil((listingsData?.total || 0) / size);
@@ -188,6 +229,10 @@ export function Listings() {
                     setPage(1);
                   }}
                 />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Выгодные предложения:</p>
+                <FilterByDeal />
               </div>
             </div>
           )}
