@@ -24,8 +24,8 @@ type Story = StoryObj<typeof meta>;
 
 // Story с интерактивным состоянием
 export const Default: Story = {
-  render: (args) => {
-    const [enabled, setEnabled] = useState(args.enabled);
+  render: (args: Story['args']) => {
+    const [enabled, setEnabled] = useState(args.enabled ?? false);
     return (
       <DealFilterToggle
         {...args}
@@ -41,8 +41,8 @@ export const Default: Story = {
 };
 
 export const Enabled: Story = {
-  render: (args) => {
-    const [enabled, setEnabled] = useState(args.enabled);
+  render: (args: Story['args']) => {
+    const [enabled, setEnabled] = useState(args.enabled ?? false);
     return (
       <DealFilterToggle
         {...args}
@@ -58,7 +58,7 @@ export const Enabled: Story = {
 };
 
 export const CustomThreshold: Story = {
-  render: (args) => {
+  render: (args: Story['args']) => {
     const [enabled, setEnabled] = useState(false);
     return (
       <DealFilterToggle
@@ -75,8 +75,8 @@ export const CustomThreshold: Story = {
 };
 
 export const Disabled: Story = {
-  render: (args) => {
-    const [enabled, setEnabled] = useState(args.enabled);
+  render: (args: Story['args']) => {
+    const [enabled, setEnabled] = useState(args.enabled ?? false);
     return (
       <DealFilterToggle
         {...args}

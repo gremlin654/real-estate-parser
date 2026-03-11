@@ -29,7 +29,7 @@ export const Low: Story = {
     dealPercent: -12, // -10% to -15%: оранжевый
   },
   decorators: [
-    (Story) => (
+    (Story: Story) => (
       <div className="relative w-64 h-32 bg-gray-100 rounded-lg">
         <Story />
       </div>
@@ -42,7 +42,7 @@ export const Medium: Story = {
     dealPercent: -17, // -15% to -20%: красно-оранжевый
   },
   decorators: [
-    (Story) => (
+    (Story: Story) => (
       <div className="relative w-64 h-32 bg-gray-100 rounded-lg">
         <Story />
       </div>
@@ -55,7 +55,7 @@ export const High: Story = {
     dealPercent: -25, // -20%+: красный
   },
   decorators: [
-    (Story) => (
+    (Story: Story) => (
       <div className="relative w-64 h-32 bg-gray-100 rounded-lg">
         <Story />
       </div>
@@ -68,7 +68,7 @@ export const Threshold: Story = {
     dealPercent: -10, // Порог отображения
   },
   decorators: [
-    (Story) => (
+    (Story: Story) => (
       <div className="relative w-64 h-32 bg-gray-100 rounded-lg">
         <Story />
       </div>
@@ -81,7 +81,7 @@ export const Extreme: Story = {
     dealPercent: -30, // Экстремальная выгода
   },
   decorators: [
-    (Story) => (
+    (Story: Story) => (
       <div className="relative w-64 h-32 bg-gray-100 rounded-lg">
         <Story />
       </div>
