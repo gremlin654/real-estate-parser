@@ -58,12 +58,12 @@ export interface DealListing {
   area: number | null;
   floor: number | null;
   total_floors?: number | null;
-  // ✅ Дополнительные поля для совместимости с Listing
-  category?: string | null;
-  description?: string | null;
-  district?: string | null;
-  metro?: string | null;
-  house_year?: number | null;
+  // ✅ Дополнительные поля для совместимости с Listing (точно такие же типы)
+  category: string | null;
+  description: string | null;
+  district: string | null;
+  metro: string | null;
+  house_year: number | null;
   images: string[];
   status: string;
   first_seen_at: string;
