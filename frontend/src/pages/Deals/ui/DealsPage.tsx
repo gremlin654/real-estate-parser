@@ -131,8 +131,8 @@ export function DealsPage() {
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Средняя цена за м²</p>
-                  <p className="text-2xl font-bold">{formatCurrency(dealsData.avg_price_per_m2)}</p>
+                  <p className="text-sm text-muted-foreground">Лучшая выгода</p>
+                  <p className="text-2xl font-bold">до 30%</p>
                 </div>
               </div>
             </CardContent>
