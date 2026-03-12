@@ -745,7 +745,7 @@ export const usePriceDropQuery = (filters: {
         params.set('offset', String(offset));
       }
 
-      const response = await fetch(`${API_BASE}/price-drop?${params}`);
+      const response = await fetch(`${API_BASE}/price-drops?${params}`);
       if (!response.ok) throw new Error('Failed to fetch price drop listings');
       return response.json();
     },
@@ -763,8 +763,8 @@ export const useListingPriceHistory = (listingId: string, currency?: 'byn' | 'us
     queryFn: async () => {
       const params = new URLSearchParams();
       if (currency) params.set('currency', currency);
-      
-      const response = await fetch(`${API_BASE}/listings/${listingId}/price-history?${params}`);
+
+      const response = await fetch(`${API_BASE}/price-drops/listings/${listingId}/price-history?${params}`);
       if (!response.ok) throw new Error('Failed to fetch listing price history');
       return response.json();
     },
