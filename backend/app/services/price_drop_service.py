@@ -313,6 +313,8 @@ class PriceDropService:
                     "kufar_id": listing.kufar_id,
                     "url": listing.url,
                     "title": listing.title,
+                    "price": listing.price or 0,  # Цена в BYN для совместимости
+                    "price_usd": listing.price_usd or 0,  # Цена в USD для совместимости
                     "current_price": current_price or 0,
                     "max_price": max_price or 0,
                     "min_price": min_price or 0,

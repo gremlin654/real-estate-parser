@@ -23,6 +23,8 @@ class PriceDropListing(BaseModel):
         kufar_id: ID объявления на Kufar
         url: Ссылка на объявление
         title: Заголовок
+        price: Цена в BYN
+        price_usd: Цена в USD
         current_price: Текущая цена (в зависимости от валюты)
         max_price: Максимальная цена за историю наблюдений
         min_price: Минимальная цена за историю наблюдений
@@ -41,7 +43,9 @@ class PriceDropListing(BaseModel):
     kufar_id: str
     url: str
     title: str
-    current_price: int
+    price: int  # Цена в BYN для совместимости с Listing
+    price_usd: int  # Цена в USD для совместимости с Listing
+    current_price: int  # Текущая цена (alias для price или price_usd)
     max_price: int
     min_price: int
     drop_percent: float = Field(..., ge=0, le=100, description="Процент падения цены")
