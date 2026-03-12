@@ -21,6 +21,10 @@ import type {
   PricePerM2DistributionBin,
   DealListing,
   DealsResponse,
+  PriceDropListing,
+  PriceDropResponse,
+  PriceDropHistoryItem,
+  PriceDropHistoryResponse,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
@@ -701,6 +705,70 @@ export const useDealsQuery = (filters: {
       return response.json();
     },
     enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * Hook для получения объявлений с падением цены (Price Drop Tracker)
+ */
+export const usePriceDropQuery = (filters: {
+  city?: string;
+  dropPercent?: number;
+  rooms?: number[];
+  roomsOther?: boolean;
+  currency?: 'byn' | 'usd';
+  page?: number;
+  size?: number;
+}) => {
+  return useQuery<PriceDropResponse>({
+    queryKey: ['priceDrop', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.dropPercent) {
+        params.set('drop_percent', String(filters.dropPercent));
+      }
+      if (filters.rooms && filters.rooms.length > 0) {
+        filters.rooms.forEach((room) => params.append('rooms', String(room)));
+      }
+      if (filters.roomsOther) {
+        params.set('rooms_other', 'true');
+      }
+      if (filters.currency) {
+        params.set('currency', filters.currency);
+      }
+      // Конвертируем page/size в limit/offset для backend
+      if (filters.page && filters.size) {
+        const offset = (filters.page - 1) * filters.size;
+        params.set('limit', String(filters.size));
+        params.set('offset', String(offset));
+      }
+
+      const response = await fetch(`${API_BASE}/price-drop?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch price drop listings');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * Hook для получения истории изменения цены объявления
+ */
+export const useListingPriceHistory = (listingId: string, currency?: 'byn' | 'usd') => {
+  return useQuery<PriceDropHistoryResponse>({
+    queryKey: ['listingPriceHistory', listingId, currency],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (currency) params.set('currency', currency);
+      
+      const response = await fetch(`${API_BASE}/listings/${listingId}/price-history?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch listing price history');
+      return response.json();
+    },
+    enabled: !!listingId,
     staleTime: 5 * 60 * 1000, // 5 минут
   });
 };
