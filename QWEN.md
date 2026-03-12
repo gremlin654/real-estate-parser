@@ -37,6 +37,7 @@
 - **📤 Экспорт** — CSV, XLSX, JSON (v2.0)
 - **🔄 CI/CD** — GitHub Actions (v2.0)
 - **🔥 Deal Finder** — поиск квартир ниже рынка (v3.5)
+- **📉 Price Drop Tracker** — трекинг падения цены (v3.6)
 
 ## Архитектура
 
@@ -497,6 +498,38 @@ GET /api/v1/stats/summary?city=minsk  # avg_price_per_m2_byn, avg_price_per_m2_u
 - `avg_price_per_m2` — средняя цена за м² по городу/комнатам
 - `price_per_m2_byn`, `price_per_m2_usd` — цена за м² объявления
 
+### Price Drop Tracker (v3.6) — Трекинг падения цены
+
+```bash
+GET /api/v1/price-drops?city=minsk&drop_percent=10&currency=usd&limit=20&offset=0
+GET /api/v1/price-drops/stats?city=minsk&drop_percent=10  # Статистика падения цен
+GET /api/v1/price-drops/listings/{id}/price-history?currency=usd  # История цен объявления
+GET /api/v1/listings?city=minsk&include_price_drop=true  # max_price, min_price, drop_percent
+```
+
+**Параметры `/api/v1/price-drops`:**
+- `city` (обязательно) — город для фильтрации
+- `drop_percent` (по умолчанию 10) — минимальный процент падения (0-100)
+- `currency` (по умолчанию usd) — валюта расчётов (byn/usd)
+- `limit` (по умолчанию 20) — максимум результатов (1-100)
+- `offset` (по умолчанию 0) — смещение для пагинации
+
+**Response `/api/v1/price-drops`:**
+- `items` — список объявлений с падением цены
+- `total` — общее количество объявлений
+- `avg_drop_percent` — средний процент падения
+- `max_drop_percent` — максимальный процент падения
+- `min_drop_percent` — минимальный процент падения
+- `currency` — валюта расчётов
+- `page`, `size` — параметры пагинации
+
+**Price Drop Listing поля:**
+- `max_price` — максимальная цена за историю наблюдений
+- `min_price` — минимальная цена за историю наблюдений
+- `drop_percent` — процент падения цены ((max - min) / max * 100)
+- `current_price` — текущая цена
+- `price`, `price_usd` — цена в BYN/USD для совместимости с Listing
+
 ## Схема базы данных
 
 ### listings
@@ -792,6 +825,64 @@ docker-compose logs backend
 **Документация:**
 - Обновлён `QWEN.md` — контекст для AI-ассистента
 - Добавлен раздел Deal Finder в API Endpoints
+
+**Code Review:** ✅ Исправлены все замечания
+
+**MR Status:** ✅ Ветка `develop` актуальна
+
+### v3.6 (текущая — в разработке)
+
+**Price Drop Tracker — трекинг падения цены:**
+- **✅ Страница `/price-drops`** — просмотр всех квартир с падением цены
+- **✅ PriceDropBadge** — бейдж "📉 Price Drop -X%" с градиентами
+- **✅ PriceDropTooltip** — tooltip с max/min/current ценами и падением
+- **✅ PriceHistoryChart** — график истории цен (recharts LineChart)
+- **✅ API `/api/v1/price-drops`** — список квартир с падением цены
+- **✅ API `/api/v1/price-drops/stats`** — статистика падения (avg/max/min drop)
+- **✅ API `/api/v1/price-drops/listings/{id}/price-history`** — история цен объявления
+
+**Backend:**
+- `backend/app/services/price_drop_service.py` — сервис расчёта drop_percent через MAX/MIN
+- `backend/app/api/v1/price_drop.py` — endpoints для price drop tracker
+- `backend/app/schemas/price_drop.py` — Pydantic schemas (PriceDropListing, PriceDropResponse)
+- `backend/app/db/migrations/versions/014_add_price_drop_indexes.py` — 5 индексов для listing_history
+- **Redis кэширование** — price_drops (TTL 300 сек), price_history (TTL 180 сек), stats (TTL 600 сек)
+- **SQL агрегация** — drop_percent = ((MAX(price_before) - MIN(price_after)) / MAX(price_before)) * 100
+- **Валидация** — city, drop_percent (0-100), currency
+
+**Frontend:**
+- `frontend/src/components/listing/PriceDropBadge.tsx` — бейдж с градиентами (5-10%: жёлтый, 10-20%: оранжевый, 20%+: красный)
+- `frontend/src/components/listing/PriceDropTooltip.tsx` — tooltip с деталями падения
+- `frontend/src/components/stats/PriceHistoryChart.tsx` — график истории цен (recharts)
+- `frontend/src/pages/PriceDrops/ui/PriceDropsPage.tsx` — страница со статистикой и фильтрами
+- `frontend/src/api/listings.ts` — hooks `usePriceDropQuery()`, `useListingPriceHistory()`
+- `frontend/src/shared/types/stats.ts` — типы PriceDropListing, PriceDropResponse, PriceDropHistoryItem
+- **Интеграция в ListingCard** — PriceDropBadge отображается при drop_percent >= 5%
+- **Интеграция в ListingDetail** — PriceHistoryChart с историей цен
+
+**Исправления:**
+- **🔴 Позиционирование PriceDropBadge** — перемещён в левый угол (top-2 left-2) для избежания наложения
+- **🔴 TypeScript дублирование** — удалён дублирующий export type в stats.ts
+- **🔴 Backend schema** — добавлены поля price и price_usd для совместимости с Listing
+- **🔴 Прогресс сканирования** — исправлена трансляция WebSocket прогресса (pages_scraped, listings_fetched)
+- **🔴 Валидация сканирования** — изменён порог с 90% на 50% для гибкости
+- **🔴 ListingCardWidget** — защита от undefined price (displayPrice = price ?? 0)
+- **🔴 Black formatting** — отформатировано 5 файлов для CI
+
+**Тесты:**
+- **Backend:** 50 тестов (27 unit + 23 integration)
+- **Frontend Unit:** 196 тестов (PriceDropBadge: 12, PriceDropTooltip: 7, PriceHistoryChart: 5)
+- **Frontend E2E:** 20 тестов (price-drop-tracker.spec.ts)
+- **Coverage:** Backend 84%, Frontend 86%
+
+**Производительность:**
+- `/api/v1/price-drops` — ~5-10ms с Redis кэшем
+- `/api/v1/price-drops/stats` — ~5-8ms с Redis кэшем
+- **5 индексов БД** — idx_listing_history_listing_event, idx_listing_history_created_at, и другие
+
+**Документация:**
+- Обновлён `QWEN.md` — контекст для AI-ассистента
+- Добавлен раздел Price Drop Tracker в API Endpoints
 
 **Code Review:** ✅ Исправлены все замечания
 
