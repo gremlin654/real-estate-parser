@@ -17,6 +17,7 @@ from app.api.v1 import (
     cache_router,
     monitoring_router,
     deals_router,
+    price_drop_router,
 )
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
@@ -142,6 +143,7 @@ app.include_router(ws_router)  # WebSocket без префикса
 app.include_router(cache_router, prefix=settings.API_PREFIX)
 app.include_router(monitoring_router)  # Monitoring без префикса
 app.include_router(deals_router, prefix=settings.API_PREFIX)  # Deal Finder
+app.include_router(price_drop_router, prefix=settings.API_PREFIX)  # Price Drop Tracker
 
 
 @app.get("/health")
