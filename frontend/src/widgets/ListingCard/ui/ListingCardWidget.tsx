@@ -9,6 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import { useFilterStore } from '@/store/filterStore';
 import { DealBadge } from '@/components/listing/DealBadge';
 import { DealTooltip } from '@/components/listing/DealTooltip';
+import { PriceDropBadge } from '@/components/listing/PriceDropBadge';
+import { PriceDropTooltip } from '@/components/listing/PriceDropTooltip';
 
 interface ListingCardProps {
   listing: Listing;
@@ -21,12 +23,17 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
   const city = listing.city ? CITIES[listing.city as keyof typeof CITIES] : null;
   const statusLabel = STATUS_LABELS[listing.status as keyof typeof STATUS_LABELS];
   const firstImage = listing.images?.[0];
-  
+
   // Deal metrics
   const dealPercent = listing.deal_percent;
   const avgPricePerM2 = listing.avg_price_per_m2;
   const pricePerM2 = currency === 'USD' ? listing.price_per_m2_usd : listing.price_per_m2_byn;
-  
+
+  // Price Drop metrics
+  const dropPercent = (listing as any).drop_percent;
+  const maxPrice = (listing as any).max_price;
+  const minPrice = (listing as any).min_price;
+
   // Определяем валюту для tooltip
   const tooltipCurrency = currency === 'USD' ? 'USD' : 'BYN';
 
@@ -51,6 +58,10 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
         {dealPercent !== null && dealPercent !== undefined && dealPercent < -10 && (
           <DealBadge dealPercent={dealPercent} />
         )}
+        {/* PriceDropBadge отображается только если есть падение >= 5% */}
+        {dropPercent !== null && dropPercent !== undefined && dropPercent >= 5 && (
+          <PriceDropBadge dropPercent={dropPercent} />
+        )}
       </div>
 
       <CardContent className="p-4 space-y-3">
@@ -71,6 +82,19 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
                 {price.toLocaleString()} {currency}
               </div>
             </DealTooltip>
+          ) : /* Цена с PriceDropTooltip если есть падение цены */
+          dropPercent !== null && dropPercent !== undefined && dropPercent >= 5 && maxPrice && minPrice ? (
+            <PriceDropTooltip
+              maxPrice={maxPrice}
+              minPrice={minPrice}
+              currentPrice={price}
+              dropPercent={dropPercent}
+              currency={tooltipCurrency}
+            >
+              <div className="text-2xl font-bold text-primary cursor-help hover:text-primary/80 transition-colors">
+                {price.toLocaleString()} {currency}
+              </div>
+            </PriceDropTooltip>
           ) : (
             <div className="text-2xl font-bold text-primary">
               {price.toLocaleString()} {currency}

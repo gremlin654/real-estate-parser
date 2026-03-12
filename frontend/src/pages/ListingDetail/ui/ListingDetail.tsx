@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useListing, useListingHistory } from '@/api/listings';
+import { useListing, useListingHistory, useListingPriceHistory } from '@/api/listings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
 import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
@@ -39,11 +39,13 @@ import {
   Clock,
   Eye,
   Tag,
+  TrendingDown,
 } from 'lucide-react';
 import { formatDateTime } from '@/shared/lib/date-format';
 import { CITIES, STATUS_LABELS } from '@/shared/config';
 import { ListingInfo } from '@/entities/listing';
 import { useFilterStore } from '@/store/filterStore';
+import { PriceHistoryChartWithStyles as PriceHistoryChart } from '@/components/stats/PriceHistoryChart';
 
 export function ListingDetail() {
   const { id } = useParams();
@@ -51,6 +53,7 @@ export function ListingDetail() {
   const { currency } = useFilterStore();
   const { data: listing, isLoading } = useListing(id || '');
   const { data: history } = useListingHistory(id || '');
+  const { data: priceHistory } = useListingPriceHistory(id || '', currency === 'USD' ? 'usd' : 'byn');
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -382,6 +385,47 @@ export function ListingDetail() {
           <CardContent className="py-8 text-center text-muted-foreground">
             <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">История изменений пуста</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Price History Chart - График изменения цены */}
+      {priceHistory && priceHistory.items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5" />
+              История изменения цены
+              {priceHistory.total_drop_percent > 0 && (
+                <Badge variant="secondary" className="ml-2 text-green-600">
+                  -{priceHistory.total_drop_percent.toFixed(1)}%
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Первая цена</p>
+                <p className="font-semibold">
+                  {priceHistory.first_price.toLocaleString()} {displayCurrency}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Текущая цена</p>
+                <p className="font-semibold text-primary">
+                  {priceHistory.last_price.toLocaleString()} {displayCurrency}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Всего изменений</p>
+                <p className="font-semibold">{priceHistory.items.length}</p>
+              </div>
+            </div>
+            <PriceHistoryChart
+              history={priceHistory.items}
+              currency={displayCurrency === 'USD' ? 'USD' : 'BYN'}
+            />
           </CardContent>
         </Card>
       )}
