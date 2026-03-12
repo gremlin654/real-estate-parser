@@ -36,6 +36,9 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
 
   // Определяем валюту для tooltip
   const tooltipCurrency = currency === 'USD' ? 'USD' : 'BYN';
+  
+  // Защита от undefined price
+  const displayPrice = price ?? 0;
 
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden relative">
@@ -79,7 +82,7 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
               area={listing.area}
             >
               <div className="text-2xl font-bold text-primary cursor-help hover:text-primary/80 transition-colors">
-                {price.toLocaleString()} {currency}
+                {displayPrice.toLocaleString()} {currency}
               </div>
             </DealTooltip>
           ) : /* Цена с PriceDropTooltip если есть падение цены */
@@ -87,17 +90,17 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
             <PriceDropTooltip
               maxPrice={maxPrice}
               minPrice={minPrice}
-              currentPrice={price}
+              currentPrice={displayPrice}
               dropPercent={dropPercent}
               currency={tooltipCurrency}
             >
               <div className="text-2xl font-bold text-primary cursor-help hover:text-primary/80 transition-colors">
-                {price.toLocaleString()} {currency}
+                {displayPrice.toLocaleString()} {currency}
               </div>
             </PriceDropTooltip>
           ) : (
             <div className="text-2xl font-bold text-primary">
-              {price.toLocaleString()} {currency}
+              {displayPrice.toLocaleString()} {currency}
             </div>
           )}
         </div>
