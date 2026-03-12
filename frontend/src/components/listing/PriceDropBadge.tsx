@@ -38,7 +38,7 @@ export const PriceDropBadge: React.FC<PriceDropBadgeProps> = ({ dropPercent, cla
   return (
     <div
       className={cn(
-        'absolute top-2 right-2 z-10',
+        'absolute top-2 left-2 z-10',
         'animate-fade-in',
         className
       )}
