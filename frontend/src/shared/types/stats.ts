@@ -151,11 +151,3 @@ export interface PriceDropHistoryResponse {
   last_price: number;
   total_drop_percent: number;
 }
-
-// Экспорт для удобного импорта из shared/types
-export type {
-  PriceDropListing,
-  PriceDropResponse,
-  PriceDropHistoryItem,
-  PriceDropHistoryResponse,
-};
