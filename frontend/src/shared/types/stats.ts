@@ -90,3 +90,64 @@ export interface DealStats {
   avg_price_per_m2: number;
   total_savings: number;
 }
+
+/**
+ * Типы для Price Drop Tracker (трекинг падения цены)
+ */
+
+export interface PriceDropListing {
+  id: string;
+  kufar_id: string;
+  url: string;
+  title: string;
+  price: number;
+  price_usd?: number | null;
+  currency: string;
+  city: string | null;
+  address: string | null;
+  rooms: number | null;
+  area: number | null;
+  floor: number | null;
+  total_floors?: number | null;
+  category: string | null;
+  description: string | null;
+  district: string | null;
+  metro: string | null;
+  house_year: number | null;
+  images: string[];
+  status: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  price_per_m2_byn?: number | null;
+  price_per_m2_usd?: number | null;
+  // Price drop метрики
+  max_price: number;
+  min_price: number;
+  drop_percent: number;
+  current_price: number;
+}
+
+export interface PriceDropResponse {
+  items: PriceDropListing[];
+  total: number;
+  avg_drop_percent: number;
+  max_drop_percent: number;
+  min_drop_percent: number;
+  currency: string;
+}
+
+export interface PriceDropHistoryItem {
+  event_type: string;
+  price_before: number;
+  price_after: number;
+  price_before_usd?: number | null;
+  price_after_usd?: number | null;
+  created_at: string;
+}
+
+export interface PriceDropHistoryResponse {
+  items: PriceDropHistoryItem[];
+  first_price: number;
+  last_price: number;
+  total_drop_percent: number;
+}
