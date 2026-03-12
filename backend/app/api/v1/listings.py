@@ -65,7 +65,8 @@ async def get_listings(
         "usd", description="Валюта для расчёта метрик выгоды (byn/usd)"
     ),
     include_price_drop: bool = Query(
-        False, description="Включить информацию о падении цены (max_price, min_price, drop_percent)"
+        False,
+        description="Включить информацию о падении цены (max_price, min_price, drop_percent)",
     ),
     price_drop_currency: str = Query(
         "usd", description="Валюта для расчёта падения цены (byn/usd)"
@@ -254,7 +255,7 @@ async def get_listings(
         logger.info(
             f"Adding price drop metrics for {len(listings)} listings, currency={price_drop_currency}"
         )
-        
+
         # Валидация валюты
         price_drop_curr = price_drop_currency.lower()
         if price_drop_curr not in ("byn", "usd"):
@@ -265,15 +266,19 @@ async def get_listings(
 
         # Определяем поле цены в зависимости от валюты
         price_before_field = (
-            ListingHistory.price_before_usd if price_drop_curr == "usd" else ListingHistory.price_before
+            ListingHistory.price_before_usd
+            if price_drop_curr == "usd"
+            else ListingHistory.price_before
         )
         price_after_field = (
-            ListingHistory.price_after_usd if price_drop_curr == "usd" else ListingHistory.price_after
+            ListingHistory.price_after_usd
+            if price_drop_curr == "usd"
+            else ListingHistory.price_after
         )
 
         # Получаем listing_id для запроса
         listing_ids = [l.id for l in listings]
-        
+
         if listing_ids:
             # Запрос для получения max/min цен по всем listing_id
             price_drop_query = (
@@ -292,7 +297,7 @@ async def get_listings(
                 )
                 .group_by(ListingHistory.listing_id)
             )
-            
+
             price_drop_result = await db.execute(price_drop_query)
             price_drops_map = {row.listing_id: row for row in price_drop_result.all()}
 
@@ -300,7 +305,7 @@ async def get_listings(
             items_with_price_drop = []
             for listing in listings:
                 price_drop = price_drops_map.get(listing.id)
-                
+
                 if price_drop and price_drop.max_price and price_drop.max_price > 0:
                     max_price = price_drop.max_price
                     min_price = price_drop.min_price

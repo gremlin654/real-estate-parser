@@ -57,6 +57,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Удаляем индексы Price Drop Tracker."""
-    op.drop_index("idx_listing_history_listing_id_created", table_name="listing_history")
+    op.drop_index(
+        "idx_listing_history_listing_id_created", table_name="listing_history"
+    )
     op.drop_index("idx_listing_history_created_at", table_name="listing_history")
     op.drop_index("idx_listing_history_listing_event", table_name="listing_history")

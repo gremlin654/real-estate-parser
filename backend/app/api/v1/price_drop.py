@@ -24,15 +24,19 @@ from app.schemas.price_drop import (
 )
 from app.config import CITY_NAMES
 
-
 router = APIRouter(prefix="/price-drops", tags=["price-drops"])
 
 
 @router.get("", response_model=PriceDropResponse)
 async def get_price_drops(
     request: Request,
-    city: str = Query(..., description="Город для фильтрации (minsk, mogilev, grodno, brest, gomel, vitebsk)"),
-    drop_percent: float = Query(10.0, ge=0, le=100, description="Минимальный процент падения (0-100)"),
+    city: str = Query(
+        ...,
+        description="Город для фильтрации (minsk, mogilev, grodno, brest, gomel, vitebsk)",
+    ),
+    drop_percent: float = Query(
+        10.0, ge=0, le=100, description="Минимальный процент падения (0-100)"
+    ),
     currency: str = Query("usd", description="Валюта: byn или usd"),
     limit: int = Query(20, ge=1, le=100, description="Количество результатов (1-100)"),
     offset: int = Query(0, ge=0, description="Смещение для пагинации"),
@@ -92,12 +96,14 @@ async def get_price_drops(
     try:
         service = get_price_drop_service(db)
 
-        listings, avg_drop, max_drop, min_drop, total = await service.get_price_drop_listings(
-            city=city_lower,
-            drop_percent=drop_percent,
-            limit=limit,
-            offset=offset,
-            currency=currency_lower,
+        listings, avg_drop, max_drop, min_drop, total = (
+            await service.get_price_drop_listings(
+                city=city_lower,
+                drop_percent=drop_percent,
+                limit=limit,
+                offset=offset,
+                currency=currency_lower,
+            )
         )
 
         logger.info(
@@ -118,14 +124,18 @@ async def get_price_drops(
 
     except Exception as e:
         logger.error(f"Error getting price drops: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения данных: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения данных: {str(e)}"
+        )
 
 
 @router.get("/stats", response_model=PriceDropStats)
 async def get_price_drop_statistics(
     request: Request,
     city: str = Query(..., description="Город для фильтрации"),
-    drop_percent: float = Query(10.0, ge=0, le=100, description="Минимальный процент падения"),
+    drop_percent: float = Query(
+        10.0, ge=0, le=100, description="Минимальный процент падения"
+    ),
     currency: str = Query("usd", description="Валюта: byn или usd"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -188,10 +198,14 @@ async def get_price_drop_statistics(
 
     except Exception as e:
         logger.error(f"Error getting price drop stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+        )
 
 
-@router.get("/listings/{listing_id}/price-history", response_model=PriceDropHistoryResponse)
+@router.get(
+    "/listings/{listing_id}/price-history", response_model=PriceDropHistoryResponse
+)
 async def get_listing_price_history(
     listing_id: UUID,
     currency: str = Query("usd", description="Валюта: byn или usd"),
@@ -231,9 +245,11 @@ async def get_listing_price_history(
     try:
         service = get_price_drop_service(db)
 
-        items, first_price, last_price, total_drop_percent = await service.get_listing_price_history(
-            listing_id=listing_id,
-            currency=currency_lower,
+        items, first_price, last_price, total_drop_percent = (
+            await service.get_listing_price_history(
+                listing_id=listing_id,
+                currency=currency_lower,
+            )
         )
 
         logger.info(
@@ -245,10 +261,14 @@ async def get_listing_price_history(
             "items": items,
             "first_price": first_price,
             "last_price": last_price,
-            "total_drop_percent": round(total_drop_percent, 2) if total_drop_percent else None,
+            "total_drop_percent": (
+                round(total_drop_percent, 2) if total_drop_percent else None
+            ),
             "currency": currency_lower.upper(),
         }
 
     except Exception as e:
         logger.error(f"Error getting price history for listing {listing_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения истории: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения истории: {str(e)}"
+        )

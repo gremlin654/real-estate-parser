@@ -30,7 +30,6 @@ from app.schemas.price_drop import (
 from app.core.redis_client import get_redis
 from app.config import settings, CITY_NAMES
 
-
 # TTL для кэширования (в секундах)
 CACHE_TTL_PRICE_DROPS = 300  # 5 минут
 CACHE_TTL_PRICE_HISTORY = 180  # 3 минуты
@@ -67,9 +66,7 @@ class PriceDropService:
                 return None
         return self._redis
 
-    def _generate_cache_key(
-        self, prefix: str, **params: Any
-    ) -> str:
+    def _generate_cache_key(self, prefix: str, **params: Any) -> str:
         """
         Генерирует ключ кэша из параметров.
 
@@ -142,7 +139,9 @@ class PriceDropService:
                     return obj.model_dump()
                 return str(obj)
 
-            serialized_data = json.dumps(data, default=default_serializer, ensure_ascii=False)
+            serialized_data = json.dumps(
+                data, default=default_serializer, ensure_ascii=False
+            )
             await redis_client.setex(key, ttl, serialized_data)
             logger.debug(f"Cached data for key {key} with TTL {ttl}s")
             return True
@@ -229,23 +228,24 @@ class PriceDropService:
         )
 
         # Запрос с расчётом drop_percent
-        drop_query = (
-            select(
-                subquery.c.listing_id,
-                subquery.c.max_price,
-                subquery.c.min_price,
+        drop_query = select(
+            subquery.c.listing_id,
+            subquery.c.max_price,
+            subquery.c.min_price,
+            (
+                (subquery.c.max_price - subquery.c.min_price)
+                / func.nullif(subquery.c.max_price, 0)
+                * 100
+            ).label("drop_percent"),
+        ).where(
+            and_(
+                subquery.c.max_price > 0,
                 (
                     (subquery.c.max_price - subquery.c.min_price)
                     / func.nullif(subquery.c.max_price, 0)
                     * 100
-                ).label("drop_percent"),
-            )
-            .where(
-                and_(
-                    subquery.c.max_price > 0,
-                    ((subquery.c.max_price - subquery.c.min_price) / func.nullif(subquery.c.max_price, 0) * 100)
-                    >= drop_percent,
                 )
+                >= drop_percent,
             )
         )
 
@@ -257,14 +257,18 @@ class PriceDropService:
         total = total_result.scalar() or 0
 
         # Основной запрос с JOIN к listings
-        drop_query_limited = drop_query.order_by(
-            func.nullif(
-                (subquery.c.max_price - subquery.c.min_price)
-                / func.nullif(subquery.c.max_price, 0)
-                * 100,
-                0,
-            ).desc()
-        ).offset(offset).limit(limit)
+        drop_query_limited = (
+            drop_query.order_by(
+                func.nullif(
+                    (subquery.c.max_price - subquery.c.min_price)
+                    / func.nullif(subquery.c.max_price, 0)
+                    * 100,
+                    0,
+                ).desc()
+            )
+            .offset(offset)
+            .limit(limit)
+        )
 
         # CTE для ограниченного запроса
         limited_cte = drop_query_limited.cte("drop_query_limited")
@@ -303,9 +307,7 @@ class PriceDropService:
             drop_percents.append(drop_pct)
 
             # Текущая цена в зависимости от валюты
-            current_price = (
-                listing.price_usd if currency == "usd" else listing.price
-            )
+            current_price = listing.price_usd if currency == "usd" else listing.price
 
             listings.append(
                 {
@@ -324,7 +326,11 @@ class PriceDropService:
                     "area": listing.area,
                     "floor": listing.floor,
                     "images": listing.images or [],
-                    "status": listing.status.value if hasattr(listing.status, "value") else str(listing.status),
+                    "status": (
+                        listing.status.value
+                        if hasattr(listing.status, "value")
+                        else str(listing.status)
+                    ),
                     "first_seen_at": listing.first_seen_at,
                     "last_seen_at": listing.last_seen_at,
                 }
@@ -433,7 +439,11 @@ class PriceDropService:
             items.append(
                 {
                     "id": str(record.id),
-                    "event_type": record.event_type.value if hasattr(record.event_type, "value") else str(record.event_type),
+                    "event_type": (
+                        record.event_type.value
+                        if hasattr(record.event_type, "value")
+                        else str(record.event_type)
+                    ),
                     "price_before": price_before,
                     "price_after": price_after,
                     "created_at": record.created_at,
@@ -454,7 +464,9 @@ class PriceDropService:
             "items": items,
             "first_price": first_price,
             "last_price": last_price,
-            "total_drop_percent": round(total_drop_percent, 2) if total_drop_percent else None,
+            "total_drop_percent": (
+                round(total_drop_percent, 2) if total_drop_percent else None
+            ),
         }
         await self._set_to_cache(cache_key, cache_data, CACHE_TTL_PRICE_HISTORY)
 
@@ -524,21 +536,22 @@ class PriceDropService:
         )
 
         # Запрос с расчётом drop_percent
-        drop_query = (
-            select(
-                subquery.c.listing_id,
+        drop_query = select(
+            subquery.c.listing_id,
+            (
+                (subquery.c.max_price - subquery.c.min_price)
+                / func.nullif(subquery.c.max_price, 0)
+                * 100
+            ).label("drop_percent"),
+        ).where(
+            and_(
+                subquery.c.max_price > 0,
                 (
                     (subquery.c.max_price - subquery.c.min_price)
                     / func.nullif(subquery.c.max_price, 0)
                     * 100
-                ).label("drop_percent"),
-            )
-            .where(
-                and_(
-                    subquery.c.max_price > 0,
-                    ((subquery.c.max_price - subquery.c.min_price) / func.nullif(subquery.c.max_price, 0) * 100)
-                    >= drop_percent,
                 )
+                >= drop_percent,
             )
         )
 

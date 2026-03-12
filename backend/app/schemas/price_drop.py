@@ -198,7 +198,5 @@ class PriceDropQueryParams(BaseModel):
             "vitebsk",
         }
         if v.lower() not in valid_cities:
-            raise ValueError(
-                f"city must be one of: {', '.join(valid_cities)}"
-            )
+            raise ValueError(f"city must be one of: {', '.join(valid_cities)}")
         return v.lower()
