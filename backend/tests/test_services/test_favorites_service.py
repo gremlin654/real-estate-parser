@@ -757,8 +757,8 @@ class TestCacheWriteRead:
             user_id=sample_user_id, page=1, size=20
         )
 
-        # Assert - проверяем что кэш был прочитан
-        mock_redis.get.assert_called_once()
+        # Assert - проверяем что кэш был прочитан (2 вызова: данные + total)
+        assert mock_redis.get.call_count == 2
         assert len(favorites) == 1
         assert isinstance(favorites[0], Favorite)
         assert favorites[0].id == sample_favorite.id
