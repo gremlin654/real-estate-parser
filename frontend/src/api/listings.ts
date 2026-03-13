@@ -791,7 +791,7 @@ export const useFavoritesQuery = (
   size = 20,
   filters?: FavoritesFilters,
   options?: {
-    refetchOnMount?: boolean | 'always' | 'never';
+    refetchOnMount?: boolean | 'always';
   }
 ) => {
   return useQuery<FavoritesResponse>({

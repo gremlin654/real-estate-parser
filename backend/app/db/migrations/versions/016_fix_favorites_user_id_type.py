@@ -5,6 +5,7 @@ Revises: 015
 Create Date: 2026-03-14 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """
     Исправляем тип колонки user_id с character varying на UUID.
-    
+
     Используем USING clause для конвертации существующих данных.
     """
     # Изменяем тип колонки user_id на UUID
@@ -30,7 +31,7 @@ def upgrade() -> None:
         existing_type=sa.String(),
         type_=UUID(as_uuid=True),
         existing_nullable=False,
-        postgresql_using="user_id::uuid"
+        postgresql_using="user_id::uuid",
     )
 
 

@@ -360,38 +360,40 @@ class FavoritesService:
         # Применяем фильтры
         if city:
             base_query = base_query.where(Listing.city == city)
-        
+
         if price_from is not None:
             base_query = base_query.where(Listing.price_usd >= price_from)
-        
+
         if price_to is not None:
             base_query = base_query.where(Listing.price_usd <= price_to)
-        
+
         if rooms:
             base_query = base_query.where(Listing.rooms.in_(rooms))
-        
+
         if rooms_other:
             base_query = base_query.where(Listing.rooms >= 5)
 
         # Применяем сортировку
-        if sort == 'created_at_asc':
+        if sort == "created_at_asc":
             base_query = base_query.order_by(Favorite.created_at.asc())
-        elif sort == 'price_asc':
+        elif sort == "price_asc":
             base_query = base_query.order_by(Listing.price_usd.asc())
-        elif sort == 'price_desc':
+        elif sort == "price_desc":
             base_query = base_query.order_by(Listing.price_usd.desc())
-        elif sort == 'newest':
+        elif sort == "newest":
             base_query = base_query.order_by(Listing.first_seen_at.desc())
-        elif sort == 'oldest':
+        elif sort == "oldest":
             base_query = base_query.order_by(Listing.first_seen_at.asc())
         else:  # created_at_desc (default)
             base_query = base_query.order_by(Favorite.created_at.desc())
 
         # Получаем общее количество с фильтрами
-        count_query = select(func.count(Favorite.id)).join(
-            Listing, Favorite.listing_id == Listing.id
-        ).where(Favorite.user_id == user_id)
-        
+        count_query = (
+            select(func.count(Favorite.id))
+            .join(Listing, Favorite.listing_id == Listing.id)
+            .where(Favorite.user_id == user_id)
+        )
+
         if city:
             count_query = count_query.where(Listing.city == city)
         if price_from is not None:
@@ -402,7 +404,38 @@ class FavoritesService:
             count_query = count_query.where(Listing.rooms.in_(rooms))
         if rooms_other:
             count_query = count_query.where(Listing.rooms >= 5)
-            
+
+        # Получаем Redis клиент для кэширования
+        redis_client = await self._get_redis()
+
+        # Проверяем кэш (если Redis доступен)
+        if redis_client:
+            cache_key = self._get_cache_key(user_id, page, size)
+            try:
+                cached_data = await redis_client.get(cache_key)
+                if cached_data:
+                    logger.debug(
+                        f"Cache hit for user {user_id}, page {page}, size {size}"
+                    )
+                    # Десериализуем данные из кэша (Redis возвращает bytes)
+                    if isinstance(cached_data, bytes):
+                        cached_data = cached_data.decode("utf-8")
+                    data = json.loads(cached_data)
+                    favorites = self._deserialize_favorites(data)
+
+                    # Получаем total из кэша или БД
+                    total_cached = await redis_client.get(f"{cache_key}:total")
+                    if total_cached:
+                        total = int(total_cached)
+                    else:
+                        total_result = await self.db.execute(count_query)
+                        total = total_result.scalar() or 0
+
+                    return favorites, total
+            except Exception as e:
+                logger.warning(f"Cache read error: {e}")
+
+        # Получаем общее количество с фильтрами (cache miss)
         total_result = await self.db.execute(count_query)
         total = total_result.scalar() or 0
 
@@ -410,6 +443,22 @@ class FavoritesService:
         query = base_query.offset(offset).limit(size)
         result = await self.db.execute(query)
         favorites = result.scalars().all()
+
+        # Записываем в кэш (если Redis доступен и есть данные)
+        if redis_client and favorites:
+            cache_key = self._get_cache_key(user_id, page, size)
+            try:
+                serialized = [self._serialize_favorite(fav) for fav in favorites]
+                await redis_client.setex(
+                    cache_key, FAVORITES_CACHE_TTL, json.dumps(serialized)
+                )
+                # Кэшируем total отдельно
+                await redis_client.setex(
+                    f"{cache_key}:total", FAVORITES_CACHE_TTL, str(total)
+                )
+                logger.debug(f"Cached {len(favorites)} favorites for user {user_id}")
+            except Exception as e:
+                logger.warning(f"Cache write error: {e}")
 
         logger.debug(
             f"Retrieved {len(favorites)} favorites for user {user_id} "

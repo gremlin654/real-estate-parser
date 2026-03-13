@@ -66,9 +66,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         # Уникальное ограничение на пару (user_id, listing_id)
-        sa.UniqueConstraint(
-            "user_id", "listing_id", name="uq_favorites_user_listing"
-        ),
+        sa.UniqueConstraint("user_id", "listing_id", name="uq_favorites_user_listing"),
     )
 
     # Создаём композитный индекс для быстрого поиска всех избранных пользователя

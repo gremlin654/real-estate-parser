@@ -33,19 +33,19 @@ export function FavoritesPage() {
   // Мемоизируем filters чтобы queryKey не менялся при каждом рендере
   const memoizedFilters = useMemo(() => filters, [filters]);
 
-  const { data, isLoading, error, refetch } = useFavoritesQuery(page, PAGE_SIZE, memoizedFilters, {
-    refetchOnMount: 'always', // Всегда обновлять данные при монтировании компонента
+  const { data, isLoading, error } = useFavoritesQuery(page, PAGE_SIZE, memoizedFilters, {
+    refetchOnMount: 'always' as const, // Всегда обновлять данные при монтировании компонента
   });
 
   // Синхронизация store с сервером при загрузке данных
   useEffect(() => {
     if (data?.items) {
-      const listingIds = data.items.map((fav) => fav.listing_id);
+      const listingIds = data.items.map((fav: { listing_id: string }) => fav.listing_id);
       setFavorites(listingIds);
     }
   }, [data?.items, setFavorites]);
 
-  const totalPages = Math.ceil((data?.total || 0) / PAGE_SIZE);
+  const totalPages = Math.ceil(((data?.total as number) || 0) / PAGE_SIZE);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
