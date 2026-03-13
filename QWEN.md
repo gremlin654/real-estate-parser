@@ -530,6 +530,42 @@ GET /api/v1/listings?city=minsk&include_price_drop=true  # max_price, min_price,
 - `current_price` — текущая цена
 - `price`, `price_usd` — цена в BYN/USD для совместимости с Listing
 
+### Favorites API (v3.7) — Избранные объявления
+
+```bash
+GET /api/v1/favorites?page=1&size=20                          # Список избранных
+GET /api/v1/favorites?page=1&size=20&city=minsk               # С фильтром по городу
+GET /api/v1/favorites?page=1&size=20&price_from=50000         # С фильтром по цене
+GET /api/v1/favorites?page=1&size=20&rooms=1&rooms=2          # С фильтром по комнатам
+GET /api/v1/favorites?page=1&size=20&sort=price_asc           # С сортировкой
+POST /api/v1/favorites/{listing_id}                           # Добавить в избранное
+DELETE /api/v1/favorites/{listing_id}                         # Удалить из избранного
+GET /api/v1/favorites/check/{listing_id}                      # Проверить, в избранном ли
+```
+
+**Параметры GET `/api/v1/favorites`:**
+- `page` (по умолчанию 1) — номер страницы
+- `size` (по умолчанию 20) — размер страницы (1-100)
+- `city` (опционально) — город для фильтрации
+- `price_from` (опционально) — минимальная цена
+- `price_to` (опционально) — максимальная цена
+- `rooms` (опционально) — количество комнат (можно несколько)
+- `rooms_other` (опционально) — включить 5+ комнат
+- `sort` (опционально) — сортировка (`created_at_desc`, `created_at_asc`, `price_asc`, `price_desc`, `newest`, `oldest`)
+
+**Response `/api/v1/favorites`:**
+- `items` — список избранных объявлений с данными
+- `total` — общее количество избранных
+- `page` — текущая страница
+- `size` — размер страницы
+
+**Favorite Listing поля:**
+- `id` — UUID записи в favorites
+- `user_id` — UUID пользователя
+- `listing_id` — UUID объявления
+- `created_at` — дата добавления
+- `listing` — полные данные объявления (Listing объект)
+
 ## Схема базы данных
 
 ### listings
@@ -830,7 +866,54 @@ docker-compose logs backend
 
 **MR Status:** ✅ Ветка `develop` актуальна
 
-### v3.6 (текущая — в разработке)
+### v3.7 (текущая — в разработке)
+
+**Favorites System — система избранных объявлений:**
+- **✅ Добавление/удаление** — кнопка FavoriteButton на всех страницах (`/listings`, `/deals`, `/price-drops`, `/favorites`, `/listing/:id`)
+- **✅ Синхронизация состояния** — store синхронизируется с сервером при загрузке `/favorites`
+- **✅ Автоматическое обновление** — список избранных обновляется при возврате на страницу (`refetchOnMount: 'always'`)
+- **✅ Кнопка на странице избранных** — можно удалять объявления прямо из карточки на `/favorites`
+- **✅ Фильтры на `/favorites`** — работают фильтры по городу, цене, комнатам, сортировке
+- **✅ API фильтрация** — backend поддерживает фильтры для избранных (`city`, `price_from`, `price_to`, `rooms`, `sort`)
+
+**UI/UX улучшения:**
+- **✅ Позиционирование PriceDropBadge** — перемещён в правый нижний угол карточки (`bottom-2 right-2`)
+- **✅ Позиционирование FavoriteButton** — правый верхний угол (`top-2 right-2`)
+- **✅ Позиционирование DealBadge** — левый верхний угол (`top-2 left-2`)
+- **✅ Улучшены фильтры на `/favorites`** — использованы shadcn/ui компоненты, иконки, tooltip
+- **✅ Исправлено наложение элементов** — Badge и FavoriteButton разнесены по разным позициям
+
+**Исправления:**
+- **🔴 FavoriteButton использует UUID** — исправлено с `listing.kufar_id` на `listing.id` (API требует UUID)
+- **🔴 Инвалидация кэша** — добавлен `exact: false` для `invalidateQueries(['favorites'])`
+- **🔴 Синхронизация store** — при загрузке `/favorites` store обновляется серверными данными
+- **🔴 Миграция БД 016** — исправлен тип колонки `favorites.user_id` с `character varying` на `UUID`
+
+**Backend изменения:**
+- `backend/app/api/v1/favorites.py` — добавлены query параметры для фильтрации (city, price_from, price_to, rooms, sort)
+- `backend/app/services/favorites_service.py` — реализована фильтрация и сортировка избранных
+- `backend/app/db/migrations/versions/016_fix_favorites_user_id_type.py` — миграция для типа user_id
+
+**Frontend изменения:**
+- `frontend/src/api/listings.ts` — `useFavoritesQuery` поддерживает filters и options (`refetchOnMount`)
+- `frontend/src/pages/Favorites/ui/FavoritesPage.tsx` — синхронизация store, refetchOnMount, кнопка на карточках
+- `frontend/src/components/listing/FavoriteButton.tsx` — убрано absolute позиционирование (теперь inline-flex)
+- `frontend/src/components/listing/PriceDropBadge.tsx` — позиционирование `bottom-2 right-2`
+- `frontend/src/widgets/ListingCard/ui/ListingCardWidget.tsx` — обновлено позиционирование кнопок
+- `frontend/src/widgets/ListingTable/ui/ListingTable.tsx` — добавлена колонка с FavoriteButton
+- `frontend/src/pages/ListingDetail/ui/ListingDetail.tsx` — добавлен FavoriteButton в header
+- `frontend/src/features/favorites/ui/FavoritesFilter.tsx` — улучшенный UI с shadcn/ui компонентами
+
+**Тесты:**
+- **Frontend Unit:** 261 тест (100% pass rate)
+- **PriceDropBadge:** 12 тестов
+- **FavoriteButton:** 14 тестов
+- **FavoritesFilter:** 27 тестов
+
+**Документация:**
+- Обновлён `QWEN.md` — контекст для AI-ассистента
+
+### v3.6 (завершённая)
 
 **Price Drop Tracker — трекинг падения цены:**
 - **✅ Страница `/price-drops`** — просмотр всех квартир с падением цены

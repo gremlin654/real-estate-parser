@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, useLocation } from 'react-router-dom';
-import { Home, List, Settings, BarChart3, Menu, Database, TrendingDown } from 'lucide-react';
+import { Home, List, Settings, BarChart3, Menu, Database, TrendingDown, Star } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/shared/ui/sheet';
 import { Button } from '@/shared/ui/button';
 import { useState, ReactNode } from 'react';
@@ -17,6 +17,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navItems = [
     { path: '/', icon: Home, label: 'Панель управления' },
     { path: '/listings', icon: List, label: 'Объявления' },
+    { path: '/favorites', icon: Star, label: 'Избранные' },
     { path: '/deals', icon: TrendingDown, label: 'Выгодные предложения' },
     { path: '/price-drops', icon: TrendingDown, label: '📉 Price Drop' },
     { path: '/statistics', icon: BarChart3, label: 'Статистика' },

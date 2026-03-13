@@ -6,6 +6,7 @@ from app.models.listing import (
     ScanHistory,
     ScanSettings,
 )
+from app.models.favorite import Favorite
 
 __all__ = [
     "Listing",
@@ -14,4 +15,5 @@ __all__ = [
     "EventType",
     "ScanHistory",
     "ScanSettings",
+    "Favorite",
 ]

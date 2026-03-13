@@ -46,6 +46,7 @@ import { CITIES, STATUS_LABELS } from '@/shared/config';
 import { ListingInfo } from '@/entities/listing';
 import { useFilterStore } from '@/store/filterStore';
 import { PriceHistoryChartWithStyles as PriceHistoryChart } from '@/components/stats/PriceHistoryChart';
+import { FavoriteButton } from '@/components/listing/FavoriteButton';
 
 export function ListingDetail() {
   const { id } = useParams();
@@ -95,12 +96,12 @@ export function ListingDetail() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Button variant="ghost" onClick={() => navigate('/listings')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Назад
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             {listing.title}
           </h1>
@@ -110,17 +111,20 @@ export function ListingDetail() {
             {city && <span>• {city}</span>}
           </div>
         </div>
-        <Badge
-          variant={
-            listing.status === 'active'
-              ? 'default'
-              : listing.status === 'deleted'
-              ? 'destructive'
-              : 'secondary'
-          }
-        >
-          {STATUS_LABELS[listing.status as keyof typeof STATUS_LABELS]}
-        </Badge>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <FavoriteButton listingId={listing.id} size="lg" />
+          <Badge
+            variant={
+              listing.status === 'active'
+                ? 'default'
+                : listing.status === 'deleted'
+                ? 'destructive'
+                : 'secondary'
+            }
+          >
+            {STATUS_LABELS[listing.status as keyof typeof STATUS_LABELS]}
+          </Badge>
+        </div>
       </div>
 
       {/* Main Content */}
