@@ -360,38 +360,40 @@ class FavoritesService:
         # Применяем фильтры
         if city:
             base_query = base_query.where(Listing.city == city)
-        
+
         if price_from is not None:
             base_query = base_query.where(Listing.price_usd >= price_from)
-        
+
         if price_to is not None:
             base_query = base_query.where(Listing.price_usd <= price_to)
-        
+
         if rooms:
             base_query = base_query.where(Listing.rooms.in_(rooms))
-        
+
         if rooms_other:
             base_query = base_query.where(Listing.rooms >= 5)
 
         # Применяем сортировку
-        if sort == 'created_at_asc':
+        if sort == "created_at_asc":
             base_query = base_query.order_by(Favorite.created_at.asc())
-        elif sort == 'price_asc':
+        elif sort == "price_asc":
             base_query = base_query.order_by(Listing.price_usd.asc())
-        elif sort == 'price_desc':
+        elif sort == "price_desc":
             base_query = base_query.order_by(Listing.price_usd.desc())
-        elif sort == 'newest':
+        elif sort == "newest":
             base_query = base_query.order_by(Listing.first_seen_at.desc())
-        elif sort == 'oldest':
+        elif sort == "oldest":
             base_query = base_query.order_by(Listing.first_seen_at.asc())
         else:  # created_at_desc (default)
             base_query = base_query.order_by(Favorite.created_at.desc())
 
         # Получаем общее количество с фильтрами
-        count_query = select(func.count(Favorite.id)).join(
-            Listing, Favorite.listing_id == Listing.id
-        ).where(Favorite.user_id == user_id)
-        
+        count_query = (
+            select(func.count(Favorite.id))
+            .join(Listing, Favorite.listing_id == Listing.id)
+            .where(Favorite.user_id == user_id)
+        )
+
         if city:
             count_query = count_query.where(Listing.city == city)
         if price_from is not None:
@@ -402,7 +404,7 @@ class FavoritesService:
             count_query = count_query.where(Listing.rooms.in_(rooms))
         if rooms_other:
             count_query = count_query.where(Listing.rooms >= 5)
-            
+
         total_result = await self.db.execute(count_query)
         total = total_result.scalar() or 0
 
