@@ -419,7 +419,7 @@ class FavoritesService:
                     )
                     # Десериализуем данные из кэша
                     data = json.loads(cached_data)
-                    favorites = [self._deserialize_favorite(item) for item in data]
+                    favorites = self._deserialize_favorites(data)
 
                     # Получаем total из кэша или БД
                     total_cached = await redis_client.get(f"{cache_key}:total")
