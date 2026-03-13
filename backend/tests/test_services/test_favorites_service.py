@@ -745,7 +745,7 @@ class TestCacheWriteRead:
         # Setup - cache hit
         sample_favorite.listing = sample_listing
         serialized_data = [favorites_service._serialize_favorite(sample_favorite)]
-        mock_redis.get.return_value = json.dumps(serialized_data)
+        mock_redis.get.return_value = json.dumps(serialized_data).encode('utf-8')  # Redis возвращает bytes
 
         # Setup - mock для total count
         mock_execute_result = MagicMock()
