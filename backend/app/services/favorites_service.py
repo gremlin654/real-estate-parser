@@ -405,13 +405,10 @@ class FavoritesService:
         if rooms_other:
             count_query = count_query.where(Listing.rooms >= 5)
 
-        total_result = await self.db.execute(count_query)
-        total = total_result.scalar() or 0
-
-        # Получаем Redis клиент
+        # Получаем Redis клиент для кэширования
         redis_client = await self._get_redis()
 
-        # Проверяем кэш
+        # Проверяем кэш (если Redis доступен)
         if redis_client:
             cache_key = self._get_cache_key(user_id, page, size)
             try:
@@ -420,25 +417,42 @@ class FavoritesService:
                     logger.debug(
                         f"Cache hit for user {user_id}, page {page}, size {size}"
                     )
-                    # Десериализуем данные
+                    # Десериализуем данные из кэша
                     data = json.loads(cached_data)
                     favorites = [self._deserialize_favorite(item) for item in data]
+
+                    # Получаем total из кэша или БД
+                    total_cached = await redis_client.get(f"{cache_key}:total")
+                    if total_cached:
+                        total = int(total_cached)
+                    else:
+                        total_result = await self.db.execute(count_query)
+                        total = total_result.scalar() or 0
+
                     return favorites, total
             except Exception as e:
                 logger.warning(f"Cache read error: {e}")
+
+        # Получаем общее количество с фильтрами (cache miss)
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar() or 0
 
         # Применяем пагинацию
         query = base_query.offset(offset).limit(size)
         result = await self.db.execute(query)
         favorites = result.scalars().all()
 
-        # Записываем в кэш
+        # Записываем в кэш (если Redis доступен и есть данные)
         if redis_client and favorites:
             cache_key = self._get_cache_key(user_id, page, size)
             try:
                 serialized = [self._serialize_favorite(fav) for fav in favorites]
                 await redis_client.setex(
                     cache_key, FAVORITES_CACHE_TTL, json.dumps(serialized)
+                )
+                # Кэшируем total отдельно
+                await redis_client.setex(
+                    f"{cache_key}:total", FAVORITES_CACHE_TTL, str(total)
                 )
                 logger.debug(f"Cached {len(favorites)} favorites for user {user_id}")
             except Exception as e:
