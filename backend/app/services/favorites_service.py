@@ -417,11 +417,9 @@ class FavoritesService:
                     logger.debug(
                         f"Cache hit for user {user_id}, page {page}, size {size}"
                     )
-                    # Десериализуем данные из кэша (Redis возвращает bytes)
-                    if isinstance(cached_data, bytes):
-                        cached_data = cached_data.decode("utf-8")
+                    # Десериализуем данные из кэша
                     data = json.loads(cached_data)
-                    favorites = self._deserialize_favorites(data)
+                    favorites = [self._deserialize_favorite(item) for item in data]
 
                     # Получаем total из кэша или БД
                     total_cached = await redis_client.get(f"{cache_key}:total")
