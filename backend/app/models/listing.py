@@ -77,6 +77,9 @@ class Listing(Base):
     history = relationship(
         "ListingHistory", back_populates="listing", cascade="all, delete-orphan"
     )
+    favorites = relationship(
+        "Favorite", back_populates="listing", cascade="all, delete-orphan"
+    )
 
 
 class ListingHistory(Base):

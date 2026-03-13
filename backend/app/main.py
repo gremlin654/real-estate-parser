@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.config import settings
 from app.db.database import engine, async_session_maker
-from app.models import Listing, ListingHistory, ScanHistory
+from app.models import Listing, ListingHistory, ScanHistory, Favorite
 from app.api.v1 import (
     listings_router,
     history_router,
@@ -18,6 +18,7 @@ from app.api.v1 import (
     monitoring_router,
     deals_router,
     price_drop_router,
+    favorites_router,
 )
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
@@ -144,6 +145,7 @@ app.include_router(cache_router, prefix=settings.API_PREFIX)
 app.include_router(monitoring_router)  # Monitoring без префикса
 app.include_router(deals_router, prefix=settings.API_PREFIX)  # Deal Finder
 app.include_router(price_drop_router, prefix=settings.API_PREFIX)  # Price Drop Tracker
+app.include_router(favorites_router, prefix=settings.API_PREFIX)  # Favorites
 
 
 @app.get("/health")

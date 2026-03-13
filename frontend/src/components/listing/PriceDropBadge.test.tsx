@@ -34,10 +34,10 @@ describe('PriceDropBadge', () => {
     expect(screen.getByText('40%')).toBeInTheDocument();
   });
 
-  it('имеет правильную позицию (absolute top-2 left-2)', () => {
+  it('имеет правильную позицию (absolute bottom-2 right-2)', () => {
     const { container } = render(<PriceDropBadge dropPercent={10} />);
     const outerDiv = container.firstChild as HTMLElement;
-    expect(outerDiv).toHaveClass('absolute', 'top-2', 'left-2');
+    expect(outerDiv).toHaveClass('absolute', 'bottom-2', 'right-2');
   });
 
   it('имеет анимацию fade-in', () => {

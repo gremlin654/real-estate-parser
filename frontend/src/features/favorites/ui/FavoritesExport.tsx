@@ -8,51 +8,49 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
 import { Download } from 'lucide-react';
+import type { FavoritesFilters } from '@/shared/types';
 
-interface ExportListingsProps {
-  city?: string;
-  status?: string;
-  priceFrom?: number | null;
-  priceTo?: number | null;
-  rooms?: number[];
+interface FavoritesExportProps {
+  filters?: FavoritesFilters;
   disabled?: boolean;
 }
 
-export function ExportListings({ city, status, priceFrom, priceTo, rooms, disabled }: ExportListingsProps) {
+export function FavoritesExport({ filters, disabled }: FavoritesExportProps) {
   const buildUrl = (format: string) => {
     const params = new URLSearchParams();
     params.set('format', format);
-    if (city) params.set('city', city);
-    if (status) params.set('status', status);
-    if (priceFrom) params.set('price_from', String(priceFrom));
-    if (priceTo) params.set('price_to', String(priceTo));
-    if (rooms?.length) {
-      rooms.forEach((r) => params.append('rooms', String(r)));
+
+    if (filters?.city) params.set('city', filters.city);
+    if (filters?.priceFrom) params.set('price_from', String(filters.priceFrom));
+    if (filters?.priceTo) params.set('price_to', String(filters.priceTo));
+    if (filters?.rooms?.length) {
+      filters.rooms.forEach((r) => params.append('rooms', String(r)));
     }
-    return `/api/v1/export/listings?${params}`;
+
+    return `/api/v1/export/favorites?${params}`;
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
+        <Button variant="outline" size="sm" disabled={disabled} data-testid="export-button">
           <Download className="w-4 h-4 mr-2" />
           Экспорт
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem asChild>
-          <a href={buildUrl('csv')} download>
+          <a href={buildUrl('csv')} download data-testid="export-csv">
             CSV
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={buildUrl('xlsx')} download>
+          <a href={buildUrl('xlsx')} download data-testid="export-xlsx">
             XLSX
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={buildUrl('json')} download>
+          <a href={buildUrl('json')} download data-testid="export-json">
             JSON
           </a>
         </DropdownMenuItem>

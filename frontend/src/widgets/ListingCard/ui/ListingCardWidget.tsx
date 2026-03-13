@@ -11,12 +11,14 @@ import { DealBadge } from '@/components/listing/DealBadge';
 import { DealTooltip } from '@/components/listing/DealTooltip';
 import { PriceDropBadge } from '@/components/listing/PriceDropBadge';
 import { PriceDropTooltip } from '@/components/listing/PriceDropTooltip';
+import { FavoriteButton } from '@/components/listing/FavoriteButton';
 
 interface ListingCardProps {
   listing: Listing;
+  withFavoriteButton?: boolean;
 }
 
-export function ListingCardWidget({ listing }: ListingCardProps) {
+export function ListingCardWidget({ listing, withFavoriteButton = true }: ListingCardProps) {
   const navigate = useNavigate();
   const { currency } = useFilterStore();
   const price = currency === 'USD' ? (listing.price_usd ?? listing.price) : listing.price;
@@ -54,17 +56,26 @@ export function ListingCardWidget({ listing }: ListingCardProps) {
             <span className="text-muted-foreground text-4xl">🏠</span>
           </div>
         )}
-        <Badge className="absolute top-2 right-2 z-20" variant="secondary">
+        {/* DealBadge отображается только если есть выгода (слева вверху) */}
+        {dealPercent !== null && dealPercent !== undefined && dealPercent < -10 && (
+          <DealBadge dealPercent={dealPercent} className="z-30" />
+        )}
+        {/* PriceDropBadge отображается только если есть падение >= 5% (справа внизу) */}
+        {dropPercent !== null && dropPercent !== undefined && dropPercent >= 5 && (
+          <PriceDropBadge dropPercent={dropPercent} className="z-20" />
+        )}
+        {/* FavoriteButton (справа вверху, левее Badge) */}
+        {withFavoriteButton && (
+          <FavoriteButton
+            listingId={listing.id}
+            size="sm"
+            className="absolute top-2 right-2 z-30"
+          />
+        )}
+        {/* Badge статуса (справа вверху, правее FavoriteButton) */}
+        <Badge className="absolute top-2 right-10 z-20" variant="secondary">
           {statusLabel}
         </Badge>
-        {/* DealBadge отображается только если есть выгода */}
-        {dealPercent !== null && dealPercent !== undefined && dealPercent < -10 && (
-          <DealBadge dealPercent={dealPercent} />
-        )}
-        {/* PriceDropBadge отображается только если есть падение >= 5% */}
-        {dropPercent !== null && dropPercent !== undefined && dropPercent >= 5 && (
-          <PriceDropBadge dropPercent={dropPercent} />
-        )}
       </div>
 
       <CardContent className="p-4 space-y-3">

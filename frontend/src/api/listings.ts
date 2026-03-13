@@ -25,6 +25,10 @@ import type {
   PriceDropResponse,
   PriceDropHistoryItem,
   PriceDropHistoryResponse,
+  FavoritesResponse,
+  FavoriteCreateResponse,
+  FavoriteCheckResponse,
+  FavoritesFilters,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
@@ -766,6 +770,137 @@ export const useListingPriceHistory = (listingId: string, currency?: 'byn' | 'us
 
       const response = await fetch(`${API_BASE}/price-drops/listings/${listingId}/price-history?${params}`);
       if (!response.ok) throw new Error('Failed to fetch listing price history');
+      return response.json();
+    },
+    enabled: !!listingId,
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * ==========================================
+ * FAVORITES API HOOKS
+ * ==========================================
+ */
+
+/**
+ * Hook для получения списка избранных объявлений
+ */
+export const useFavoritesQuery = (
+  page = 1,
+  size = 20,
+  filters?: FavoritesFilters,
+  options?: {
+    refetchOnMount?: boolean | 'always';
+  }
+) => {
+  return useQuery<FavoritesResponse>({
+    queryKey: ['favorites', page, size, filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('size', String(size));
+
+      // Добавить фильтры в query params
+      if (filters) {
+        if (filters.city) params.set('city', filters.city);
+        if (filters.priceFrom !== null && filters.priceFrom !== undefined) {
+          params.set('price_from', String(filters.priceFrom));
+        }
+        if (filters.priceTo !== null && filters.priceTo !== undefined) {
+          params.set('price_to', String(filters.priceTo));
+        }
+        if (filters.rooms && filters.rooms.length > 0) {
+          filters.rooms.forEach((room) => params.append('rooms', String(room)));
+        }
+        if (filters.roomsOther) {
+          params.set('rooms_other', 'true');
+        }
+        if (filters.sort) {
+          // Маппинг значений сортировки
+          const sortMap: Record<string, string> = {
+            'created_at_desc': 'created_at_desc',
+            'created_at_asc': 'created_at_asc',
+            'price_asc': 'price_asc',
+            'price_desc': 'price_desc',
+            'newest': 'newest',
+            'oldest': 'oldest',
+          };
+          params.set('sort', sortMap[filters.sort] || filters.sort);
+        }
+      }
+
+      const response = await fetch(`${API_BASE}/favorites?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch favorites');
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // 2 минуты
+    refetchOnMount: options?.refetchOnMount ?? false, // По умолчанию не обновлять при монтировании если данные есть
+  });
+};
+
+/**
+ * Hook для добавления в избранное
+ * Backend использует UUID для listing_id, поэтому принимаем string
+ */
+export const useAddToFavorites = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (listingId: string) => {
+      const response = await fetch(`${API_BASE}/favorites/${listingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error('Failed to add to favorites');
+      return response.json();
+    },
+    onSuccess: () => {
+      // Инвалидируем все query с 'favorites' (включая page, size, filters)
+      // exact: false позволяет совпадать с ['favorites', page, size, filters]
+      queryClient.invalidateQueries({ queryKey: ['favorites'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['isFavorite'], exact: false });
+    },
+  });
+};
+
+/**
+ * Hook для удаления из избранного
+ * Backend использует UUID для listing_id, поэтому принимаем string
+ */
+export const useRemoveFromFavorites = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (listingId: string) => {
+      const response = await fetch(`${API_BASE}/favorites/${listingId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok && response.status !== 204) {
+        throw new Error('Failed to remove from favorites');
+      }
+    },
+    onSuccess: () => {
+      // Инвалидируем все query с 'favorites' (включая page, size, filters)
+      // exact: false позволяет совпадать с ['favorites', page, size, filters]
+      queryClient.invalidateQueries({ queryKey: ['favorites'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['isFavorite'], exact: false });
+    },
+  });
+};
+
+/**
+ * Hook для проверки, в избранном ли объявлении
+ * Backend использует UUID для listing_id, поэтому принимаем string | null
+ */
+export const useIsFavoriteCheck = (listingId: string | null) => {
+  return useQuery<FavoriteCheckResponse>({
+    queryKey: ['isFavorite', listingId],
+    queryFn: async () => {
+      if (!listingId) throw new Error('Listing ID is required');
+      
+      const response = await fetch(`${API_BASE}/favorites/check/${listingId}`);
+      if (!response.ok) throw new Error('Failed to check favorite status');
       return response.json();
     },
     enabled: !!listingId,

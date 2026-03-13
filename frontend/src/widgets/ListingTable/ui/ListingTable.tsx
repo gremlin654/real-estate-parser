@@ -15,6 +15,7 @@ import {
 import { Link } from 'react-router-dom';
 import { ExternalLink, Home, MapPin } from 'lucide-react';
 import { useFilterStore } from '@/store/filterStore';
+import { FavoriteButton } from '@/components/listing/FavoriteButton';
 
 interface ListingTableProps {
   listings: Listing[];
@@ -64,6 +65,9 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
                   <div className="h-6 w-20 bg-muted rounded" />
                 </TableCell>
                 <TableCell>
+                  <div className="h-8 w-8 bg-muted rounded mx-auto" />
+                </TableCell>
+                <TableCell>
                   <div className="h-8 w-20 bg-muted rounded" />
                 </TableCell>
               </TableRow>
@@ -94,6 +98,7 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
             <TableHead className="text-center">Комнаты</TableHead>
             <TableHead className="text-center">Площадь</TableHead>
             <TableHead className="text-center">Статус</TableHead>
+            <TableHead className="w-[150px] text-center">Избранное</TableHead>
             <TableHead className="w-[100px] text-center">Действия</TableHead>
           </TableRow>
         </TableHeader>
@@ -151,6 +156,9 @@ export function ListingTable({ listings, isLoading }: ListingTableProps) {
               </TableCell>
               <TableCell className="text-center">
                 <StatusBadge status={listing.status} />
+              </TableCell>
+              <TableCell className="text-center">
+                <FavoriteButton listingId={listing.id} size="sm" />
               </TableCell>
               <TableCell className="text-center">
                 <Button

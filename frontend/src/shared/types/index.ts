@@ -1,5 +1,6 @@
 export * from './listing';
 export * from './stats';
+export * from './favorites';
 
 export interface PriceTrendData {
   year: number;
