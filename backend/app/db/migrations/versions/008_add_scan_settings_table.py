@@ -30,11 +30,13 @@ def upgrade():
     )
 
     # Insert default settings (single row)
-    op.execute("""
+    op.execute(
+        """
         INSERT INTO scan_settings (id, scan_interval_minutes, enabled, updated_at)
         VALUES (1, 30, TRUE, NOW())
         ON CONFLICT (id) DO NOTHING
-    """)
+    """
+    )
 
 
 def downgrade():

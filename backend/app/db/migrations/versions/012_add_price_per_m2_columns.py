@@ -45,13 +45,15 @@ def upgrade() -> None:
 
     # Backfill: рассчитываем цену за м² для существующих записей
     # Делим цену на площадь только если area > 0
-    op.execute("""
+    op.execute(
+        """
         UPDATE listings 
         SET 
             price_per_m2_byn = CAST(CAST(price AS NUMERIC) / CAST(area AS NUMERIC) AS NUMERIC(12,2)),
             price_per_m2_usd = CAST(CAST(price_usd AS NUMERIC) / CAST(area AS NUMERIC) AS NUMERIC(12,2))
         WHERE area > 0 AND price IS NOT NULL AND price_usd IS NOT NULL
-        """)
+        """
+    )
 
 
 def downgrade() -> None:
