@@ -153,7 +153,7 @@ class TestPriceMinInput:
 
         Ожидание:
         - price_min сохраняется
-        - Переход к waiting_for_price_max
+        - Переход к waiting_for_confirmation (показывается подтверждение)
         """
         # Arrange
         mock_message.text = "50000"
@@ -170,7 +170,7 @@ class TestPriceMinInput:
         # Assert
         mock_state.update_data.assert_called_once_with(price_min=50000)
         mock_state.set_state.assert_called_once_with(
-            SubscriptionStates.waiting_for_price_max
+            SubscriptionStates.waiting_for_confirmation
         )
 
     @pytest.mark.asyncio
@@ -215,12 +215,13 @@ class TestPriceMinInput:
         assert "Неверный формат" in call_args[0][0]
 
     @pytest.mark.asyncio
-    async def test_process_price_min_cancel(self, mock_message, mock_state):
+    async def test_process_price_min_no_cancel_handler(self, mock_message, mock_state):
         """
-        Тест: Отмена через кнопку "❌ Отменить".
+        Тест: process_price_min больше не обрабатывает кнопку отмены.
 
         Ожидание:
-        - Wizard отменяется
+        - При вводе "❌ Отменить" обрабатывается как обычный текст
+        - Показывается ошибка валидации (т.к. не число)
         """
         # Arrange
         mock_message.text = "❌ Отменить"
@@ -228,8 +229,9 @@ class TestPriceMinInput:
         # Act
         await process_price_min(mock_message, mock_state)
 
-        # Assert
-        mock_state.clear.assert_called_once()
+        # Assert - должна быть ошибка валидации
+        assert mock_message.answer.called
+        assert "❌" in mock_message.answer.call_args[0][0]
 
 
 class TestPriceMaxInput:
@@ -350,7 +352,7 @@ class TestConfirmSubscription:
             )
 
             mock_state.clear.assert_called_once()
-            assert mock_callback_query.message.edit_text.called
+            assert mock_callback_query.message.answer.called
 
     @pytest.mark.asyncio
     async def test_confirm_subscription_limit_exceeded(
@@ -503,13 +505,14 @@ class TestEditSubscription:
 
     @pytest.mark.asyncio
     async def test_edit_subscription(
-        self, mock_callback_query, mock_session, mock_subscription
+        self, mock_callback_query, mock_session, mock_subscription, mock_telegram_user
     ):
         """
         Тест: Начать редактирование подписки.
 
         Ожидание:
         - Получается подписка по ID
+        - Проверяется владелец
         - Показываются текущие параметры
         - Предлагается выбрать поле для редактирования
         """
@@ -521,6 +524,7 @@ class TestEditSubscription:
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
+        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
 
         with patch(
             "app.telegram.handlers.subscriptions.TelegramSubscriptionService",
@@ -533,6 +537,7 @@ class TestEditSubscription:
 
             # Assert
             mock_service.get_subscription_by_id.assert_called_once()
+            mock_service.get_user_by_telegram_id.assert_called_once()
             assert mock_callback_query.message.edit_text.called
             call_args = mock_callback_query.message.edit_text.call_args
             assert "Редактирование" in call_args[0][0]
@@ -543,12 +548,14 @@ class TestDeleteSubscription:
 
     @pytest.mark.asyncio
     async def test_delete_subscription(
-        self, mock_callback_query, mock_session, mock_subscription
+        self, mock_callback_query, mock_session, mock_subscription, mock_telegram_user
     ):
         """
         Тест: Удаление подписки.
 
         Ожидание:
+        - Получается подписка по ID
+        - Проверяется владелец
         - Вызывается delete_subscription
         - Показывается сообщение об успехе
         """
@@ -558,6 +565,8 @@ class TestDeleteSubscription:
         )
 
         mock_service = AsyncMock()
+        mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
+        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
         mock_service.delete_subscription = AsyncMock(return_value=True)
 
         with patch(
@@ -568,6 +577,8 @@ class TestDeleteSubscription:
             await delete_subscription(mock_callback_query, callback_data, mock_session)
 
             # Assert
+            mock_service.get_subscription_by_id.assert_called_once()
+            mock_service.get_user_by_telegram_id.assert_called_once()
             mock_service.delete_subscription.assert_called_once_with(
                 mock_subscription.id
             )

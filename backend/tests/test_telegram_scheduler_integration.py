@@ -61,26 +61,25 @@ def mock_session_maker():
 
 
 @pytest.fixture
-def test_listing():
-    """Создаёт тестовое объявление."""
-    return Listing(
-        id=uuid4(),
-        kufar_id="12345",
-        url="https://re.kufar.by/vi/minsk/kupit/kvartiru/12345",
-        title="Test Apartment",
-        price=50000,
-        price_usd=15000,
-        currency="BYN",
-        city="minsk",
-        address="Test Street 1",
-        rooms=2,
-        area=50.0,
-        floor=3,
-        total_floors=9,
-        status=ListingStatus.new,
-        first_seen_at=datetime.now(timezone.utc).replace(tzinfo=None),
-        images=[],
-    )
+def test_listing_dict():
+    """Создаёт тестовое объявление в формате dict (как возвращает скрейпер)."""
+    return {
+        "kufar_id": "12345",
+        "url": "https://re.kufar.by/vi/minsk/kupit/kvartiru/12345",
+        "title": "Test Apartment",
+        "price": 50000,
+        "price_usd": 15000,
+        "currency": "BYN",
+        "city": "minsk",
+        "address": "Test Street 1",
+        "rooms": 2,
+        "area": 50.0,
+        "floor": 3,
+        "total_floors": 9,
+        "status": "new",
+        "first_seen_at": datetime.now(timezone.utc).replace(tzinfo=None),
+        "images": [],
+    }
 
 
 @pytest.fixture
@@ -104,7 +103,7 @@ class TestTelegramNotificationsAfterScan:
 
     @pytest.mark.asyncio
     async def test_telegram_notifications_called_after_scan(
-        self, mock_settings, mock_session_maker, test_listing, test_scan_record
+        self, mock_settings, mock_session_maker, test_listing_dict, test_scan_record
     ):
         """Telegram уведомления вызываются после успешного сканирования."""
         mock_maker, mock_session = mock_session_maker
@@ -114,7 +113,7 @@ class TestTelegramNotificationsAfterScan:
 
         # Мокаем запрос к БД для получения новых объявлений
         mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [test_listing]
+        mock_result.scalars.return_value.all.return_value = [test_listing_dict]
         mock_session.execute.return_value = mock_result
 
         with (
@@ -138,18 +137,18 @@ class TestTelegramNotificationsAfterScan:
             scheduler = ScraperScheduler()
 
             # Вызываем метод отправки уведомлений
-            await scheduler._send_telegram_notifications([test_listing])
+            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
 
             # Проверяем что сервис был вызван
             mock_notification_service.assert_called_once()
             mock_service_instance.send_new_listings_notifications.assert_called_once_with(
-                [test_listing]
+                [test_listing_dict]
             )
             mock_service_instance.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_telegram_disabled_does_not_affect_scan(
-        self, mock_settings_disabled, test_listing
+        self, mock_settings_disabled, test_listing_dict
     ):
         """Отключённый Telegram не влияет на сканирование."""
         with patch(
@@ -158,14 +157,14 @@ class TestTelegramNotificationsAfterScan:
             scheduler = ScraperScheduler()
 
             # Вызываем метод при отключённом Telegram
-            await scheduler._send_telegram_notifications([test_listing])
+            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
 
             # Сервис уведомлений не должен быть вызван
             mock_notification_service.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_telegram_error_does_not_break_scan(
-        self, mock_settings, mock_session_maker, test_listing, test_scan_record
+        self, mock_settings, mock_session_maker, test_listing_dict, test_scan_record
     ):
         """Ошибки Telegram не должны ломать сканирование."""
         mock_maker, mock_session = mock_session_maker
@@ -184,7 +183,7 @@ class TestTelegramNotificationsAfterScan:
             # Метод должен завершиться без выброса исключения
             # (ошибка логируется но не пробрасывается)
             # Сервис может быть вызван но упасть внутри
-            await scheduler._send_telegram_notifications([test_listing])
+            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
 
             # Убеждаемся что ошибка не прервала выполнение
             # (если дошли сюда — тест прошёл)
@@ -192,7 +191,7 @@ class TestTelegramNotificationsAfterScan:
 
     @pytest.mark.asyncio
     async def test_telegram_stats_logged(
-        self, mock_settings, mock_session_maker, test_listing, test_scan_record, capsys
+        self, mock_settings, mock_session_maker, test_listing_dict, test_scan_record, capsys
     ):
         """Статистика отправки должна логироваться."""
         mock_maker, mock_session = mock_session_maker
@@ -200,7 +199,7 @@ class TestTelegramNotificationsAfterScan:
         mock_session.get.return_value = test_scan_record
 
         mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [test_listing]
+        mock_result.scalars.return_value.all.return_value = [test_listing_dict]
         mock_session.execute.return_value = mock_result
 
         with (
@@ -221,7 +220,7 @@ class TestTelegramNotificationsAfterScan:
             mock_notification_service.return_value = mock_service_instance
 
             scheduler = ScraperScheduler()
-            await scheduler._send_telegram_notifications([test_listing])
+            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
 
             # Проверяем что статистика была залогирована в stdout (loguru)
             captured = capsys.readouterr()
