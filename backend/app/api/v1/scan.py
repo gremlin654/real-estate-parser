@@ -1,7 +1,7 @@
 import asyncio
 import math
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional, List, Dict
 from uuid import UUID
@@ -387,7 +387,7 @@ async def trigger_scan(
     scan_id = f"{request.city}:{time.time_ns()}"  # Уникальный ID
 
     # Попытка захватить Redis lock
-    lock = RedisLock(redis_client, lock_key, timeout=3600)
+    lock = RedisLock(redis_client, lock_key, timeout=600)
     acquired = await lock.acquire()
 
     if not acquired:
@@ -415,7 +415,13 @@ async def trigger_scan(
     # Запускаем сканирование в background с передачей lock для освобождения
     logger.info(f"Starting manual scan for {request.city}, scan_id: {scan_record.id}")
     background_tasks.add_task(
-        _run_manual_scan, scheduler, request.city, str(scan_record.id), lock
+        _run_manual_scan,
+        scheduler,
+        request.city,
+        str(scan_record.id),
+        lock,
+        lock_key,
+        redis_client,
     )
 
     # Возвращаем статус сразу
@@ -427,7 +433,9 @@ async def trigger_scan(
     )
 
 
-async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock):
+async def _run_manual_scan(
+    scheduler, city: str, scan_id: str, lock: RedisLock, lock_key: str, redis_client
+):
     """Запуск ручного сканирования
 
     Args:
@@ -671,6 +679,51 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock):
                     f"duration: {int((end_time - start_time).total_seconds())}s"
                 )
 
+                # === ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЙ ===
+                # Отправляем только для CREATED объявлений
+                from sqlalchemy import select
+                from app.services.telegram_notification_service import (
+                    TelegramNotificationService,
+                )
+                from app.models.listing import Listing
+                from app.config import settings
+
+                created_count = stats.get("created", 0)
+                if settings.TELEGRAM_BOT_ENABLED and created_count > 0:
+                    # Находим только что созданные объявления — у которых first_seen_at в пределах последних 2 минут
+                    two_minutes_ago = datetime.now() - timedelta(minutes=2)
+                    result = await db.execute(
+                        select(Listing)
+                        .where(
+                            Listing.city == city,
+                            Listing.first_seen_at >= two_minutes_ago,
+                        )
+                        .order_by(Listing.first_seen_at.desc())
+                        .limit(created_count * 2)
+                    )
+                    new_listings = list(result.scalars().all())
+
+                    logger.info(
+                        f"Found {len(new_listings)} new listings for Telegram notifications"
+                    )
+
+                    if new_listings:
+                        async with async_session_maker() as notify_db:
+                            notification_service = TelegramNotificationService(
+                                notify_db
+                            )
+                            try:
+                                telegram_stats = await notification_service.send_new_listings_notifications(
+                                    new_listings
+                                )
+                                logger.info(
+                                    f"Telegram notifications: {telegram_stats['sent']} sent, "
+                                    f"{telegram_stats['failed']} failed, "
+                                    f"{telegram_stats['blocked']} blocked"
+                                )
+                            finally:
+                                await notification_service.close()
+
             except Exception as e:
                 logger.error(f"[Scan {scan_id}] Error in transaction: {e}")
                 await db.rollback()
@@ -715,7 +768,18 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock):
             pass
         # === ОСВОБОДИТЬ REDIS LOCK ===
         try:
-            await lock.release()
-            logger.info(f"Scan lock released for {city}, scan_id={scan_id}")
+            released = await lock.release()
+            if released:
+                logger.info(f"Scan lock released for {city}, scan_id={scan_id}")
+            else:
+                # Если release не сработал (owner mismatch) — принудительно удаляем
+                logger.warning(f"Lock release skipped, force deleting for {city}")
+                await redis_client.delete(lock_key)
+                logger.info(f"Scan lock force deleted for {city}")
         except Exception as e:
             logger.error(f"Failed to release scan lock for {city}: {e}")
+            # Последняя попытка — принудительно удалить
+            try:
+                await redis_client.delete(lock_key)
+            except Exception:
+                pass

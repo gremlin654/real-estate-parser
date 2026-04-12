@@ -38,6 +38,7 @@
 - **🔄 CI/CD** — GitHub Actions (v2.0)
 - **🔥 Deal Finder** — поиск квартир ниже рынка (v3.5)
 - **📉 Price Drop Tracker** — трекинг падения цены (v3.6)
+- **🤖 Telegram Bot** — уведомления о новых квартирах (v4.0)
 
 ## Архитектура
 
@@ -50,10 +51,10 @@ Frontend (React + TS) ↔ Backend (FastAPI) ↔ PostgreSQL ↔ Kufar.by Scraper
 | Компонент    | Технологии                                                                              |
 | ------------ | --------------------------------------------------------------------------------------- |
 | **Frontend** | React 19, TypeScript, Vite, TailwindCSS 4, Zustand, TanStack Query, shadcn/ui, recharts |
-| **Backend**  | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, pandas, **Redis 7**                 |
+| **Backend**  | FastAPI, SQLAlchemy (async), Pydantic, APScheduler, pandas, **Redis 7**, **aiogram 3.x** |
 | **Database** | PostgreSQL 16, Alembic, **Redis 7**                                                     |
 | **Scraper**  | Playwright, BeautifulSoup4, aiohttp                                                     |
-| **Testing**  | Playwright E2E (118), Vitest Unit (326, 66% coverage), pytest API (201, 55%)            |
+| **Testing**  | Playwright E2E (118), Vitest Unit (326, 66% coverage), pytest API (201, 55%), **pytest Telegram (196)** |
 
 ## 🔴 Redis Integration
 
@@ -566,6 +567,50 @@ GET /api/v1/favorites/check/{listing_id}                      # Проверит
 - `created_at` — дата добавления
 - `listing` — полные данные объявления (Listing объект)
 
+### Telegram Bot Commands (v4.0)
+
+**Команды бота:**
+
+```bash
+/start        # Регистрация пользователя
+/help         # Справка по командам
+/stop         # Отписаться от уведомлений
+/subscribe    # Создать подписку (FSM wizard)
+/settings     # Мои подписки
+/unsubscribe  # Удалить все подписки
+```
+
+**Flow подписки (/subscribe):**
+1. Выбор города (inline keyboard: Минск, Могилёв, Гродно, Брест, Гомель, Витебск)
+2. Выбор комнат (1, 2, 3, 4, 5+, Любые)
+3. Ввод минимальной цены (BYN)
+4. Ввод максимальной цены (BYN)
+5. Подтверждение подписки
+
+**Управление подписками (/settings):**
+- Просмотр всех активных подписок с деталями
+- Редактирование: город, комнаты, цена
+- Удаление подписки inline кнопкой
+- Добавление новой подписки
+
+**Формат уведомления:**
+```
+🏠 Новая квартира в {city}!
+
+📍 Адрес: {address}
+🚪 Комнат: {rooms}
+📐 Площадь: {area} м²
+🏢 Этаж: {floor}/{total_floors}
+💰 Цена: ${price_usd:,} ({price_byn:,} BYN)
+📊 Цена за м²: ${price_per_m2_usd:,}
+
+🔗 {listing.url}
+```
+
+**Inline кнопки в уведомлении:**
+- 🔗 Открыть объявление (URL)
+- ⚙️ Настройки (callback: settings)
+
 ## Схема базы данных
 
 ### listings
@@ -589,6 +634,25 @@ GET /api/v1/favorites/check/{listing_id}                      # Проверит
 ### scan_settings (1 запись, id=1)
 
 - `scan_interval_minutes` (5-1440), `enabled`, `updated_at`
+
+### telegram_users (v4.0)
+
+- `id` (UUID, PK), `telegram_id` (BigInteger, unique, index), `username`, `first_name`, `last_name`
+- `language_code` (default 'ru'), `is_active`, `blocked_by_user`
+- `created_at`, `updated_at`
+
+### telegram_subscriptions (v4.0)
+
+- `id` (UUID, PK), `user_id` (FK → telegram_users, CASCADE), `city` (index), `rooms` (Array[Integer])
+- `price_min`, `price_max`, `price_per_m2_max`, `floor_min`, `floor_max`
+- `currency` (default 'usd'), `notify_only_price_drop`, `exclude_deal_below_percent`
+- `is_active` (index), `created_at`, `updated_at`
+
+### telegram_notification_log (v4.0)
+
+- `id` (UUID, PK), `user_id` (FK → telegram_users, CASCADE), `listing_id` (FK → listings, SET NULL)
+- `subscription_id` (FK → telegram_subscriptions, SET NULL), `sent_at` (index)
+- `status` (Enum: sent/failed/retry/blocked), `error_message`, `retry_count`, `response_message_id`
 
 ## Доступные города
 
@@ -866,6 +930,113 @@ docker-compose logs backend
 
 **MR Status:** ✅ Ветка `develop` актуальна
 
+### v4.0 (завершённая)
+
+**Telegram Bot — уведомления о новых квартирах:**
+- **🤖 aiogram 3.x** — библиотека для Telegram Bot API (polling режим)
+- **✅ 3 новые таблицы БД:** `telegram_users`, `telegram_subscriptions`, `telegram_notification_log`
+- **✅ Миграция 017** — создание таблиц с индексами и FK constraints
+- **✅ 3 сервиса:** `TelegramSubscriptionService`, `TelegramNotificationService`, `TelegramMessageBuilder`
+- **✅ Bot handlers:** `/start`, `/help`, `/stop`, `/subscribe` (FSM wizard), `/settings`, `/unsubscribe`
+- **✅ Inline/Reply клавиатуры** — type-safe CallbackData через aiogram фильтры
+- **✅ FSM wizard** — пошаговое создание подписки (город → комнаты → цена → подтверждение)
+- **✅ Интеграция со scraper** — авто-отправка уведомлений после каждого сканирования
+- **✅ Shared bot pattern** — один instance на всё приложение (предотвращает утечку)
+- **✅ IDOR protection** — проверка владельца во всех callback handlers
+- **✅ Retry логика** — exponential backoff (5s, 10s, 20s) с cap 60s
+- **✅ Graceful shutdown** — корректная остановка бота
+
+**Backend:**
+- `backend/app/models/telegram_user.py` — модели: TelegramUser, TelegramSubscription, TelegramNotificationLog
+- `backend/app/services/telegram_subscription_service.py` — CRUD подписок + matching logic (15 методов)
+- `backend/app/services/telegram_validators.py` — валидация параметров подписок (94% coverage)
+- `backend/app/services/telegram_exceptions.py` — 8 кастомных исключений
+- `backend/app/services/telegram_notification_service.py` — отправка уведомлений с retry
+- `backend/app/services/telegram_message_builder.py` — форматирование сообщений (98% coverage)
+- `backend/app/telegram/bot.py` — инициализация бота и dispatcher
+- `backend/app/telegram/handlers/commands.py` — /start, /help, /stop
+- `backend/app/telegram/handlers/subscriptions.py` — FSM wizard + управление подписками
+- `backend/app/telegram/keyboards/inline.py` — inline клавиатуры с CallbackData
+- `backend/app/telegram/keyboards/reply.py` — reply клавиатуры
+- `backend/app/telegram/middlewares/db_session.py` — middleware для db_session
+- `backend/app/scraper/scheduler.py` — интеграция отправки уведомлений
+- `backend/app/main.py` — запуск бота в lifespan
+- `backend/TELEGRAM_BOT.md` — полная документация
+
+**Тесты:**
+- **Backend Telegram:** 196 тестов (100% pass rate)
+  - Subscription Service: 92 теста (81% coverage)
+  - Validators: 55 тестов (94% coverage)
+  - Notification Service: 59 тестов (80% coverage)
+  - Message Builder: 98% coverage
+  - Scheduler Integration: 10 тестов
+  - Bot Handlers: 29 тестов (66-100% coverage)
+
+**Конфигурация:**
+```bash
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_ENABLED=false
+TELEGRAM_MAX_RETRIES=3
+TELEGRAM_RETRY_DELAY_SECONDS=5
+TELEGRAM_RATE_LIMIT_PER_MINUTE=20
+```
+
+**Формат уведомления:**
+```
+🏠 Новая квартира в Минск!
+
+📍 Адрес: пр. Независимости, 100
+🚪 Комнат: 2
+📐 Площадь: 54 м²
+🏢 Этаж: 5/9
+💰 Цена: $42,500 (123,750 BYN)
+📊 Цена за м²: $833
+
+🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123456
+```
+
+**Code Review:** ✅ APPROVED (7.3/10 → исправлены 4 критических issues)
+- 🔴 IDOR уязвимость → owner check во всех handlers
+- 🔴 Бесконечный retry → cap 60s + max retries
+- 🔴 Утечка Bot instance → shared bot pattern
+- 🔴 Миграция не идемпотентна → CREATE TYPE IF NOT EXISTS
+
+**PR:** #15 (feature/telegram-bot → develop)
+
+### v4.0.1 (текущая — в разработке)
+
+**Исправления Telegram Bot и сканирования:**
+
+**Адрес из Kufar API:**
+- **✅ Извлечение адреса** — теперь берётся из `account_parameters` где `p == "address"` (ранее `location.geography.displayName` было пустым)
+- **✅ Формат адреса** — "Т.С. Бородина ул, 14, Гомель, Гомельская область"
+- **✅ Fallback** — если адрес пустой → "Не указан" в Telegram сообщении
+- **✅ Адрес сохраняется в БД** — подтверждено тестированием на Гомеле
+
+**Redis Lock cleanup:**
+- **✅ Принудительное удаление lock** — если `lock.release()` не сработал (owner mismatch), вызывается `redis_client.delete(lock_key)`
+- **✅ TTL уменьшен** — с 3600 сек (1 час) до 600 сек (10 минут) для авто-очистки stale lock'ов
+- **✅ Double cleanup** — сначала пробуем release(), затем принудительно delete() в `finally` блоке
+
+**Manual Scan Telegram интеграция:**
+- **✅ Исправлен баг** — `_run_manual_scan` в `scan.py` теперь отправляет Telegram уведомления (ранее только `_run_scheduled_scan` в `scheduler.py`)
+- **✅ Фильтрация новых объявлений** — `first_seen_at >= now - 2 минуты` чтобы не спамить старыми
+- **✅ Конвертация dict → Listing** — запрос к БД по `kufar_id` для получения SQLAlchemy модели
+- **✅ UnboundLocalError fixed** — `timedelta` импортирован на уровне модуля (был локальный импорт внутри функции)
+
+**Backend изменения:**
+- `backend/app/scraper/kufar_scraper.py` — извлечение адреса из `account_parameters`
+- `backend/app/api/v1/scan.py` — Telegram интеграция в manual scan, lock cleanup, timedelta import
+- `backend/app/services/telegram_message_builder.py` — fallback для пустого адреса ("Не указан")
+- `backend/app/services/telegram_notification_service.py` — убран нерабочий фильтр `status='new'`
+
+**Тестирование:**
+- **Telegram уведомления** — 28 объявлений отправлено, все соответствуют фильтру (gomel, rooms=1)
+- **Адреса в БД** — подтверждено: "Чкалова ул, 62, Гомель", "Ленина пр, 63, Гомель" и др.
+- **Redis lock cleanup** — lock удаляется автоматически после завершения сканирования
+
+**MR Status:** 🚀 Готов к созданию (ветка `feature/telegram-bot` → `develop`)
+
 ### v3.7 (текущая — в разработке)
 
 **Favorites System — система избранных объявлений:**
@@ -1023,8 +1194,8 @@ docker-compose logs backend
     ┌───────────┬───────────────────────────────────────────┬───────────┬─────────────────────────────────────────────┐
     │ Приоритет │ Фича                                      │ Сложность │ Ценность                                    │
     ├───────────┼───────────────────────────────────────────┼───────────┼─────────────────────────────────────────────┤
-    │ P0        │ 📢 Система уведомлений (Telegram)         │ Medium    │ Мгновенное реагирование на новые объявления │
-    │ P0        │ ⭐ Избранные объявления                   │ Low       │ Быстрый доступ к выбранным вариантам        │
+    │ ✅ P0     │ 🤖 Telegram Bot (MVP)                     │ Medium    │ Мгновенные уведомления о новых квартирах    │
+    │ ✅ P0     │ ⭐ Избранные объявления (v3.7)            │ Low       │ Быстрый доступ к выбранным вариантам        │
     │ P1        │ 🔍 Расширенные фильтры (цена за м², этаж) │ Medium    │ Точный поиск по параметрам                  │
     │ P1        │ 📄 Детальная страница объявления          │ Medium    │ История изменений, графики цены             │
-    │ P2        │ ⚖️ Сравнение объявлений                   │ High      │ Наглядное сравнение характеристик
+    │ P2        │ ⚖️ Сравнение объявлений                   │ High      │ Наглядное сравнение характеристик           │
