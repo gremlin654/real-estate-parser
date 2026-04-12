@@ -28,6 +28,7 @@ from app.telegram.keyboards.inline import (
     get_subscription_confirmation_keyboard,
     get_subscriptions_list_keyboard,
     get_edit_subscription_keyboard,
+    get_price_input_keyboard,
     CityCallback,
     RoomsCallback,
     SubscriptionActionCallback,
@@ -38,7 +39,6 @@ from app.telegram.keyboards.inline import (
 from app.telegram.keyboards.reply import (
     get_main_keyboard,
     get_cancel_keyboard,
-    get_price_input_keyboard,
 )
 
 router = Router()
@@ -163,7 +163,46 @@ async def process_rooms_selection(
     await callback.answer()
 
 
-# === Ввод минимальной цены ===
+# === Пропуск цены ===
+
+
+@router.callback_query(lambda c: c.data == "skip_price")
+async def skip_price(callback: types.CallbackQuery, state: FSMContext):
+    """Пропустить ввод цены — перейти к подтверждению подписки"""
+    await state.update_data(price_min=None, price_max=None)
+    data = await state.get_data()
+    city_name = CITY_NAMES.get(data.get("city", ""), data.get("city", ""))
+    rooms_value = data.get("rooms")
+    if rooms_value is None:
+        rooms_text = "Любые"
+    elif rooms_value == [5]:
+        rooms_text = "5+"
+    else:
+        rooms_text = f"{rooms_value[0]} комн."
+
+    await callback.message.edit_text(
+        f"✅ <b>Подтвердите подписку:</b>\n\n"
+        f"🏙️ Город: {city_name}\n"
+        f"🚪 Комнаты: {rooms_text}\n"
+        f"💰 Цена: Любая\n\n"
+        f"Нажмите '✅ Подтвердить' для создания подписки",
+        reply_markup=get_subscription_confirmation_keyboard(),
+    )
+    await callback.answer()
+
+
+# === Подтверждение подписки ===
+
+
+@router.callback_query(lambda c: c.data == "cancel_subscription")
+async def cancel_subscription_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Отменить создание подписки (inline кнопка)"""
+    await state.clear()
+    await callback.message.edit_text(
+        "❌ Создание подписки отменено.\n\n"
+        "Используйте /subscribe для начала заново.",
+    )
+    await callback.answer()
 
 
 @router.message(SubscriptionStates.waiting_for_price_min)
@@ -171,19 +210,8 @@ async def process_price_min(message: types.Message, state: FSMContext):
     """
     Обработать ввод минимальной цены.
 
-    Валидирует что введено число и переходит к цене max.
+    Валидирует что введено число и переходит к подтверждению подписки.
     """
-    # Проверяем кнопку отмены
-    if message.text == "❌ Отменить":
-        await cancel_flow(message, state)
-        return
-
-    # Проверяем кнопку пропуска
-    if message.text == "⏭️ Пропустить (любая цена)":
-        await state.update_data(price_min=None)
-        await _proceed_to_price_max(message, state)
-        return
-
     # Валидируем число
     try:
         price_min = int(message.text.strip().replace(",", "").replace(" ", ""))
@@ -203,7 +231,8 @@ async def process_price_min(message: types.Message, state: FSMContext):
     # Сохраняем цену
     await state.update_data(price_min=price_min)
 
-    await _proceed_to_price_max(message, state)
+    # Переходим к подтверждению подписки
+    await _show_confirmation(message, state)
 
 
 async def _proceed_to_price_max(message: types.Message, state: FSMContext):
@@ -321,10 +350,7 @@ async def _show_confirmation(message: types.Message, state: FSMContext):
 # === Подтверждение подписки ===
 
 
-@router.callback_query(
-    SubscriptionStates.waiting_for_confirmation,
-    SubscriptionActionCallback.filter(F.action == "confirm"),
-)
+@router.callback_query(SubscriptionActionCallback.filter())
 async def confirm_subscription(
     callback: types.CallbackQuery,
     callback_data: SubscriptionActionCallback,
@@ -333,14 +359,31 @@ async def confirm_subscription(
 ):
     """
     Создать подписку после подтверждения.
-
-    Получает данные из FSM state, создаёт подписку через сервис
-    и показывает результат.
     """
-    logger.info(f"User {callback.from_user.id} confirmed subscription")
+    # Проверяем что это confirm а не cancel
+    if callback_data.action == "confirm":
+        pass  # Продолжаем обработку ниже
+    elif callback_data.action == "cancel":
+        await state.clear()
+        await callback.message.answer("❌ Создание подписки отменено.")
+        await callback.answer()
+        return
+    elif callback_data.action == "add_new":
+        # Начать новую подписку
+        await state.clear()
+        await callback.message.answer(
+            "🏙️ <b>Выберите город для мониторинга:</b>",
+            reply_markup=get_city_keyboard(),
+        )
+        await state.set_state(SubscriptionStates.waiting_for_city)
+        await callback.answer()
+        return
+
+    logger.info(f"User {callback.from_user.id} CONFIRMED subscription, callback_data={callback_data}")
 
     # Получаем данные из state
     data = await state.get_data()
+    logger.info(f"FSM state data: city={data.get('city')}, rooms={data.get('rooms')}, price_min={data.get('price_min')}, price_max={data.get('price_max')}")
     city = data.get("city")
     rooms = data.get("rooms")
     price_min = data.get("price_min")
@@ -387,10 +430,16 @@ async def confirm_subscription(
             f"Используйте /settings для управления подписками."
         )
 
-        await callback.message.edit_text(
+        # Отправляем новое сообщение вместо edit_text
+        await callback.message.answer(
             success_text,
             reply_markup=get_main_keyboard(),
         )
+        # Скрываем сообщение подтверждения
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
 
         logger.info(
             f"Subscription created: id={subscription.id}, "

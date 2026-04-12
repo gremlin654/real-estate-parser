@@ -149,34 +149,36 @@ class ScraperScheduler:
             logger.error(f"Error getting new listings from scan {scan_id}: {e}")
             return []
 
-    async def _send_telegram_notifications(self, new_listings: list):
+    async def _send_telegram_notifications(self, listings_data: list, city: str):
         """
         Отправить уведомления о новых объявлениях через Telegram бота.
-
-        Логика:
-        1. Создать db_session
-        2. Создать TelegramNotificationService
-        3. Вызвать send_new_listings_notifications(new_listings)
-        4. Залогировать статистику (sent, failed, blocked)
-        5. Закрыть сервис
-
-        Args:
-            new_listings: Список новых объявлений для отправки уведомлений
         """
+        logger.info(f"DEBUG: _send_telegram_notifications called for {city}, listings_data len={len(listings_data)}")
+        
         if not settings.TELEGRAM_BOT_ENABLED:
             logger.debug("Telegram bot disabled, skipping notifications")
             return
 
-        if not new_listings:
-            logger.debug("No new listings to send notifications for")
+        if not listings_data:
+            logger.debug("No listings to send notifications for")
             return
 
-        logger.info(
-            f"Sending Telegram notifications for {len(new_listings)} new listings"
-        )
+        # Извлекаем kufar_id для поиска в БД
+        kufar_ids = [item.get("kufar_id") for item in listings_data if item.get("kufar_id")]
+        logger.info(f"Sending Telegram notifications for {len(kufar_ids)} listings in {city}")
 
         try:
             async with async_session_maker() as db:
+                # Находим объявления в БД по kufar_ids
+                from sqlalchemy import select
+                from app.models.listing import Listing
+
+                result = await db.execute(
+                    select(Listing).where(Listing.kufar_id.in_(kufar_ids))
+                )
+                new_listings = result.scalars().all()
+                logger.info(f"Found {len(new_listings)} listings in DB for notifications")
+
                 notification_service = TelegramNotificationService(db)
                 try:
                     stats = await notification_service.send_new_listings_notifications(
@@ -528,6 +530,7 @@ class ScraperScheduler:
                     logger.info(f"Transaction committed for {city}: {stats}")
 
                     # Завершение записи сканирования
+                    logger.info(f"DEBUG: About to complete_scan_record for {city}")
                     end_time = datetime.now(timezone.utc).replace(tzinfo=None)
                     await scan_history_service.complete_scan_record(
                         scan_id=str(scan_record.id),
@@ -541,6 +544,7 @@ class ScraperScheduler:
                         pages_scraped=pages_scraped,
                         duration_seconds=int((end_time - start_time).total_seconds()),
                     )
+                    logger.info(f"DEBUG: complete_scan_record done for {city}")
 
                     logger.info(
                         f"Scheduled scan completed for {city}: {stats}, "
@@ -548,11 +552,9 @@ class ScraperScheduler:
                     )
 
                     # === ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЙ (НЕ БЛОКИРУЕТ СКРАПИНГ) ===
-                    # Получаем новые объявления для Telegram уведомлений
-                    new_listings = await self._get_new_listings_from_scan(
-                        str(scan_record.id), city
-                    )
-                    await self._send_telegram_notifications(new_listings)
+                    # Отправляем уведомления после коммита транзакции
+                    # Передаём listings_data чтобы сервис мог найти новые объявления
+                    await self._send_telegram_notifications(listings_data, city)
 
                 except Exception as e:
                     logger.error(f"[Scan {scan_record.id}] Error in transaction: {e}")

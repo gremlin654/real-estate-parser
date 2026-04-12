@@ -116,6 +116,20 @@ def get_rooms_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def get_price_input_keyboard() -> InlineKeyboardMarkup:
+    """
+    Inline клавиатура для ввода цены.
+
+    Returns:
+        InlineKeyboardMarkup с кнопками отмены и пропуска
+    """
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⏭️ Пропустить (любая цена)", callback_data="skip_price")
+    builder.button(text="❌ Отменить", callback_data="cancel_subscription")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def get_subscription_confirmation_keyboard() -> InlineKeyboardMarkup:
     """
     Клавиатура подтверждения подписки.

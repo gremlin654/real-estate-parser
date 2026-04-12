@@ -91,6 +91,14 @@ class KufarScraper:
             address = (
                 location.get("geography", {}).get("displayName", "") if location else ""
             )
+            
+            # Если address пустой — пробуем взять из account_parameters.address
+            if not address:
+                account_params = ad.get("account_parameters", [])
+                for param in account_params:
+                    if isinstance(param, dict) and param.get("p") == "address":
+                        address = param.get("v", "")
+                        break
 
             # Extract parameters - can be dict or list of dicts
             ad_params_raw = ad.get("ad_parameters", {})

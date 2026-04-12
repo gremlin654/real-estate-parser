@@ -210,8 +210,11 @@ class TelegramMessageBuilder:
         city_formatted = TelegramMessageBuilder.format_city(city)
         message = f"🏠 Новая квартира в {city_formatted}!\n\n"
 
+        # Адрес или "Не указан"
+        address_display = address if address and address.strip() else "Не указан"
+        
         # Основные характеристики
-        message += f"📍 Адрес: {address}\n"
+        message += f"📍 Адрес: {address_display}\n"
         message += f"🚪 Комнат: {TelegramMessageBuilder.format_rooms(rooms)}\n"
         message += f"📐 Площадь: {area} м²\n"
         message += (

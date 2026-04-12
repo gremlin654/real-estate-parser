@@ -152,6 +152,10 @@ class TelegramNotificationService:
                 "skipped_no_match": len(new_listings),
             }
 
+        logger.info(
+            f"Processing {len(new_listings)} listings for Telegram notifications"
+        )
+
         stats = {
             "sent": 0,
             "failed": 0,
