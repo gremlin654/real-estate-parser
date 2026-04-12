@@ -13,6 +13,8 @@ from app.services.scan_settings_service import ScanSettingsService
 from app.services.scan_stats_service import ScanStatsService
 from app.services.listing_service import ListingService
 from app.services.scan_history_service import ScanHistoryService
+from app.services.telegram_notification_service import TelegramNotificationService
+from app.models.listing import ScanHistory
 
 
 class ScraperScheduler:
@@ -102,6 +104,100 @@ class ScraperScheduler:
         async with self._lock:
             if city in self.scanning_cities:
                 self.scanning_cities[city]["progress"] = progress
+
+    async def _get_new_listings_from_scan(self, scan_id: str, city: str) -> list:
+        """
+        Получить новые объявления из последнего сканирования.
+
+        Args:
+            scan_id: ID записи сканирования
+            city: Код города
+
+        Returns:
+            Список новых объявлений (status='new' или недавно созданных)
+        """
+        try:
+            async with async_session_maker() as db:
+                # Получаем объявления, созданные во время этого сканирования
+                # Используем scan_record.started_at как время начала
+                from sqlalchemy import select
+                from app.models.listing import Listing
+
+                # Получаем время начала сканирования
+                scan_record = await db.get(ScanHistory, scan_id)
+                if not scan_record:
+                    logger.warning(f"Scan record {scan_id} not found")
+                    return []
+
+                started_at = scan_record.started_at
+
+                # Находим все объявления созданные после начала сканирования
+                result = await db.execute(
+                    select(Listing)
+                    .where(
+                        Listing.city == city,
+                        Listing.first_seen_at >= started_at,
+                    )
+                    .order_by(Listing.first_seen_at.desc())
+                )
+                new_listings = result.scalars().all()
+                logger.info(
+                    f"Found {len(new_listings)} new listings for scan {scan_id}"
+                )
+                return new_listings
+        except Exception as e:
+            logger.error(f"Error getting new listings from scan {scan_id}: {e}")
+            return []
+
+    async def _send_telegram_notifications(self, listings_data: list, city: str):
+        """
+        Отправить уведомления о новых объявлениях через Telegram бота.
+        """
+        logger.info(f"DEBUG: _send_telegram_notifications called for {city}, listings_data len={len(listings_data)}")
+        
+        if not settings.TELEGRAM_BOT_ENABLED:
+            logger.debug("Telegram bot disabled, skipping notifications")
+            return
+
+        if not listings_data:
+            logger.debug("No listings to send notifications for")
+            return
+
+        # Извлекаем kufar_id для поиска в БД
+        kufar_ids = [item.get("kufar_id") for item in listings_data if item.get("kufar_id")]
+        logger.info(f"Sending Telegram notifications for {len(kufar_ids)} listings in {city}")
+
+        try:
+            async with async_session_maker() as db:
+                # Находим объявления в БД по kufar_ids
+                from sqlalchemy import select
+                from app.models.listing import Listing
+
+                result = await db.execute(
+                    select(Listing).where(Listing.kufar_id.in_(kufar_ids))
+                )
+                new_listings = result.scalars().all()
+                logger.info(f"Found {len(new_listings)} listings in DB for notifications")
+
+                notification_service = TelegramNotificationService(db)
+                try:
+                    stats = await notification_service.send_new_listings_notifications(
+                        new_listings
+                    )
+                    logger.info(
+                        f"Telegram notifications: {stats['sent']} sent, "
+                        f"{stats['failed']} failed, {stats['blocked']} blocked, "
+                        f"{stats['rate_limited']} rate_limited, "
+                        f"{stats['skipped_no_match']} skipped_no_match"
+                    )
+                finally:
+                    await notification_service.close()
+        except Exception as e:
+            # Ошибки отправки не должны прерывать сканирование
+            logger.error(f"Failed to send Telegram notifications: {e}")
+            import traceback
+
+            traceback.print_exc()
 
     async def _broadcast_progress(self):
         """Отправить текущий прогресс всем WebSocket клиентам."""
@@ -434,6 +530,7 @@ class ScraperScheduler:
                     logger.info(f"Transaction committed for {city}: {stats}")
 
                     # Завершение записи сканирования
+                    logger.info(f"DEBUG: About to complete_scan_record for {city}")
                     end_time = datetime.now(timezone.utc).replace(tzinfo=None)
                     await scan_history_service.complete_scan_record(
                         scan_id=str(scan_record.id),
@@ -447,11 +544,17 @@ class ScraperScheduler:
                         pages_scraped=pages_scraped,
                         duration_seconds=int((end_time - start_time).total_seconds()),
                     )
+                    logger.info(f"DEBUG: complete_scan_record done for {city}")
 
                     logger.info(
                         f"Scheduled scan completed for {city}: {stats}, "
                         f"duration: {int((end_time - start_time).total_seconds())}s"
                     )
+
+                    # === ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЙ (НЕ БЛОКИРУЕТ СКРАПИНГ) ===
+                    # Отправляем уведомления после коммита транзакции
+                    # Передаём listings_data чтобы сервис мог найти новые объявления
+                    await self._send_telegram_notifications(listings_data, city)
 
                 except Exception as e:
                     logger.error(f"[Scan {scan_record.id}] Error in transaction: {e}")

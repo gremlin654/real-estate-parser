@@ -28,12 +28,17 @@ from app.core.redis_watchdog import (
     stop_lock_watchdog,
     RedisLockWatchdog,
 )
+from app.telegram.bot import create_bot, create_dispatcher
+from app.telegram.middlewares.db_session import DbSessionMiddleware
 
 setup_logging()
 logger = get_logger(__name__)
 
 # Глобальный watchdog для очистки застрявших lock
 _lock_watchdog: Optional[RedisLockWatchdog] = None
+
+# Глобальная задача для Telegram бота
+_telegram_task: Optional[asyncio.Task] = None
 
 
 @asynccontextmanager
@@ -97,12 +102,48 @@ async def lifespan(app: FastAPI):
     await scheduler.start()
     logger.info("Scheduler started with settings from database")
 
+    # Запуск Telegram бота (если включён)
+    global _telegram_task
+    if settings.TELEGRAM_BOT_ENABLED and settings.TELEGRAM_BOT_TOKEN:
+        try:
+            bot = create_bot()
+            
+            # Установить shared bot для переиспользования в notification service
+            from app.services.telegram_notification_service import (
+                TelegramNotificationService,
+            )
+            TelegramNotificationService.set_shared_bot(bot)
+
+            dp = create_dispatcher()
+
+            # Middleware уже добавлен в create_dispatcher
+            logger.info("Telegram bot middleware configured")
+
+            # Запускаем polling в фоне
+            _telegram_task = asyncio.create_task(dp.start_polling(bot))
+            logger.info("Telegram bot started in polling mode")
+        except Exception as e:
+            logger.error(f"Failed to start Telegram bot: {e}")
+            _telegram_task = None
+    else:
+        logger.info("Telegram bot disabled or token not set, skipping startup")
+
     logger.info("Application startup completed successfully")
 
     yield
 
     logger.info("Application shutdown initiated")
     scheduler.stop()
+
+    # Остановка Telegram бота
+    if _telegram_task:
+        _telegram_task.cancel()
+        try:
+            await _telegram_task
+        except asyncio.CancelledError:
+            logger.info("Telegram bot task cancelled")
+        _telegram_task = None
+        logger.info("Telegram bot stopped")
 
     # Остановка watchdog
     if _lock_watchdog:

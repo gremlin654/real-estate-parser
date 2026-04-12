@@ -7,6 +7,12 @@ from app.models.listing import (
     ScanSettings,
 )
 from app.models.favorite import Favorite
+from app.models.telegram_user import (
+    TelegramUser,
+    TelegramSubscription,
+    TelegramNotificationLog,
+    TelegramNotificationStatus,
+)
 
 __all__ = [
     "Listing",
@@ -16,4 +22,8 @@ __all__ = [
     "ScanHistory",
     "ScanSettings",
     "Favorite",
+    "TelegramUser",
+    "TelegramSubscription",
+    "TelegramNotificationLog",
+    "TelegramNotificationStatus",
 ]
