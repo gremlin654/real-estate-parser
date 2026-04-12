@@ -13,6 +13,8 @@ from app.services.scan_settings_service import ScanSettingsService
 from app.services.scan_stats_service import ScanStatsService
 from app.services.listing_service import ListingService
 from app.services.scan_history_service import ScanHistoryService
+from app.services.telegram_notification_service import TelegramNotificationService
+from app.models.listing import ScanHistory
 
 
 class ScraperScheduler:
@@ -102,6 +104,98 @@ class ScraperScheduler:
         async with self._lock:
             if city in self.scanning_cities:
                 self.scanning_cities[city]["progress"] = progress
+
+    async def _get_new_listings_from_scan(self, scan_id: str, city: str) -> list:
+        """
+        Получить новые объявления из последнего сканирования.
+
+        Args:
+            scan_id: ID записи сканирования
+            city: Код города
+
+        Returns:
+            Список новых объявлений (status='new' или недавно созданных)
+        """
+        try:
+            async with async_session_maker() as db:
+                # Получаем объявления, созданные во время этого сканирования
+                # Используем scan_record.started_at как время начала
+                from sqlalchemy import select
+                from app.models.listing import Listing
+
+                # Получаем время начала сканирования
+                scan_record = await db.get(ScanHistory, scan_id)
+                if not scan_record:
+                    logger.warning(f"Scan record {scan_id} not found")
+                    return []
+
+                started_at = scan_record.started_at
+
+                # Находим все объявления созданные после начала сканирования
+                result = await db.execute(
+                    select(Listing)
+                    .where(
+                        Listing.city == city,
+                        Listing.first_seen_at >= started_at,
+                    )
+                    .order_by(Listing.first_seen_at.desc())
+                )
+                new_listings = result.scalars().all()
+                logger.info(
+                    f"Found {len(new_listings)} new listings for scan {scan_id}"
+                )
+                return new_listings
+        except Exception as e:
+            logger.error(f"Error getting new listings from scan {scan_id}: {e}")
+            return []
+
+    async def _send_telegram_notifications(self, new_listings: list):
+        """
+        Отправить уведомления о новых объявлениях через Telegram бота.
+
+        Логика:
+        1. Создать db_session
+        2. Создать TelegramNotificationService
+        3. Вызвать send_new_listings_notifications(new_listings)
+        4. Залогировать статистику (sent, failed, blocked)
+        5. Закрыть сервис
+
+        Args:
+            new_listings: Список новых объявлений для отправки уведомлений
+        """
+        if not settings.TELEGRAM_BOT_ENABLED:
+            logger.debug("Telegram bot disabled, skipping notifications")
+            return
+
+        if not new_listings:
+            logger.debug("No new listings to send notifications for")
+            return
+
+        logger.info(
+            f"Sending Telegram notifications for {len(new_listings)} new listings"
+        )
+
+        try:
+            async with async_session_maker() as db:
+                notification_service = TelegramNotificationService(db)
+                try:
+                    stats = await notification_service.send_new_listings_notifications(
+                        new_listings
+                    )
+                    logger.info(
+                        f"Telegram notifications: {stats['sent']} sent, "
+                        f"{stats['failed']} failed, {stats['blocked']} blocked, "
+                        f"{stats['rate_limited']} rate_limited, "
+                        f"{stats['skipped_no_match']} skipped_no_match"
+                    )
+                finally:
+                    await notification_service.close()
+        except Exception as e:
+            # Ошибки отправки не должны прерывать сканирование
+            logger.error(f"Failed to send Telegram notifications: {e}")
+            import traceback
+
+            traceback.print_exc()
 
     async def _broadcast_progress(self):
         """Отправить текущий прогресс всем WebSocket клиентам."""
@@ -452,6 +546,13 @@ class ScraperScheduler:
                         f"Scheduled scan completed for {city}: {stats}, "
                         f"duration: {int((end_time - start_time).total_seconds())}s"
                     )
+
+                    # === ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЙ (НЕ БЛОКИРУЕТ СКРАПИНГ) ===
+                    # Получаем новые объявления для Telegram уведомлений
+                    new_listings = await self._get_new_listings_from_scan(
+                        str(scan_record.id), city
+                    )
+                    await self._send_telegram_notifications(new_listings)
 
                 except Exception as e:
                     logger.error(f"[Scan {scan_record.id}] Error in transaction: {e}")

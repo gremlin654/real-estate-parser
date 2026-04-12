@@ -52,6 +52,8 @@ services:
 
   backend:
     build: ./backend
+    env_file:
+      - ./backend/.env
     depends_on:
       db:
         condition: service_healthy
@@ -65,6 +67,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       SCAN_INTERVAL_MINUTES: 30
       KUFAR_CITY: mogilev
+      # Telegram Bot (переопределяется из .env файла)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_ENABLED: ${TELEGRAM_BOT_ENABLED:-false}
+      TELEGRAM_MAX_RETRIES: ${TELEGRAM_MAX_RETRIES:-3}
+      TELEGRAM_RETRY_DELAY_SECONDS: ${TELEGRAM_RETRY_DELAY_SECONDS:-5}
+      TELEGRAM_RATE_LIMIT_PER_MINUTE: ${TELEGRAM_RATE_LIMIT_PER_MINUTE:-20}
     volumes:
       - ./backend:/app  # Монтирование кода для hot reload
     ports:

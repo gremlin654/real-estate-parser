@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     LOG_ROTATION_SIZE: str = "10 MB"
     LOG_COMPRESSION: str = "zip"
 
+    # Telegram Bot настройки
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_ENABLED: bool = False
+    TELEGRAM_MAX_RETRIES: int = 3
+    TELEGRAM_RETRY_DELAY_SECONDS: int = 5
+    TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 20
+
     class Config:
         env_file = ".env"
 

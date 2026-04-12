@@ -22,6 +22,7 @@ docker-compose up --build
 - ✅ История сканирований
 - ✅ Экспорт данных (CSV, XLSX, JSON)
 - ✅ Графики и аналитика
+- ✅ 📱 Telegram Bot — уведомления о новых квартирах (v4.0)
 - ✅ CI/CD pipeline
 - ✅ Тесты (E2E + Unit + API)
 - ✅ Redis integration (кэширование, distributed locking, rate limiting)
@@ -81,6 +82,19 @@ docker-compose up --build
 ### 4. Запустите сканирование
 
 Нажмите кнопку **"🔄 Сканировать"** на странице Listings
+
+### 📱 Telegram Bot (опционально)
+
+1. Создайте бота через [@BotFather](https://t.me/BotFather)
+2. Добавьте токен в `backend/.env`:
+   ```bash
+   TELEGRAM_BOT_TOKEN=your_token_here
+   TELEGRAM_BOT_ENABLED=true
+   ```
+3. Перезапустите backend: `docker-compose restart backend`
+4. Откройте бота в Telegram и отправьте `/start`
+
+📖 Подробная документация: [backend/TELEGRAM_BOT.md](backend/TELEGRAM_BOT.md)
 
 ## 📊 API Endpoints
 
