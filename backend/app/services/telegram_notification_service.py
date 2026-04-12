@@ -374,7 +374,9 @@ class TelegramNotificationService:
             )
             return msg.message_id
 
-    async def _retry_with_backoff(self, func, *args, max_retries: int | None = None, **kwargs):
+    async def _retry_with_backoff(
+        self, func, *args, max_retries: int | None = None, **kwargs
+    ):
         """
         Выполняет функцию с exponential backoff retry логикой.
 

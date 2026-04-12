@@ -195,7 +195,9 @@ async def skip_price(callback: types.CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(lambda c: c.data == "cancel_subscription")
-async def cancel_subscription_callback(callback: types.CallbackQuery, state: FSMContext):
+async def cancel_subscription_callback(
+    callback: types.CallbackQuery, state: FSMContext
+):
     """Отменить создание подписки (inline кнопка)"""
     await state.clear()
     await callback.message.edit_text(
@@ -379,11 +381,15 @@ async def confirm_subscription(
         await callback.answer()
         return
 
-    logger.info(f"User {callback.from_user.id} CONFIRMED subscription, callback_data={callback_data}")
+    logger.info(
+        f"User {callback.from_user.id} CONFIRMED subscription, callback_data={callback_data}"
+    )
 
     # Получаем данные из state
     data = await state.get_data()
-    logger.info(f"FSM state data: city={data.get('city')}, rooms={data.get('rooms')}, price_min={data.get('price_min')}, price_max={data.get('price_max')}")
+    logger.info(
+        f"FSM state data: city={data.get('city')}, rooms={data.get('rooms')}, price_min={data.get('price_min')}, price_max={data.get('price_max')}"
+    )
     city = data.get("city")
     rooms = data.get("rooms")
     price_min = data.get("price_min")
@@ -676,8 +682,7 @@ async def _edit_subscription_field(
         return
 
     logger.info(
-        f"User {user_id} editing field '{field}' "
-        f"of subscription {subscription_id}"
+        f"User {user_id} editing field '{field}' " f"of subscription {subscription_id}"
     )
 
     # ПРОВЕРКА: подписка принадлежит текущему пользователю
@@ -915,13 +920,17 @@ async def process_edit_price(
         # ПРОВЕРКА: подписка принадлежит текущему пользователю
         subscription = await service.get_subscription_by_id(subscription_id)
         if not subscription:
-            await message.answer("❌ Подписка не найдена", reply_markup=get_main_keyboard())
+            await message.answer(
+                "❌ Подписка не найдена", reply_markup=get_main_keyboard()
+            )
             await state.clear()
             return
 
         user = await service.get_user_by_telegram_id(user_id)
         if not user or subscription.user_id != user.id:
-            await message.answer("❌ Это не ваша подписка", reply_markup=get_main_keyboard())
+            await message.answer(
+                "❌ Это не ваша подписка", reply_markup=get_main_keyboard()
+            )
             await state.clear()
             return
 
@@ -962,7 +971,9 @@ async def process_edit_price(
 
     user = await service.get_user_by_telegram_id(user_id)
     if not user or subscription.user_id != user.id:
-        await message.answer("❌ Это не ваша подписка", reply_markup=get_main_keyboard())
+        await message.answer(
+            "❌ Это не ваша подписка", reply_markup=get_main_keyboard()
+        )
         await state.clear()
         return
 

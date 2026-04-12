@@ -212,7 +212,7 @@ class TelegramMessageBuilder:
 
         # Адрес или "Не указан"
         address_display = address if address and address.strip() else "Не указан"
-        
+
         # Основные характеристики
         message += f"📍 Адрес: {address_display}\n"
         message += f"🚪 Комнат: {TelegramMessageBuilder.format_rooms(rooms)}\n"

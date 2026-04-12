@@ -107,11 +107,12 @@ async def lifespan(app: FastAPI):
     if settings.TELEGRAM_BOT_ENABLED and settings.TELEGRAM_BOT_TOKEN:
         try:
             bot = create_bot()
-            
+
             # Установить shared bot для переиспользования в notification service
             from app.services.telegram_notification_service import (
                 TelegramNotificationService,
             )
+
             TelegramNotificationService.set_shared_bot(bot)
 
             dp = create_dispatcher()

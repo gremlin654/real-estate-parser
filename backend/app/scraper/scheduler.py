@@ -153,8 +153,10 @@ class ScraperScheduler:
         """
         Отправить уведомления о новых объявлениях через Telegram бота.
         """
-        logger.info(f"DEBUG: _send_telegram_notifications called for {city}, listings_data len={len(listings_data)}")
-        
+        logger.info(
+            f"DEBUG: _send_telegram_notifications called for {city}, listings_data len={len(listings_data)}"
+        )
+
         if not settings.TELEGRAM_BOT_ENABLED:
             logger.debug("Telegram bot disabled, skipping notifications")
             return
@@ -164,8 +166,12 @@ class ScraperScheduler:
             return
 
         # Извлекаем kufar_id для поиска в БД
-        kufar_ids = [item.get("kufar_id") for item in listings_data if item.get("kufar_id")]
-        logger.info(f"Sending Telegram notifications for {len(kufar_ids)} listings in {city}")
+        kufar_ids = [
+            item.get("kufar_id") for item in listings_data if item.get("kufar_id")
+        ]
+        logger.info(
+            f"Sending Telegram notifications for {len(kufar_ids)} listings in {city}"
+        )
 
         try:
             async with async_session_maker() as db:
@@ -177,7 +183,9 @@ class ScraperScheduler:
                     select(Listing).where(Listing.kufar_id.in_(kufar_ids))
                 )
                 new_listings = result.scalars().all()
-                logger.info(f"Found {len(new_listings)} listings in DB for notifications")
+                logger.info(
+                    f"Found {len(new_listings)} listings in DB for notifications"
+                )
 
                 notification_service = TelegramNotificationService(db)
                 try:
