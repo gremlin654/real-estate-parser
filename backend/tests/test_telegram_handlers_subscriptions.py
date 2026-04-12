@@ -522,6 +522,9 @@ class TestEditSubscription:
         )
         mock_state = AsyncMock()
 
+        # ВАЖНО: subscription.user_id должен совпадать с user.id
+        mock_subscription.user_id = mock_telegram_user.id
+
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
         mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
@@ -563,6 +566,9 @@ class TestDeleteSubscription:
         callback_data = DeleteSubscriptionCallback(
             subscription_id=str(mock_subscription.id)
         )
+
+        # ВАЖНО: subscription.user_id должен совпадать с user.id
+        mock_subscription.user_id = mock_telegram_user.id
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
