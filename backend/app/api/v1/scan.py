@@ -415,7 +415,13 @@ async def trigger_scan(
     # Запускаем сканирование в background с передачей lock для освобождения
     logger.info(f"Starting manual scan for {request.city}, scan_id: {scan_record.id}")
     background_tasks.add_task(
-        _run_manual_scan, scheduler, request.city, str(scan_record.id), lock, lock_key, redis_client
+        _run_manual_scan,
+        scheduler,
+        request.city,
+        str(scan_record.id),
+        lock,
+        lock_key,
+        redis_client,
     )
 
     # Возвращаем статус сразу
@@ -427,7 +433,9 @@ async def trigger_scan(
     )
 
 
-async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock, lock_key: str, redis_client):
+async def _run_manual_scan(
+    scheduler, city: str, scan_id: str, lock: RedisLock, lock_key: str, redis_client
+):
     """Запуск ручного сканирования
 
     Args:
@@ -685,25 +693,28 @@ async def _run_manual_scan(scheduler, city: str, scan_id: str, lock: RedisLock, 
                     # Находим только что созданные объявления — у которых first_seen_at в пределах последних 2 минут
                     two_minutes_ago = datetime.now() - timedelta(minutes=2)
                     result = await db.execute(
-                        select(Listing).where(
+                        select(Listing)
+                        .where(
                             Listing.city == city,
-                            Listing.first_seen_at >= two_minutes_ago
-                        ).order_by(Listing.first_seen_at.desc()).limit(created_count * 2)
+                            Listing.first_seen_at >= two_minutes_ago,
+                        )
+                        .order_by(Listing.first_seen_at.desc())
+                        .limit(created_count * 2)
                     )
                     new_listings = list(result.scalars().all())
-                    
+
                     logger.info(
                         f"Found {len(new_listings)} new listings for Telegram notifications"
                     )
-                    
+
                     if new_listings:
                         async with async_session_maker() as notify_db:
-                            notification_service = TelegramNotificationService(notify_db)
+                            notification_service = TelegramNotificationService(
+                                notify_db
+                            )
                             try:
-                                telegram_stats = (
-                                    await notification_service.send_new_listings_notifications(
-                                        new_listings
-                                    )
+                                telegram_stats = await notification_service.send_new_listings_notifications(
+                                    new_listings
                                 )
                                 logger.info(
                                     f"Telegram notifications: {telegram_stats['sent']} sent, "

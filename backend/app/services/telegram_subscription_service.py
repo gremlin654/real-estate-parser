@@ -119,9 +119,7 @@ class TelegramSubscriptionService:
             logger.error(f"Error creating Telegram user: {e}")
             raise
 
-    async def get_user_by_telegram_id(
-        self, telegram_id: int
-    ) -> Optional[TelegramUser]:
+    async def get_user_by_telegram_id(self, telegram_id: int) -> Optional[TelegramUser]:
         """
         Получить пользователя по telegram_id.
 
@@ -137,9 +135,7 @@ class TelegramSubscriptionService:
         user = result.scalar_one_or_none()
 
         if user:
-            logger.debug(
-                f"Found user by telegram_id {telegram_id}: user_id={user.id}"
-            )
+            logger.debug(f"Found user by telegram_id {telegram_id}: user_id={user.id}")
         else:
             logger.debug(f"User with telegram_id {telegram_id} not found")
 
@@ -161,9 +157,7 @@ class TelegramSubscriptionService:
         user = result.scalar_one_or_none()
 
         if user:
-            logger.debug(
-                f"Found user by id {user_id}: telegram_id={user.telegram_id}"
-            )
+            logger.debug(f"Found user by id {user_id}: telegram_id={user.telegram_id}")
         else:
             logger.debug(f"User with id {user_id} not found")
 
@@ -422,15 +416,19 @@ class TelegramSubscriptionService:
 
         price_min = kwargs.get(
             "price_min",
-            (await self.get_subscription_by_id(subscription_id)).price_min
-            if await self.get_subscription_by_id(subscription_id)
-            else None,
+            (
+                (await self.get_subscription_by_id(subscription_id)).price_min
+                if await self.get_subscription_by_id(subscription_id)
+                else None
+            ),
         )
         price_max = kwargs.get(
             "price_max",
-            (await self.get_subscription_by_id(subscription_id)).price_max
-            if await self.get_subscription_by_id(subscription_id)
-            else None,
+            (
+                (await self.get_subscription_by_id(subscription_id)).price_max
+                if await self.get_subscription_by_id(subscription_id)
+                else None
+            ),
         )
         if "price_min" in kwargs or "price_max" in kwargs:
             self.validator.validate_price_range(
@@ -440,12 +438,8 @@ class TelegramSubscriptionService:
 
         if "floor_min" in kwargs or "floor_max" in kwargs:
             sub = await self.get_subscription_by_id(subscription_id)
-            floor_min = kwargs.get(
-                "floor_min", sub.floor_min if sub else None
-            )
-            floor_max = kwargs.get(
-                "floor_max", sub.floor_max if sub else None
-            )
+            floor_min = kwargs.get("floor_min", sub.floor_min if sub else None)
+            floor_max = kwargs.get("floor_max", sub.floor_max if sub else None)
             self.validator.validate_floor_range(floor_min, floor_max)
 
         if "currency" in kwargs:
@@ -499,9 +493,7 @@ class TelegramSubscriptionService:
                 logger.info(f"Soft deleted subscription: {subscription_id}")
                 return True
             else:
-                logger.warning(
-                    f"Subscription {subscription_id} not found for deletion"
-                )
+                logger.warning(f"Subscription {subscription_id} not found for deletion")
                 return False
         except SQLAlchemyError as e:
             await self.db.rollback()
@@ -536,9 +528,7 @@ class TelegramSubscriptionService:
                 return False
         except SQLAlchemyError as e:
             await self.db.rollback()
-            logger.error(
-                f"Error hard deleting subscription {subscription_id}: {e}"
-            )
+            logger.error(f"Error hard deleting subscription {subscription_id}: {e}")
             raise
 
     # === Matching Logic ===
