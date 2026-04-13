@@ -168,7 +168,10 @@ class KufarScraper:
             total_floors_raw = ad_params.get("re_number_floors", "")
             if total_floors_raw is not None and total_floors_raw != "":
                 try:
-                    if isinstance(total_floors_raw, (int, float)):
+                    # re_number_floors can be array [12] or number or string
+                    if isinstance(total_floors_raw, list) and len(total_floors_raw) > 0:
+                        total_floors = int(total_floors_raw[0])
+                    elif isinstance(total_floors_raw, (int, float)):
                         total_floors = int(total_floors_raw)
                     elif (
                         isinstance(total_floors_raw, str)
