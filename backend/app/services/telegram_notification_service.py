@@ -548,7 +548,7 @@ class TelegramNotificationService:
             rooms=listing.rooms or 0,
             area=listing.area or 0.0,
             floor=listing.floor or 0,
-            total_floors=listing.total_floors or 0,
+            total_floors=listing.total_floors,
             price_byn=listing.price or 0,
             price_usd=listing.price_usd or 0,
             price_per_m2_usd=price_per_m2_usd,

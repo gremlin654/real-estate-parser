@@ -104,20 +104,24 @@ class TelegramMessageBuilder:
     @staticmethod
     def format_floor(floor: int, total_floors: int) -> str:
         """
-        Форматирует этаж в виде "текущий/всего".
+        Форматирует этаж в виде "текущий/всего" или просто "текущий".
 
         Args:
             floor: Текущий этаж
             total_floors: Общее количество этажей
 
         Returns:
-            Строка в формате "5/9"
+            Строка в формате "5/9" или "5" если total_floors неизвестен
 
         Example:
             >>> TelegramMessageBuilder.format_floor(5, 9)
             "5/9"
+            >>> TelegramMessageBuilder.format_floor(5, 0)
+            "5"
         """
-        return f"{floor}/{total_floors}"
+        if total_floors and total_floors > 0:
+            return f"{floor}/{total_floors}"
+        return str(floor)
 
     @staticmethod
     def format_deal_badge(deal_percent: float) -> str:
@@ -160,11 +164,11 @@ class TelegramMessageBuilder:
         rooms: int,
         area: float,
         floor: int,
-        total_floors: int,
-        price_byn: int,
-        price_usd: int,
-        price_per_m2_usd: float,
-        listing_url: str,
+        total_floors: int | None = None,
+        price_byn: int = 0,
+        price_usd: int = 0,
+        price_per_m2_usd: float = 0.0,
+        listing_url: str = "",
         deal_percent: float | None = None,
         price_drop_percent: float | None = None,
     ) -> str:
