@@ -23,7 +23,7 @@ def upgrade() -> None:
     Добавляем поля для Deal Score:
     1. deal_score - скоринг выгодности объявления (0-100)
     2. deal_label - текстовая метка ("🔥 HOT", "👍 GOOD", "😐 NORMAL")
-    
+
     Индексы:
     - idx_listings_deal_score - для сортировки по deal_score DESC NULLS LAST
     - idx_listings_deal_label - partial index для фильтрации по метке

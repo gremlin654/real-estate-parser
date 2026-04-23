@@ -255,12 +255,14 @@ async def get_listings(
                 "deal_percent": deal_percent,
                 "avg_price_per_m2": avg_price_per_m2,
             }
-            
+
             # Добавляем deal_score если запрошен
             if include_score:
-                item_dict["deal_score"] = round(listing.deal_score, 2) if listing.deal_score else None
+                item_dict["deal_score"] = (
+                    round(listing.deal_score, 2) if listing.deal_score else None
+                )
                 item_dict["deal_label"] = listing.deal_label
-            
+
             items_with_metrics.append(item_dict)
 
         return {
@@ -372,12 +374,14 @@ async def get_listings(
                     "min_price": min_price,
                     "drop_percent": round(drop_percent, 2) if drop_percent else None,
                 }
-                
+
                 # Добавляем deal_score если запрошен
                 if include_score:
-                    item_dict["deal_score"] = round(listing.deal_score, 2) if listing.deal_score else None
+                    item_dict["deal_score"] = (
+                        round(listing.deal_score, 2) if listing.deal_score else None
+                    )
                     item_dict["deal_label"] = listing.deal_label
-                
+
                 items_with_price_drop.append(item_dict)
 
             return {
@@ -428,9 +432,7 @@ async def get_listings(
                 .group_by(ListingHistory.listing_id)
             )
             history_result = await db.execute(price_history_query)
-            price_history_map = {
-                row.listing_id: row for row in history_result.all()
-            }
+            price_history_map = {row.listing_id: row for row in history_result.all()}
 
         items_with_score = []
         for listing in listings:
@@ -438,9 +440,7 @@ async def get_listings(
             history = price_history_map.get(listing.id)
             if history and history.max_price and history.max_price > 0:
                 drop_percent = (
-                    (history.max_price - history.min_price)
-                    / history.max_price
-                    * 100
+                    (history.max_price - history.min_price) / history.max_price * 100
                 )
             else:
                 drop_percent = 0.0
@@ -460,7 +460,9 @@ async def get_listings(
                     deal_score_value = round(score, 2)
                     deal_label_value = DealScoreService.calculate_label(score)
                 except Exception as e:
-                    logger.warning(f"Error calculating deal_score for {listing.id}: {e}")
+                    logger.warning(
+                        f"Error calculating deal_score for {listing.id}: {e}"
+                    )
                     # Fallback: использовать значения из БД если они есть
                     if listing.deal_score:
                         deal_score_value = round(listing.deal_score, 2)

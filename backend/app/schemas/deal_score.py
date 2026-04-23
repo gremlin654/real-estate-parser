@@ -15,7 +15,9 @@ class DealScoreBreakdown(BaseModel):
 
     score: float = Field(..., ge=0, le=100, description="Score фактора (0-100)")
     weight: float = Field(..., ge=0, le=1, description="Вес фактора")
-    weighted: float = Field(..., ge=0, le=100, description="Взвешенный вклад (score * weight)")
+    weighted: float = Field(
+        ..., ge=0, le=100, description="Взвешенный вклад (score * weight)"
+    )
 
 
 class DealScoreFullBreakdown(BaseModel):
@@ -33,8 +35,12 @@ class DealScoreResponse(BaseModel):
     """Response для Deal Score."""
 
     deal_score: float = Field(..., ge=0, le=100, description="Deal Score (0-100)")
-    deal_label: str = Field(..., description="Текстовая метка (🔥 HOT, 👍 GOOD, 😐 NORMAL)")
-    breakdown: DealScoreFullBreakdown = Field(..., description="Детализация по факторам")
+    deal_label: str = Field(
+        ..., description="Текстовая метка (🔥 HOT, 👍 GOOD, 😐 NORMAL)"
+    )
+    breakdown: DealScoreFullBreakdown = Field(
+        ..., description="Детализация по факторам"
+    )
 
 
 class DealListingWithScore(BaseModel):
@@ -58,7 +64,9 @@ class DealListingWithScore(BaseModel):
     last_seen_at: datetime
 
     # Deal Score поля
-    deal_score: Optional[float] = Field(None, ge=0, le=100, description="Deal Score (0-100)")
+    deal_score: Optional[float] = Field(
+        None, ge=0, le=100, description="Deal Score (0-100)"
+    )
     deal_label: Optional[str] = Field(None, description="Текстовая метка")
 
     class Config:
