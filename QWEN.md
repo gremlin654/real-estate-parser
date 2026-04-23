@@ -8,6 +8,8 @@
 
 - В локальном окружении может отсутствовать `gh` CLI (`zsh: command not found: gh`).
 - MCP-интеграция GitHub может возвращать `401 Bad credentials`; в таком случае PR/MR создаётся вручную по URL из `git push`.
+- В хост-окружении может не быть `python`/модуля `black`; для backend-форматирования используйте контейнер:
+  `docker-compose exec backend black app/...` и проверку `docker-compose exec backend black --check app/...`.
 
 ## Политика изменений в базе данных
 
