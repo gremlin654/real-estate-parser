@@ -114,6 +114,7 @@ export function Listings() {
     sort,
     dealsOnly,
     includeDealMetrics: true,
+    includeScore: true,
   });
 
   const totalPages = Math.ceil((listingsData?.total || 0) / size);
