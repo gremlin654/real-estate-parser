@@ -10,6 +10,7 @@
 - MCP-интеграция GitHub может возвращать `401 Bad credentials`; в таком случае PR/MR создаётся вручную по URL из `git push`.
 - В хост-окружении может не быть `python`/модуля `black`; для backend-форматирования используйте контейнер:
   `docker-compose exec backend black app/...` и проверку `docker-compose exec backend black --check app/...`.
+- Для `DealScoreBadge` в UI и тестах актуальные пороги: `>=50` → `🔥` (зелёный), `35-49.9` → `👍` (жёлто-оранжевый), `<35` → не рендерится.
 
 ## Политика изменений в базе данных
 

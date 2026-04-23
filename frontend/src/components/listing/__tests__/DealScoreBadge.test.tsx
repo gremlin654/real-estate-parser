@@ -13,21 +13,24 @@ describe('DealScoreBadge', () => {
     expect(badge).toHaveClass('to-emerald-600');
   });
 
-  it('score=70 → жёлтый фон, текст "👍 70"', () => {
+  it('score=70 → зелёный фон, текст "🔥 70"', () => {
     const { container } = render(<DealScoreBadge score={70} />);
     const badge = container.querySelector('.inline-flex');
     
-    expect(badge).toHaveTextContent('👍');
+    expect(badge).toHaveTextContent('🔥');
     expect(badge).toHaveTextContent('70');
-    expect(badge).toHaveClass('from-yellow-400');
-    expect(badge).toHaveClass('to-orange-500');
+    expect(badge).toHaveClass('from-green-500');
+    expect(badge).toHaveClass('to-emerald-600');
   });
 
-  it('score=40 → серый фон, не отображается (ниже порога 60)', () => {
+  it('score=40 → жёлтый фон, текст "👍 40"', () => {
     const { container } = render(<DealScoreBadge score={40} />);
     const badge = container.querySelector('.inline-flex');
-    
-    expect(badge).toBeNull();
+
+    expect(badge).toHaveTextContent('👍');
+    expect(badge).toHaveTextContent('40');
+    expect(badge).toHaveClass('from-yellow-400');
+    expect(badge).toHaveClass('to-orange-500');
   });
 
   it("size='sm' → маленький размер", () => {
@@ -87,20 +90,23 @@ describe('DealScoreBadge', () => {
     expect(badge).toHaveClass('to-emerald-600');
   });
 
-  it('score=59 → серый (ниже порога)', () => {
+  it('score=59 → зелёный (>=50)', () => {
     const { container } = render(<DealScoreBadge score={59} />);
     const badge = container.querySelector('.inline-flex');
-    
-    expect(badge).toBeNull();
+
+    expect(badge).toHaveTextContent('🔥');
+    expect(badge).toHaveTextContent('59');
+    expect(badge).toHaveClass('from-green-500');
+    expect(badge).toHaveClass('to-emerald-600');
   });
 
-  it('score=60 → жёлтый (на пороге)', () => {
+  it('score=60 → зелёный (>=50)', () => {
     const { container } = render(<DealScoreBadge score={60} />);
     const badge = container.querySelector('.inline-flex');
-    
-    expect(badge).toHaveTextContent('👍');
+
+    expect(badge).toHaveTextContent('🔥');
     expect(badge).toHaveTextContent('60');
-    expect(badge).toHaveClass('from-yellow-400');
-    expect(badge).toHaveClass('to-orange-500');
+    expect(badge).toHaveClass('from-green-500');
+    expect(badge).toHaveClass('to-emerald-600');
   });
 });
