@@ -101,9 +101,7 @@ async def populate_deal_scores():
                 .group_by(ListingHistory.listing_id)
             )
             history_result = await db.execute(price_history_query)
-            price_history_map = {
-                row.listing_id: row for row in history_result.all()
-            }
+            price_history_map = {row.listing_id: row for row in history_result.all()}
 
             # Рассчитать deal_score для каждого
             city_updated = 0

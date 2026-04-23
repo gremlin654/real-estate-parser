@@ -38,7 +38,11 @@ class DealScoreService:
         "bonus": 0.10,
     }
 
-    def __init__(self, redis_client: Optional[redis.Redis] = None, weights: Optional[Dict[str, float]] = None):
+    def __init__(
+        self,
+        redis_client: Optional[redis.Redis] = None,
+        weights: Optional[Dict[str, float]] = None,
+    ):
         """
         Инициализация сервиса.
 
@@ -109,12 +113,12 @@ class DealScoreService:
 
         # Weighted sum
         score = (
-            self.weights["price"] * price_score +
-            self.weights["trend"] * trend_score +
-            self.weights["liquidity"] * liquidity_score +
-            self.weights["freshness"] * freshness_score +
-            self.weights["floor"] * floor_score +
-            self.weights["bonus"] * bonus_score
+            self.weights["price"] * price_score
+            + self.weights["trend"] * trend_score
+            + self.weights["liquidity"] * liquidity_score
+            + self.weights["freshness"] * freshness_score
+            + self.weights["floor"] * floor_score
+            + self.weights["bonus"] * bonus_score
         )
 
         # Clamp to 0-100
@@ -151,13 +155,17 @@ class DealScoreService:
 
         price_per_m2 = float(listing.price_per_m2_usd or 0)
         if price_per_m2 <= 0:
-            logger.debug(f"PriceScore: invalid price_per_m2={price_per_m2} for listing {listing.id}")
+            logger.debug(
+                f"PriceScore: invalid price_per_m2={price_per_m2} for listing {listing.id}"
+            )
             return 0.0
 
         discount_percent = (avg_price_per_m2 - price_per_m2) / avg_price_per_m2 * 100
         score = max(0.0, min(100.0, discount_percent))
 
-        logger.debug(f"PriceScore: avg={avg_price_per_m2}, current={price_per_m2}, discount={discount_percent:.2f}%, score={score}")
+        logger.debug(
+            f"PriceScore: avg={avg_price_per_m2}, current={price_per_m2}, discount={discount_percent:.2f}%, score={score}"
+        )
         return score
 
     def calculate_trend_score(self, drop_percent: float) -> float:
@@ -205,7 +213,9 @@ class DealScoreService:
             float: LiquidityScore (20, 50, 70 или 90)
         """
         if not listing.first_seen_at:
-            logger.debug(f"LiquidityScore: no first_seen_at for listing {listing.id}, using default 50")
+            logger.debug(
+                f"LiquidityScore: no first_seen_at for listing {listing.id}, using default 50"
+            )
             return 50.0
 
         days_on_market = (datetime.now() - listing.first_seen_at).days
@@ -238,10 +248,14 @@ class DealScoreService:
             float: FreshnessScore (30, 70 или 100)
         """
         if not listing.first_seen_at:
-            logger.debug(f"FreshnessScore: no first_seen_at for listing {listing.id}, using default 50")
+            logger.debug(
+                f"FreshnessScore: no first_seen_at for listing {listing.id}, using default 50"
+            )
             return 50.0
 
-        hours_since_first_seen = (datetime.now() - listing.first_seen_at).total_seconds() / 3600
+        hours_since_first_seen = (
+            datetime.now() - listing.first_seen_at
+        ).total_seconds() / 3600
 
         if hours_since_first_seen < 24:
             score = 100.0
@@ -250,7 +264,9 @@ class DealScoreService:
         else:
             score = 30.0
 
-        logger.debug(f"FreshnessScore: hours={hours_since_first_seen:.1f}, score={score}")
+        logger.debug(
+            f"FreshnessScore: hours={hours_since_first_seen:.1f}, score={score}"
+        )
         return score
 
     def calculate_floor_score(self, listing) -> float:
@@ -268,7 +284,9 @@ class DealScoreService:
             float: FloorScore (40 или 80)
         """
         if not listing.floor or not listing.total_floors:
-            logger.debug(f"FloorScore: no floor/total_floors for listing {listing.id}, using default 50")
+            logger.debug(
+                f"FloorScore: no floor/total_floors for listing {listing.id}, using default 50"
+            )
             return 50.0
 
         if listing.floor == 1 or listing.floor == listing.total_floors:
@@ -276,7 +294,9 @@ class DealScoreService:
         else:
             score = 80.0
 
-        logger.debug(f"FloorScore: floor={listing.floor}/{listing.total_floors}, score={score}")
+        logger.debug(
+            f"FloorScore: floor={listing.floor}/{listing.total_floors}, score={score}"
+        )
         return score
 
     def calculate_bonus_score(self, listing) -> float:
@@ -309,7 +329,9 @@ class DealScoreService:
         #     score += 60.0
 
         score = min(score, 100.0)
-        logger.debug(f"BonusScore: has_images={bool(listing.images)}, area={listing.area}, score={score}")
+        logger.debug(
+            f"BonusScore: has_images={bool(listing.images)}, area={listing.area}, score={score}"
+        )
         return score
 
     @staticmethod
@@ -361,12 +383,12 @@ class DealScoreService:
 
         # Weighted sum
         score = (
-            self.weights["price"] * price_score +
-            self.weights["trend"] * trend_score +
-            self.weights["liquidity"] * liquidity_score +
-            self.weights["freshness"] * freshness_score +
-            self.weights["floor"] * floor_score +
-            self.weights["bonus"] * bonus_score
+            self.weights["price"] * price_score
+            + self.weights["trend"] * trend_score
+            + self.weights["liquidity"] * liquidity_score
+            + self.weights["freshness"] * freshness_score
+            + self.weights["floor"] * floor_score
+            + self.weights["bonus"] * bonus_score
         )
         score = max(0.0, min(100.0, score))
         score = round(score, 2)
