@@ -36,6 +36,10 @@ class ListingResponse(ListingBase):
     deal_percent: Optional[float] = None
     avg_price_per_m2: Optional[float] = None
 
+    # Deal Score metrics (опционально, добавляется при include_score=true)
+    deal_score: Optional[float] = None
+    deal_label: Optional[str] = None
+
     class Config:
         from_attributes = True
 

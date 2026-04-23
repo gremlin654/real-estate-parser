@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     TELEGRAM_RETRY_DELAY_SECONDS: int = 5
     TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 20
 
+    # Курс обмена валют (1 USD = X BYN)
+    # Обновляется вручную или из API Нацбанка РБ
+    EXCHANGE_RATE_USD_BYN: float = 3.27
+
     class Config:
         env_file = ".env"
 

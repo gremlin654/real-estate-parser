@@ -12,6 +12,9 @@ import { DealTooltip } from '@/components/listing/DealTooltip';
 import { PriceDropBadge } from '@/components/listing/PriceDropBadge';
 import { PriceDropTooltip } from '@/components/listing/PriceDropTooltip';
 import { FavoriteButton } from '@/components/listing/FavoriteButton';
+import { DealScoreBadge } from '@/components/listing/DealScoreBadge';
+import { DealScoreTooltip } from '@/components/listing/DealScoreTooltip';
+import { cn } from '@/shared/lib/utils';
 
 interface ListingCardProps {
   listing: Listing;
@@ -36,13 +39,22 @@ export function ListingCardWidget({ listing, withFavoriteButton = true }: Listin
   const maxPrice = (listing as any).max_price;
   const minPrice = (listing as any).min_price;
 
+  // Deal Score metrics
+  const dealScore = listing.deal_score;
+  const dealLabel = listing.deal_label;
+  const showDealScore = dealScore != null && dealScore >= 35;
+
   // Определяем валюту для tooltip
   const tooltipCurrency = currency === 'USD' ? 'USD' : 'BYN';
-  
+
   // Защита от undefined price
   const displayPrice = price ?? 0;
 
-  return (
+  // Проверяем наличие DealBadge для позиционирования DealScoreBadge
+  const hasDealBadge = dealPercent != null && dealPercent < -10;
+
+  // Карточка с контентом
+  const cardContent = (
     <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden relative">
       <div className="relative aspect-video overflow-hidden">
         {firstImage ? (
@@ -56,8 +68,21 @@ export function ListingCardWidget({ listing, withFavoriteButton = true }: Listin
             <span className="text-muted-foreground text-4xl">🏠</span>
           </div>
         )}
+        {/* DealScoreBadge (слева вверху) */}
+        {showDealScore && dealScore != null && dealLabel != null && (
+          <div className={cn(
+            'absolute z-30',
+            hasDealBadge ? 'top-2 left-20' : 'top-2 left-2'
+          )}>
+            <DealScoreBadge
+              score={dealScore}
+              label={dealLabel}
+              size="sm"
+            />
+          </div>
+        )}
         {/* DealBadge отображается только если есть выгода (слева вверху) */}
-        {dealPercent !== null && dealPercent !== undefined && dealPercent < -10 && (
+        {hasDealBadge && (
           <DealBadge dealPercent={dealPercent} className="z-30" />
         )}
         {/* PriceDropBadge отображается только если есть падение >= 5% (справа внизу) */}
@@ -154,4 +179,19 @@ export function ListingCardWidget({ listing, withFavoriteButton = true }: Listin
       </CardFooter>
     </Card>
   );
+
+  // Wrap with DealScoreTooltip если есть breakdown
+  if (showDealScore && listing.deal_score_breakdown) {
+    return (
+      <DealScoreTooltip
+        dealScore={dealScore!}
+        dealLabel={dealLabel || ''}
+        breakdown={listing.deal_score_breakdown}
+      >
+        {cardContent}
+      </DealScoreTooltip>
+    );
+  }
+
+  return cardContent;
 }

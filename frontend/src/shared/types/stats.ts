@@ -151,3 +151,63 @@ export interface PriceDropHistoryResponse {
   last_price: number;
   total_drop_percent: number;
 }
+
+/**
+ * Типы для Deal Score (оценка выгодности объявления)
+ */
+
+export interface DealScoreBreakdown {
+  score: number;          // Score фактора (0-100)
+  weight: number;         // Вес фактора
+  weighted: number;       // Взвешенный вклад (score * weight / 100)
+}
+
+export interface DealScoreFullBreakdown {
+  price_score: DealScoreBreakdown;      // Цена ниже рынка
+  trend_score: DealScoreBreakdown;      // Падение цены
+  liquidity_score: DealScoreBreakdown;  // Дней на рынке
+  freshness_score: DealScoreBreakdown;  // Свежее объявление
+  floor_score: DealScoreBreakdown;      // Этаж
+  bonus_score: DealScoreBreakdown;      // Бонусы (фото, площадь)
+}
+
+export interface DealScoreListing {
+  id: string;
+  kufar_id: string;
+  url: string;
+  title: string;
+  price: number;
+  price_usd?: number | null;
+  currency: string;
+  city: string | null;
+  address: string | null;
+  rooms: number | null;
+  area: number | null;
+  floor: number | null;
+  total_floors?: number | null;
+  category: string | null;
+  description: string | null;
+  district: string | null;
+  metro: string | null;
+  house_year: number | null;
+  images: string[];
+  status: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  price_per_m2_byn?: number | null;
+  price_per_m2_usd?: number | null;
+  // Deal Score поля
+  deal_score: number;           // 0-100
+  deal_label: string;           // "🔥 HOT", "👍 GOOD", "😐 NORMAL"
+  deal_score_breakdown?: DealScoreFullBreakdown;  // Детализация по факторам
+}
+
+export interface DealsScoreResponse {
+  items: DealScoreListing[];
+  total: number;
+  avg_score: number;
+  min_score_filter: number;
+  currency: string;
+  limit: number;
+  offset: number;
+}

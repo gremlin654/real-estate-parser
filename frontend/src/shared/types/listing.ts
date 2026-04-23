@@ -1,3 +1,5 @@
+import type { DealScoreFullBreakdown } from './stats';
+
 export interface Listing {
   id: string;
   kufar_id: string;
@@ -26,6 +28,10 @@ export interface Listing {
   price_per_m2_usd?: number | null;
   deal_percent?: number | null;
   avg_price_per_m2?: number | null;
+  // Deal Score fields (v4.1)
+  deal_score?: number | null;
+  deal_label?: string | null;
+  deal_score_breakdown?: DealScoreFullBreakdown | null;
 }
 
 export interface PaginatedResponse {

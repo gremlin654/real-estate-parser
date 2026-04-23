@@ -13,6 +13,8 @@ from sqlalchemy import (
     Enum as SQLEnum,
     Boolean,
     Numeric,
+    Index,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -73,6 +75,21 @@ class Listing(Base):
     deleted_at = Column(DateTime)
     price_per_m2_byn = Column(Numeric(12, 2), nullable=True)
     price_per_m2_usd = Column(Numeric(12, 2), nullable=True)
+    deal_score = Column(Float, nullable=True)
+    deal_label = Column(String(20), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "idx_listings_deal_score",
+            "deal_score",
+            postgresql_ops={"deal_score": "DESC NULLS LAST"},
+        ),
+        Index(
+            "idx_listings_deal_label",
+            "deal_label",
+            postgresql_where=text("deal_label IS NOT NULL"),
+        ),
+    )
 
     history = relationship(
         "ListingHistory", back_populates="listing", cascade="all, delete-orphan"
