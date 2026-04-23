@@ -29,6 +29,8 @@ import type {
   FavoriteCreateResponse,
   FavoriteCheckResponse,
   FavoritesFilters,
+  DealScoreListing,
+  DealsScoreResponse,
 } from '@/shared/types';
 import { useFilterStore } from '@/store/filterStore';
 import { toast } from 'sonner';
@@ -226,6 +228,7 @@ export const useListings = (filters: {
   sort?: string;
   dealsOnly?: boolean;
   includeDealMetrics?: boolean;
+  includeScore?: boolean;
 }) => {
   return useQuery<PaginatedResponse>({
     queryKey: ['listings', filters],
@@ -258,6 +261,9 @@ export const useListings = (filters: {
       }
       if (filters.includeDealMetrics) {
         params.set('include_deal_metrics', 'true');
+      }
+      if (filters.includeScore) {
+        params.set('include_score', 'true');
       }
       // currency используется только для отображения на frontend, не передаём на backend
 
@@ -898,12 +904,65 @@ export const useIsFavoriteCheck = (listingId: string | null) => {
     queryKey: ['isFavorite', listingId],
     queryFn: async () => {
       if (!listingId) throw new Error('Listing ID is required');
-      
+
       const response = await fetch(`${API_BASE}/favorites/check/${listingId}`);
       if (!response.ok) throw new Error('Failed to check favorite status');
       return response.json();
     },
     enabled: !!listingId,
     staleTime: 5 * 60 * 1000, // 5 минут
+  });
+};
+
+/**
+ * ==========================================
+ * DEAL SCORE API HOOKS
+ * ==========================================
+ */
+
+/**
+ * Hook для получения объявлений с Deal Score (оценка выгодности)
+ */
+export const useDealsScoreQuery = (filters: {
+  city: string;
+  rooms?: number[];
+  roomsOther?: boolean;
+  minScore?: number;
+  currency?: 'byn' | 'usd';
+  limit?: number;
+  offset?: number;
+}) => {
+  return useQuery<DealsScoreResponse>({
+    queryKey: ['dealsScore', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.city) params.set('city', filters.city);
+      if (filters.rooms && filters.rooms.length > 0) {
+        filters.rooms.forEach((room) => params.append('rooms', String(room)));
+      }
+      if (filters.roomsOther) {
+        params.set('rooms_other', 'true');
+      }
+      if (filters.minScore) {
+        params.set('min_score', String(filters.minScore));
+      }
+      if (filters.currency) {
+        params.set('currency', filters.currency);
+      }
+      if (filters.limit) {
+        params.set('limit', String(filters.limit));
+      }
+      if (filters.offset) {
+        params.set('offset', String(filters.offset));
+      }
+
+      const response = await fetch(`${API_BASE}/deals/score?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch deals score');
+      return response.json();
+    },
+    enabled: !!filters.city,
+    staleTime: 5 * 60 * 1000, // 5 минут
+    retry: 2,
+    retryDelay: 1000,
   });
 };
