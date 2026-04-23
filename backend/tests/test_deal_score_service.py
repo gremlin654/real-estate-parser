@@ -402,14 +402,14 @@ class TestLabel:
         assert label == "🔥 HOT"
 
     def test_good_label(self):
-        """Тест: score = 70 → '👍 GOOD'."""
+        """Тест: score = 70 → '🔥 HOT'."""
         label = DealScoreService.calculate_label(70.0)
-        assert label == "👍 GOOD"
+        assert label == "🔥 HOT"
 
     def test_normal_label(self):
-        """Тест: score = 40 → '😐 NORMAL'."""
+        """Тест: score = 40 → '👍 GOOD'."""
         label = DealScoreService.calculate_label(40.0)
-        assert label == "😐 NORMAL"
+        assert label == "👍 GOOD"
 
 
 class TestWeightsValidation:
@@ -604,9 +604,10 @@ class TestEdgeCases:
     def test_label_boundaries(self):
         """Тест: Label boundaries корректны."""
         assert DealScoreService.calculate_label(80.0) == "🔥 HOT"
-        assert DealScoreService.calculate_label(79.99) == "👍 GOOD"
-        assert DealScoreService.calculate_label(60.0) == "👍 GOOD"
-        assert DealScoreService.calculate_label(59.99) == "😐 NORMAL"
+        assert DealScoreService.calculate_label(50.0) == "🔥 HOT"
+        assert DealScoreService.calculate_label(49.99) == "👍 GOOD"
+        assert DealScoreService.calculate_label(35.0) == "👍 GOOD"
+        assert DealScoreService.calculate_label(34.99) == "😐 NORMAL"
 
     def test_custom_weights(self):
         """Тест: Кастомные веса работают корректно."""

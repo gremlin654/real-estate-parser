@@ -11,6 +11,7 @@
 - В хост-окружении может не быть `python`/модуля `black`; для backend-форматирования используйте контейнер:
   `docker-compose exec backend black app/...` и проверку `docker-compose exec backend black --check app/...`.
 - Для `DealScoreBadge` в UI и тестах актуальные пороги: `>=50` → `🔥` (зелёный), `35-49.9` → `👍` (жёлто-оранжевый), `<35` → не рендерится.
+- Для `DealScoreService.calculate_label()` и backend-тестов действуют те же пороги: `>=50` → `🔥 HOT`, `35-49.99` → `👍 GOOD`, `<35` → `😐 NORMAL`.
 
 ## Политика изменений в базе данных
 
