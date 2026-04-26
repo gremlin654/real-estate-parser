@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: |
           cd frontend
-          VITE_BASE_URL=/real-estate-parser/ npm run build
+          VITE_BASE_URL=/real-estate-parser/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
