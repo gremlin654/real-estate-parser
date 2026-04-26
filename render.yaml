@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: kufar-backend
+    env: docker
+    region: frankfurt
+    plan: free
+    dockerfilePath: backend/Dockerfile
+    context: ./
+    envVars:
+      - key: DATABASE_URL
+        value: ${DATABASE_URL}
+      - key: REDIS_URL
+        value: ${REDIS_URL}
+      - key: TELEGRAM_BOT_TOKEN
+        value: ${TELEGRAM_BOT_TOKEN}
+      - key: TELEGRAM_BOT_ENABLED
+        value: "true"
+      - key: TELEGRAM_WEB_APP_URL
+        fromService:
+          name: kufar-frontend
+          type: web
+          envVar: KUFAR_FRONTEND_URL
+      - key: TELEGRAM_USER_RATE_LIMIT_PER_HOUR
+        value: "300"
+      - key: EXCHANGE_RATE_USD_BYN
+        value: "3.27"
+      - key: SCAN_INTERVAL_MINUTES
+        value: "30"
+
+  - type: web
+    name: kufar-frontend
+    env: static
+    region: frankfurt
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://kufar-backend.onrender.com
+      - key: VITE_BASE_URL
+        value: /
