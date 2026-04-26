@@ -18,7 +18,7 @@ import type {
   TelegramSubscriptionCreate,
   TelegramSubscriptionUpdate,
 } from '@/shared/types/telegram';
-import './styles.css';
+import '../styles.css';
 
 const CITIES = [
   { code: 'minsk', name: 'Минск', emoji: '🏙️' },
