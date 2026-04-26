@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLayout } from '@/widgets/AppLayout';
 import { Dashboard } from '@/pages/Dashboard';
@@ -35,7 +35,7 @@ function PageTitle({ title }: { title: string }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={import.meta.env.BASE_URL || '/'}>
+      <HashRouter>
         <PageTitle title="Панель управления" />
         <AppLayout>
           <Routes>
@@ -51,7 +51,7 @@ function App() {
             <Route path="/telegram-webapp" element={<TelegramWebApp />} />
           </Routes>
         </AppLayout>
-      </BrowserRouter>
+      </HashRouter>
     </QueryClientProvider>
   );
 }
