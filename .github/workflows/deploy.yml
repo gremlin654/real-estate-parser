@@ -32,6 +32,11 @@ jobs:
           VITE_BASE_URL=/real-estate-parser/telegram-webapp/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
           cp -r dist out-telegram
 
+      - name: Add Telegram SDK to index.html
+        run: |
+          sed -i 's|<meta name="viewport" content="width=device-width, initial-scale=1.0" />|<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />|' out-telegram/index.html
+          sed -i 's|<title>|<script src="https://telegram.org/js/telegram-web-app.js"></script>\n    <title>|' out-telegram/index.html
+
       - name: Merge Telegram into main
         run: |
           mkdir -p out/telegram-webapp
