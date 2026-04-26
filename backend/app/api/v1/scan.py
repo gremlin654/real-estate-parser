@@ -729,7 +729,11 @@ async def _run_manual_scan(
                     # === ОТПРАВКА PRICE_DROP УВЕДОМЛЕНИЙ ===
                     if settings.TELEGRAM_BOT_ENABLED:
                         from sqlalchemy import select, and_
-                        from app.models.listing import Listing, ListingHistory, EventType
+                        from app.models.listing import (
+                            Listing,
+                            ListingHistory,
+                            EventType,
+                        )
 
                         scan_started_at = datetime.now() - timedelta(minutes=2)
                         listing_ids_result = await db.execute(
@@ -746,7 +750,10 @@ async def _run_manual_scan(
                                     and_(
                                         ListingHistory.listing_id.in_(listing_ids),
                                         ListingHistory.event_type.in_(
-                                            [EventType.price_changed, EventType.price_changed_byn]
+                                            [
+                                                EventType.price_changed,
+                                                EventType.price_changed_byn,
+                                            ]
                                         ),
                                         ListingHistory.created_at >= scan_started_at,
                                     ),
@@ -772,21 +779,26 @@ async def _run_manual_scan(
                                     drop_percent_by_listing_id[item.listing_id] = round(
                                         float(drop_percent), 2
                                     )
-                                    price_before_by_listing_id[item.listing_id] = item.price_before
+                                    price_before_by_listing_id[item.listing_id] = (
+                                        item.price_before
+                                    )
 
                             listings_result = await db.execute(
-                                select(Listing)
-                                .where(Listing.id.in_(listing_ids))
+                                select(Listing).where(Listing.id.in_(listing_ids))
                             )
                             db_listings = list(listings_result.scalars().all())
 
                             price_drop_listings = []
                             for listing in db_listings:
-                                drop_percent = drop_percent_by_listing_id.get(listing.id)
+                                drop_percent = drop_percent_by_listing_id.get(
+                                    listing.id
+                                )
                                 if drop_percent is None:
                                     continue
                                 listing.drop_percent = drop_percent
-                                price_before_usd = price_before_by_listing_id.get(listing.id)
+                                price_before_usd = price_before_by_listing_id.get(
+                                    listing.id
+                                )
                                 if price_before_usd and listing.price_usd:
                                     price_drop_amount_usd = round(
                                         price_before_usd - listing.price_usd

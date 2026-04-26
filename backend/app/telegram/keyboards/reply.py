@@ -31,11 +31,10 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text="/stop")
 
     # Кнопка запуска Web App (если настроен URL)
-    web_app_url = getattr(settings, 'TELEGRAM_WEB_APP_URL', None)
+    web_app_url = getattr(settings, "TELEGRAM_WEB_APP_URL", None)
     if web_app_url:
         builder.button(
-            text="⚙️ Расширенные настройки",
-            web_app=WebAppInfo(url=web_app_url)
+            text="⚙️ Расширенные настройки", web_app=WebAppInfo(url=web_app_url)
         )
         builder.adjust(2, 2, 1)
     else:

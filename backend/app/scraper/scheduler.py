@@ -234,7 +234,9 @@ class ScraperScheduler:
                             drop_percent_by_listing_id[item.listing_id] = round(
                                 float(drop_percent), 2
                             )
-                            price_before_by_listing_id[item.listing_id] = item.price_before
+                            price_before_by_listing_id[item.listing_id] = (
+                                item.price_before
+                            )
 
                     for listing in db_listings:
                         drop_percent = drop_percent_by_listing_id.get(listing.id)
