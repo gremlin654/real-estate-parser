@@ -33,6 +33,18 @@ class RoomsCallback(CallbackData, prefix="rooms"):
     rooms: str  # "1", "2", "3", "4", "5", "any"
 
 
+class CurrencyCallback(CallbackData, prefix="curr"):
+    """Callback для выбора валюты подписки."""
+
+    currency: str  # "usd" | "byn"
+
+
+class PriceDropNotifyCallback(CallbackData, prefix="price_drop"):
+    """Callback для настройки уведомлений только о падении цены."""
+
+    enabled: str  # "1" | "0"
+
+
 class SubscriptionActionCallback(CallbackData, prefix="sub_action"):
     """Callback для действий с подпиской."""
 
@@ -49,7 +61,7 @@ class EditSubscriptionFieldCallback(CallbackData, prefix="edit_field"):
     """Callback для редактирования конкретного поля подписки."""
 
     subscription_id: str
-    field: str  # "city", "rooms", "price"
+    field: str  # city, rooms, price, curr, ppm2, floor, drop, deal
 
 
 class DeleteSubscriptionCallback(CallbackData, prefix="delete_sub"):
@@ -125,6 +137,32 @@ def get_price_input_keyboard() -> InlineKeyboardMarkup:
     """
     builder = InlineKeyboardBuilder()
     builder.button(text="⏭️ Пропустить (любая цена)", callback_data="skip_price")
+    builder.button(text="❌ Отменить", callback_data="cancel_subscription")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_currency_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора валюты подписки."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="USD ($)", callback_data=CurrencyCallback(currency="usd"))
+    builder.button(text="BYN (Br)", callback_data=CurrencyCallback(currency="byn"))
+    builder.button(text="❌ Отменить", callback_data="cancel_subscription")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def get_price_drop_toggle_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для выбора режима уведомлений."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="Только падение цены",
+        callback_data=PriceDropNotifyCallback(enabled="1"),
+    )
+    builder.button(
+        text="Все новые объявления",
+        callback_data=PriceDropNotifyCallback(enabled="0"),
+    )
     builder.button(text="❌ Отменить", callback_data="cancel_subscription")
     builder.adjust(1)
     return builder.as_markup()
@@ -252,6 +290,41 @@ def get_edit_subscription_keyboard(
         callback_data=EditSubscriptionFieldCallback(
             subscription_id=subscription_id,
             field="price",
+        ),
+    )
+    builder.button(
+        text="💱 Изменить валюту",
+        callback_data=EditSubscriptionFieldCallback(
+            subscription_id=subscription_id,
+            field="curr",
+        ),
+    )
+    builder.button(
+        text="📏 Изменить цену за м²",
+        callback_data=EditSubscriptionFieldCallback(
+            subscription_id=subscription_id,
+            field="ppm2",
+        ),
+    )
+    builder.button(
+        text="🏢 Изменить этаж",
+        callback_data=EditSubscriptionFieldCallback(
+            subscription_id=subscription_id,
+            field="floor",
+        ),
+    )
+    builder.button(
+        text="📉 Price-drop режим",
+        callback_data=EditSubscriptionFieldCallback(
+            subscription_id=subscription_id,
+            field="drop",
+        ),
+    )
+    builder.button(
+        text="🎯 Порог Deal Score",
+        callback_data=EditSubscriptionFieldCallback(
+            subscription_id=subscription_id,
+            field="deal",
         ),
     )
     builder.button(

@@ -27,6 +27,7 @@ from app.models.telegram_user import (
     TelegramSubscription,
     TelegramNotificationLog,
     TelegramNotificationStatus,
+    TelegramNotificationEventType,
 )
 
 
@@ -208,7 +209,7 @@ class TestSendNewListingsWithMatches:
             )
 
             mock_send.assert_called_once_with(
-                test_user, test_listing, test_subscription
+                test_user, test_listing, test_subscription, "new_listing"
             )
             assert result["sent"] == 1
             assert result["skipped_no_match"] == 0
@@ -326,34 +327,117 @@ class TestSendNewListingsWithMatches:
             assert result["sent"] == 2
 
 
-class TestSendListingToUser:
-    """Тесты отправки одного объявления пользователю."""
+class TestEventTypeAwareNotifications:
+    """Тесты event-aware matching для уведомлений."""
 
     @pytest.mark.asyncio
-    async def test_send_listing_to_user_success(
+    async def test_send_new_listings_uses_new_listing_event_type(
+        self, notification_service, test_listing
+    ):
+        """Для новых объявлений должен передаваться event_type=new_listing."""
+        notification_service.subscription_service.get_matching_subscriptions.return_value = (
+            []
+        )
+
+        await notification_service.send_new_listings_notifications([test_listing])
+
+        notification_service.subscription_service.get_matching_subscriptions.assert_awaited_once_with(
+            test_listing,
+            event_type="new_listing",
+        )
+
+    @pytest.mark.asyncio
+    async def test_send_price_drop_uses_price_drop_event_type(
+        self, notification_service, test_listing
+    ):
+        """Для price drop должен передаваться event_type=price_drop."""
+        notification_service.subscription_service.get_matching_subscriptions.return_value = (
+            []
+        )
+
+        await notification_service.send_price_drop_notifications([test_listing])
+
+        notification_service.subscription_service.get_matching_subscriptions.assert_awaited_once_with(
+            test_listing,
+            event_type="price_drop",
+        )
+
+
+class TestEventTypeInMessage:
+    """Тесты event_type в построении сообщений."""
+
+    @pytest.mark.asyncio
+    async def test_send_listing_to_user_passes_event_type_to_message_builder(
         self, notification_service, test_user, test_listing, test_subscription, mock_bot
     ):
-        """Тест: успешная отправка сообщения."""
+        """send_listing_to_user передаёт event_type в message builder."""
         mock_message = AsyncMock()
         mock_message.message_id = 12345
         mock_bot.send_message.return_value = mock_message
 
-        # Мокаем _log_notification
         with patch.object(
             notification_service, "_log_notification", new_callable=AsyncMock
-        ) as mock_log:
+        ):
             with patch.object(
-                notification_service, "_send_message_with_photo", return_value=12345
-            ) as mock_send:
-                result = await notification_service.send_listing_to_user(
-                    test_user, test_listing, test_subscription
-                )
+                notification_service,
+                "_is_duplicate_notification",
+                return_value=False,
+            ):
+                with patch.object(
+                    notification_service,
+                    "_check_user_rate_limit",
+                    return_value=False,
+                ):
+                    with patch.object(
+                        notification_service,
+                        "_format_listing_message",
+                        wraps=notification_service._format_listing_message,
+                    ) as mock_format:
+                        await notification_service.send_listing_to_user(
+                            test_user,
+                            test_listing,
+                            test_subscription,
+                            event_type="price_drop",
+                        )
 
-                assert result == "sent"
-                mock_send.assert_called_once()
-                mock_log.assert_called_once()
-                assert mock_log.call_args.kwargs["status"] == "sent"
-                assert mock_log.call_args.kwargs["message_id"] == 12345
+                        mock_format.assert_called_once()
+                        call_args = mock_format.call_args.args
+                        assert call_args[2] == "price_drop"
+
+    @pytest.mark.asyncio
+    async def test_send_listing_to_user_default_event_type(
+        self, notification_service, test_user, test_listing, test_subscription, mock_bot
+    ):
+        """По умолчанию event_type=new_listing."""
+        mock_message = AsyncMock()
+        mock_message.message_id = 12345
+        mock_bot.send_message.return_value = mock_message
+
+        with patch.object(
+            notification_service, "_log_notification", new_callable=AsyncMock
+        ):
+            with patch.object(
+                notification_service,
+                "_is_duplicate_notification",
+                return_value=False,
+            ):
+                with patch.object(
+                    notification_service,
+                    "_check_user_rate_limit",
+                    return_value=False,
+                ):
+                    with patch.object(
+                        notification_service,
+                        "_format_listing_message",
+                        wraps=notification_service._format_listing_message,
+                    ) as mock_format:
+                        await notification_service.send_listing_to_user(
+                            test_user, test_listing, test_subscription
+                        )
+
+                        mock_format.assert_called_once()
+                        call_args = mock_format.call_args.args
+                        assert call_args[2] == "new_listing"
 
     @pytest.mark.asyncio
     async def test_send_listing_to_user_with_photo(
@@ -364,65 +448,94 @@ class TestSendListingToUser:
             notification_service, "_log_notification", new_callable=AsyncMock
         ):
             with patch.object(
-                notification_service, "_send_message_with_photo", return_value=12346
-            ) as mock_send_photo:
-                result = await notification_service.send_listing_to_user(
-                    test_user, test_listing, test_subscription
-                )
+                notification_service,
+                "_is_duplicate_notification",
+                return_value=False,
+            ):
+                with patch.object(
+                    notification_service,
+                    "_check_user_rate_limit",
+                    return_value=False,
+                ):
+                    with patch.object(
+                        notification_service,
+                        "_send_message_with_photo",
+                        return_value=12346,
+                    ) as mock_send_photo:
+                        result = await notification_service.send_listing_to_user(
+                            test_user, test_listing, test_subscription
+                        )
 
-                assert result == "sent"
-                mock_send_photo.assert_called_once()
-                # Проверяем что фото было передано
-                call_args = mock_send_photo.call_args[0]
-                assert (
-                    call_args[3] == "https://example.com/image1.jpg"
-                )  # image_url argument
+                        assert result == "sent"
+                        mock_send_photo.assert_called_once()
+                        call_args = mock_send_photo.call_args[0]
+                        assert call_args[3] == "https://example.com/image1.jpg"
 
     @pytest.mark.asyncio
     async def test_send_listing_to_user_forbidden(
         self, notification_service, test_user, test_listing, test_subscription
     ):
         """Тест: пользователь заблокировал бота."""
-        # Мокаем _send_message_with_photo чтобы вызывать ForbiddenError
         with patch.object(
             notification_service,
-            "_send_message_with_photo",
-            side_effect=TelegramForbiddenError(
-                method=MagicMock(), message="Forbidden: bot was blocked by the user"
-            ),
+            "_is_duplicate_notification",
+            return_value=False,
         ):
-            result = await notification_service.send_listing_to_user(
-                test_user, test_listing, test_subscription
-            )
+            with patch.object(
+                notification_service,
+                "_check_user_rate_limit",
+                return_value=False,
+            ):
+                with patch.object(
+                    notification_service,
+                    "_send_message_with_photo",
+                    side_effect=TelegramForbiddenError(
+                        method=MagicMock(),
+                        message="Forbidden: bot was blocked by the user",
+                    ),
+                ):
+                    result = await notification_service.send_listing_to_user(
+                        test_user, test_listing, test_subscription
+                    )
 
-            assert result == "blocked"
-            assert test_user.blocked_by_user == True
-            # Commit вызывается минимум 1 раз (для обновления blocked_by_user и для логирования)
-            notification_service.db.commit.assert_called()
+                    assert result == "blocked"
+                    assert test_user.blocked_by_user == True
+                    notification_service.db.commit.assert_called()
 
     @pytest.mark.asyncio
     async def test_send_listing_to_user_network_error(
         self, notification_service, test_user, test_listing, test_subscription
     ):
         """Тест: сетевая ошибка при отправке."""
-        # Мокаем _send_message_with_photo чтобы вызывать NetworkError
         with patch.object(
             notification_service,
-            "_send_message_with_photo",
-            side_effect=TelegramNetworkError(
-                method=MagicMock(), message="Connection error"
-            ),
+            "_is_duplicate_notification",
+            return_value=False,
         ):
             with patch.object(
-                notification_service, "_log_notification", new_callable=AsyncMock
-            ) as mock_log:
-                result = await notification_service.send_listing_to_user(
-                    test_user, test_listing, test_subscription
-                )
+                notification_service,
+                "_check_user_rate_limit",
+                return_value=False,
+            ):
+                with patch.object(
+                    notification_service,
+                    "_send_message_with_photo",
+                    side_effect=TelegramNetworkError(
+                        method=MagicMock(), message="Connection error"
+                    ),
+                ):
+                    with patch.object(
+                        notification_service,
+                        "_log_notification",
+                        new_callable=AsyncMock,
+                    ) as mock_log:
+                        result = await notification_service.send_listing_to_user(
+                            test_user, test_listing, test_subscription
+                        )
 
-                assert result == "failed"
-                mock_log.assert_called_once()
-                assert mock_log.call_args.kwargs["status"] == "failed"
+                        assert result == "failed"
+                        mock_log.assert_called_once()
+                        assert mock_log.call_args.kwargs["status"] == "failed"
 
 
 class TestRetryWithBackoff:
@@ -502,7 +615,9 @@ class TestRetryWithBackoff:
             )
         )
 
-        with pytest.raises(NotificationSendError, match="Rate limited after 3 attempts"):
+        with pytest.raises(
+            NotificationSendError, match="Rate limited after 3 attempts"
+        ):
             await notification_service._retry_with_backoff(mock_func)
 
         assert mock_func.call_count == 3
@@ -721,3 +836,276 @@ class TestClose:
 
             # Не должно вызывать ошибок
             await service.close()
+
+
+class TestDeduplication:
+    """Тесты дедупликации уведомлений."""
+
+    @pytest.mark.asyncio
+    async def test_is_duplicate_notification_exists(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """Возвращает True если запись уже существует."""
+        mock_result = AsyncMock()
+        mock_result.scalar_one_or_none.return_value = TelegramNotificationLog(
+            id=uuid4(),
+            user_id=test_user.id,
+            listing_id=test_listing.id,
+            subscription_id=test_subscription.id,
+            event_type=TelegramNotificationEventType.new_listing,
+            status=TelegramNotificationStatus.sent,
+        )
+        notification_service.db.execute.return_value = mock_result
+
+        result = await notification_service._is_duplicate_notification(
+            user_id=test_user.id,
+            listing_id=test_listing.id,
+            subscription_id=test_subscription.id,
+            event_type="new_listing",
+        )
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_is_duplicate_notification_not_exists(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """Возвращает False если записи нет."""
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        notification_service.db.execute = AsyncMock(return_value=mock_result)
+
+        result = await notification_service._is_duplicate_notification(
+            user_id=test_user.id,
+            listing_id=test_listing.id,
+            subscription_id=test_subscription.id,
+            event_type="new_listing",
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_is_duplicate_notification_invalid_event_type(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """Возвращает False для неизвестного event_type."""
+        result = await notification_service._is_duplicate_notification(
+            user_id=test_user.id,
+            listing_id=test_listing.id,
+            subscription_id=test_subscription.id,
+            event_type="unknown_type",
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_is_duplicate_notification_none_event_type(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """Возвращает False если event_type=None."""
+        result = await notification_service._is_duplicate_notification(
+            user_id=test_user.id,
+            listing_id=test_listing.id,
+            subscription_id=test_subscription.id,
+            event_type=None,
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_send_listing_to_user_skips_duplicate(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """send_listing_to_user пропускает дубликаты."""
+        with patch.object(
+            notification_service,
+            "_is_duplicate_notification",
+            return_value=True,
+        ):
+            result = await notification_service.send_listing_to_user(
+                test_user, test_listing, test_subscription, event_type="new_listing"
+            )
+
+            assert result == "duplicate"
+
+    @pytest.mark.asyncio
+    async def test_stats_includes_duplicate(self, notification_service, test_listing):
+        """Stats включают duplicate count."""
+        notification_service.subscription_service.get_matching_subscriptions.return_value = (
+            []
+        )
+
+        result = await notification_service._send_listings_notifications(
+            listings=[test_listing], event_type="new_listing"
+        )
+
+        assert "duplicate" in result
+        assert "skipped_no_match" in result
+
+
+class TestUserRateLimit:
+    """Тесты per-user rate limiting."""
+
+    @pytest.mark.asyncio
+    async def test_check_user_rate_limit_within_limit(
+        self, notification_service, test_user
+    ):
+        """Пользователь в пределах лимита — Redis возвращает None."""
+        with patch(
+            "app.services.telegram_notification_service.get_redis"
+        ) as mock_get_redis:
+            mock_redis = AsyncMock()
+            mock_redis.get.return_value = None
+            mock_redis.pipeline.return_value = AsyncMock()
+            mock_get_redis.return_value = mock_redis
+
+            with patch(
+                "app.services.telegram_notification_service.settings"
+            ) as mock_settings:
+                mock_settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR = 20
+                result = await notification_service._check_user_rate_limit(test_user)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_user_rate_limit_exceeded(
+        self, notification_service, test_user
+    ):
+        """Пользователь превысил лимит — Redis возвращает count >= limit."""
+        with patch(
+            "app.services.telegram_notification_service.get_redis"
+        ) as mock_get_redis:
+            mock_redis = AsyncMock()
+            mock_redis.get.return_value = "25"
+            mock_get_redis.return_value = mock_redis
+
+            with patch(
+                "app.services.telegram_notification_service.settings"
+            ) as mock_settings:
+                mock_settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR = 20
+                result = await notification_service._check_user_rate_limit(test_user)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_check_user_rate_limit_redis_error_fallback_to_db(
+        self, notification_service, test_user
+    ):
+        """Redis недоступен — fallback на PostgreSQL."""
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 5
+        notification_service.db.execute = AsyncMock(return_value=mock_result)
+
+        with patch(
+            "app.services.telegram_notification_service.get_redis",
+            side_effect=Exception("Redis unavailable"),
+        ):
+            with patch(
+                "app.services.telegram_notification_service.settings"
+            ) as mock_settings:
+                mock_settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR = 20
+                result = await notification_service._check_user_rate_limit(test_user)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_check_user_rate_limit_db_fallback_exceeded(
+        self, notification_service, test_user
+    ):
+        """Redis недоступен, DB показывает превышение."""
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = 25
+        notification_service.db.execute = AsyncMock(return_value=mock_result)
+
+        with patch(
+            "app.services.telegram_notification_service.get_redis",
+            side_effect=Exception("Redis unavailable"),
+        ):
+            with patch(
+                "app.services.telegram_notification_service.settings"
+            ) as mock_settings:
+                mock_settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR = 20
+                result = await notification_service._check_user_rate_limit(test_user)
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_check_user_rate_limit_disabled(
+        self, notification_service, test_user
+    ):
+        """Лимит выключен (limit=0) — всегда False."""
+        with patch(
+            "app.services.telegram_notification_service.settings"
+        ) as mock_settings:
+            mock_settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR = 0
+            result = await notification_service._check_user_rate_limit(test_user)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_send_listing_to_user_skips_rate_limited(
+        self, notification_service, test_user, test_listing, test_subscription
+    ):
+        """send_listing_to_user пропускает rate-limited пользователей."""
+        with patch.object(
+            notification_service,
+            "_is_duplicate_notification",
+            return_value=False,
+        ):
+            with patch.object(
+                notification_service,
+                "_check_user_rate_limit",
+                return_value=True,
+            ):
+                result = await notification_service.send_listing_to_user(
+                    test_user, test_listing, test_subscription, event_type="new_listing"
+                )
+
+                assert result == "ratelimited_user"
+
+    @pytest.mark.asyncio
+    async def test_stats_includes_ratelimited_user(
+        self, notification_service, test_listing
+    ):
+        """Stats включают ratelimited_user count."""
+        notification_service.subscription_service.get_matching_subscriptions.return_value = (
+            []
+        )
+
+        result = await notification_service._send_listings_notifications(
+            listings=[test_listing], event_type="new_listing"
+        )
+
+        assert "ratelimited_user" in result
+
+
+class TestCleanupOldLogs:
+    """Тесты cleanup старых логов уведомлений."""
+
+    @pytest.mark.asyncio
+    async def test_cleanup_old_logs(self, notification_service, test_user):
+        """Удаляет записи старше retention_days."""
+        result_mock = MagicMock()
+        result_mock.rowcount = 42
+        notification_service.db.execute.return_value = result_mock
+
+        deleted = await notification_service.cleanup_old_logs(retention_days=30)
+
+        assert deleted == 42
+        notification_service.db.execute.assert_called_once()
+        call_args = notification_service.db.execute.call_args
+        stmt = call_args[0][0]
+        assert "delete" in str(stmt).lower()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_old_logs_custom_retention(
+        self, notification_service, test_user
+    ):
+        """Использует custom retention_days."""
+        result_mock = MagicMock()
+        result_mock.rowcount = 10
+        notification_service.db.execute.return_value = result_mock
+
+        deleted = await notification_service.cleanup_old_logs(retention_days=7)
+
+        assert deleted == 10

@@ -180,7 +180,7 @@ class TestBuildListingMessage:
         assert "💰 Цена: $48,000 (156,000 BYN)" in result
         assert "📊 Цена за м²: $883.5" in result
         assert "🔥 Выгода: 16.5%" in result
-        assert "📉 Цена упала: 10.2%" in result
+        assert "📉 Цена упала" not in result
         assert "🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123456" in result
 
     def test_build_listing_message_minimal(self):
@@ -246,7 +246,50 @@ class TestBuildListingMessage:
             listing_url="https://re.kufar.by/vi/gomel/kupit/kvartiru/321",
             deal_percent=None,
             price_drop_percent=8.5,
+            event_type="price_drop",
         )
 
         assert "🔥 Выгода" not in result
         assert "📉 Цена упала: 8.5%" in result
+
+    def test_build_listing_message_event_type_price_drop(self):
+        result = TelegramMessageBuilder.build_listing_message(
+            city="minsk",
+            address="ул. Тестовая, д. 1",
+            rooms=2,
+            area=50.0,
+            floor=3,
+            total_floors=9,
+            price_byn=150000,
+            price_usd=46000,
+            price_per_m2_usd=920.0,
+            listing_url="https://re.kufar.by/vi/minsk/kupit/kvartiru/999",
+            deal_percent=10.0,
+            price_drop_percent=15.0,
+            event_type="price_drop",
+        )
+
+        assert "📉 Цена снизилась — 🏙️ Минск!" in result
+        assert "📉 Цена упала: 15.0%" in result
+        assert "🔥 Выгода" not in result
+
+    def test_build_listing_message_event_type_new_listing_shows_deal_badge(self):
+        result = TelegramMessageBuilder.build_listing_message(
+            city="minsk",
+            address="ул. Тестовая, д. 1",
+            rooms=2,
+            area=50.0,
+            floor=3,
+            total_floors=9,
+            price_byn=150000,
+            price_usd=46000,
+            price_per_m2_usd=920.0,
+            listing_url="https://re.kufar.by/vi/minsk/kupit/kvartiru/999",
+            deal_percent=10.0,
+            price_drop_percent=5.0,
+            event_type="new_listing",
+        )
+
+        assert "🏠 Новая квартира в 🏙️ Минск!" in result
+        assert "🔥 Выгода: 10.0%" in result
+        assert "📉 Цена упала" not in result
