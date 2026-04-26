@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 import istanbul from 'vite-plugin-istanbul'
 import path from 'path'
 
-// GitHub Pages base - установить через env или по умолчанию
 const base = process.env.VITE_BASE_URL || '/'
+const apiUrl = process.env.VITE_API_URL
 
 export default defineConfig({
   base,
@@ -25,7 +25,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
-    proxy: {
+    proxy: apiUrl ? undefined : {
       '/api': {
         target: 'http://backend:8000',
         changeOrigin: true,
