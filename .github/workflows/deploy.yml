@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: cd frontend && npm ci
+
+      - name: Build main site
+        run: |
+          cd frontend
+          VITE_BASE_URL=/real-estate-parser/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
+
+      - name: Save main site
+        run: |
+          cp -r frontend/dist out
+
+      - name: Build Telegram WebApp
+        run: |
+          cd frontend
+          VITE_BASE_URL=/telegram-webapp/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
+
+      - name: Copy Telegram to subfolder
+        run: |
+          mkdir -p out/telegram-webapp
+          cp frontend/dist/index.html out/telegram-webapp/
+          cp frontend/dist/vite.svg out/telegram-webapp/
+          cp -r frontend/dist/assets out/telegram-webapp/assets
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+      - uses: actions/deploy-pages@v4
