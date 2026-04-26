@@ -260,10 +260,13 @@ class TestScraperSchedulerStart:
                     mock_sched_instance = MagicMock()
                     MockScheduler.return_value = mock_sched_instance
 
-                    await scheduler.start()
+                    with patch("app.scraper.scheduler.settings") as mock_settings:
+                        mock_settings.TELEGRAM_BOT_ENABLED = True
 
-                    # Job добавлен для каждого города + cleanup
-                    assert mock_sched_instance.add_job.call_count == 3
+                        await scheduler.start()
+
+                        # Job добавлен для каждого города + cleanup
+                        assert mock_sched_instance.add_job.call_count == 3
 
 
 @pytest.mark.asyncio
