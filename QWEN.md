@@ -34,6 +34,8 @@
 - **Phase 9: Docker/Env фикс**: исправлен `.env` для контейнера — лишние env vars (`CONTEXT7_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`) вызывали ошибку `Extra inputs are not permitted`; создан отдельный `backend/.env` с корректными переменными; убран root-level volume mount `./.env:/app/.env:ro` который перезаписывал env vars; `TELEGRAM_USER_RATE_LIMIT_PER_HOUR=300` подтверждён.
 - **Deploy на Render**: бэкенд задеплоен на https://real-estate-parser.onrender.com (бесплатный план, может spin down при inactivity).
 - **Telegram Web App**: https://gremlin654.github.io/real-estate-parser/telegram-webapp/ + бэкенд на Render (API: https://real-estate-parser.onrender.com/api/v1).
+  - ⚠️ **Важно:** Использует HashRouter — URL должен включать `#/telegram-webapp`
+  - Пример: `https://gremlin654.github.io/real-estate-parser/telegram-webapp/#/telegram-webapp`
 
 ## Запуск Telegram бота
 
