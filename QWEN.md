@@ -32,6 +32,22 @@
 - **Phase 7: Graceful shutdown scheduler**: `scheduler.stop()` теперь `shutdown(wait=False)` (не блокирует shutdown event loop); добавлен `wait_for_running_jobs(timeout=30.0)` который ждёт завершения active jobs перед остановкой; main.py lifespan вызывает `await scheduler.wait_for_running_jobs()` перед `scheduler.stop()`.
 - **Phase 8: Cleanup старых TelegramNotificationLog**: добавлен `TELEGRAM_NOTIFICATION_LOG_RETENTION_DAYS=30` в config; `cleanup_old_logs(retention_days)` в notification service (DELETE по cutoff date); ежедневный scheduled job `_run_notification_log_cleanup()` в APScheduler; миграция не нужна — cleanup по sent_at без схемы.
 - **Phase 9: Docker/Env фикс**: исправлен `.env` для контейнера — лишние env vars (`CONTEXT7_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`) вызывали ошибку `Extra inputs are not permitted`; создан отдельный `backend/.env` с корректными переменными; убран root-level volume mount `./.env:/app/.env:ro` который перезаписывал env vars; `TELEGRAM_USER_RATE_LIMIT_PER_HOUR=300` подтверждён.
+- **Deploy на Render**: бэкенд задеплоен на https://real-estate-parser.onrender.com (бесплатный план, может spin down при inactivity).
+- **Telegram Web App**: https://gremlin654.github.io/real-estate-parser/telegram-webapp/ + бэкенд на Render (API: https://real-estate-parser.onrender.com/api/v1).
+
+## Запуск Telegram бота
+
+### Конфликт Polling
+**Проблема:** При запуске локального бота (docker-compose) и на Render одновременно возникает ошибка:
+```
+TelegramConflictError: Conflict: terminated by other getUpdates request
+```
+
+**Решение:**
+1. При запуске локально — отключить бота на Render:
+   - Render Dashboard → kufar-backend → Settings → Environment Variables
+   - `TELEGRAM_BOT_ENABLED = false`
+2. При остановке локального бота — вернуть `TELEGRAM_BOT_ENABLED = true` на Render
 
 ## Политика изменений в базе данных
 
