@@ -14,7 +14,11 @@ import json
 
 from app.db.database import get_db
 from app.services.telegram_subscription_service import TelegramSubscriptionService
-from app.models.telegram_user import TelegramUser, TelegramSubscription, TelegramNotificationLog
+from app.models.telegram_user import (
+    TelegramUser,
+    TelegramSubscription,
+    TelegramNotificationLog,
+)
 from app.config import CITY_NAMES
 
 router = APIRouter(prefix="/telegram", tags=["telegram"])
@@ -29,17 +33,17 @@ def get_telegram_user_id(
 ) -> int:
     """
     Получает Telegram user ID из заголовков.
-    
+
     В реальном приложении это должно извлекаться из initData
     и валидироваться через Bot API. Для упрощения принимаем из заголовка.
-    
+
     Args:
         x_telegram_user_id: Telegram user ID из заголовка
         authorization: Authorization заголовок (для future use)
-    
+
     Returns:
         Telegram user ID
-    
+
     Raises:
         HTTPException: Если Telegram user ID не предоставлен
     """
@@ -51,7 +55,7 @@ def get_telegram_user_id(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid X-Telegram-User-Id format",
             )
-    
+
     # Для разработки - использовать тестовый ID
     # В production это должно быть обязательно
     logger.warning("No X-Telegram-User-Id header provided, using default test ID")
@@ -64,17 +68,17 @@ async def get_or_create_telegram_user(
 ) -> TelegramUser:
     """
     Получает или создаёт пользователя Telegram.
-    
+
     Args:
         telegram_id: ID пользователя в Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Объект TelegramUser
     """
     service = TelegramSubscriptionService(db)
     user = await service.get_user_by_telegram_id(telegram_id)
-    
+
     if not user:
         # Создаём пользователя с тестовыми данными
         user = await service.create_user(
@@ -85,7 +89,7 @@ async def get_or_create_telegram_user(
             language_code="ru",
         )
         logger.info(f"Created new Telegram user: {user.id} (telegram_id={telegram_id})")
-    
+
     return user
 
 
@@ -96,18 +100,18 @@ async def get_subscriptions(
 ) -> List[dict]:
     """
     Получает список подписок текущего пользователя.
-    
+
     Args:
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Список подписок
     """
     user = await get_or_create_telegram_user(telegram_id, db)
     service = TelegramSubscriptionService(db)
     subscriptions = await service.get_active_subscriptions(user.id)
-    
+
     return [
         {
             "id": str(sub.id),
@@ -138,21 +142,21 @@ async def create_subscription(
 ) -> dict:
     """
     Создаёт новую подписку.
-    
+
     Args:
         subscription_data: Данные подписки
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Созданная подписка
-    
+
     Raises:
         HTTPException: При ошибках валидации
     """
     user = await get_or_create_telegram_user(telegram_id, db)
     service = TelegramSubscriptionService(db)
-    
+
     # Проверяем лимит подписок
     existing = await service.get_active_subscriptions(user.id)
     if len(existing) >= MAX_SUBSCRIPTIONS_PER_USER:
@@ -160,7 +164,7 @@ async def create_subscription(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Maximum subscriptions limit ({MAX_SUBSCRIPTIONS_PER_USER}) reached",
         )
-    
+
     # Создаём подписку
     subscription = await service.create_subscription(
         user_id=user.id,
@@ -175,9 +179,9 @@ async def create_subscription(
         notify_only_price_drop=subscription_data.get("notify_only_price_drop", False),
         exclude_deal_below_percent=subscription_data.get("exclude_deal_below_percent"),
     )
-    
+
     logger.info(f"Created subscription {subscription.id} for user {user.id}")
-    
+
     return {
         "id": str(subscription.id),
         "user_id": str(subscription.user_id),
@@ -206,22 +210,22 @@ async def update_subscription(
 ) -> dict:
     """
     Обновляет подписку.
-    
+
     Args:
         subscription_id: ID подписки
         subscription_data: Новые данные подписки
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Обновлённая подписка
-    
+
     Raises:
         HTTPException: При ошибках
     """
     user = await get_or_create_telegram_user(telegram_id, db)
     service = TelegramSubscriptionService(db)
-    
+
     # Проверяем, что подписка принадлежит пользователю
     subscription = await service.get_subscription_by_id(subscription_id)
     if not subscription:
@@ -229,19 +233,19 @@ async def update_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Subscription not found",
         )
-    
+
     if subscription.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Subscription belongs to another user",
         )
-    
+
     # Обновляем подписку
     update_fields = {k: v for k, v in subscription_data.items() if v is not None}
     updated = await service.update_subscription(subscription_id, **update_fields)
-    
+
     logger.info(f"Updated subscription {subscription_id}")
-    
+
     return {
         "id": str(updated.id),
         "user_id": str(updated.user_id),
@@ -269,21 +273,21 @@ async def delete_subscription(
 ) -> dict:
     """
     Удаляет подписку.
-    
+
     Args:
         subscription_id: ID подписки
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Результат удаления
-    
+
     Raises:
         HTTPException: При ошибках
     """
     user = await get_or_create_telegram_user(telegram_id, db)
     service = TelegramSubscriptionService(db)
-    
+
     # Проверяем, что подписка принадлежит пользователю
     subscription = await service.get_subscription_by_id(subscription_id)
     if not subscription:
@@ -291,18 +295,18 @@ async def delete_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Subscription not found",
         )
-    
+
     if subscription.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Subscription belongs to another user",
         )
-    
+
     # Удаляем подписку
     await service.delete_subscription(subscription_id)
-    
+
     logger.info(f"Deleted subscription {subscription_id}")
-    
+
     return {"success": True, "message": "Subscription deleted"}
 
 
@@ -313,23 +317,20 @@ async def get_webapp_config(
 ) -> dict:
     """
     Получает конфигурацию для Web App.
-    
+
     Args:
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Конфигурация Web App
     """
     user = await get_or_create_telegram_user(telegram_id, db)
     service = TelegramSubscriptionService(db)
     subscriptions = await service.get_active_subscriptions(user.id)
-    
+
     return {
-        "cities": [
-            {"code": code, "name": name}
-            for code, name in CITY_NAMES.items()
-        ],
+        "cities": [{"code": code, "name": name} for code, name in CITY_NAMES.items()],
         "currencies": [
             {"code": "usd", "name": "USD", "symbol": "$"},
             {"code": "byn", "name": "BYN", "symbol": "Br"},
@@ -354,42 +355,42 @@ async def get_stats(
 ) -> dict:
     """
     Получает статистику уведомлений для пользователя.
-    
+
     Args:
         telegram_id: ID пользователя Telegram
         db: Сессия базы данных
-    
+
     Returns:
         Статистика уведомлений
     """
     user = await get_or_create_telegram_user(telegram_id, db)
-    
+
     # Получаем статистику из логов уведомлений
     from datetime import datetime, timedelta
-    
+
     # Все уведомления
     total_query = select(func.count(TelegramNotificationLog.id)).where(
         TelegramNotificationLog.user_id == user.id
     )
     total_result = await db.execute(total_query)
     total_notifications = total_result.scalar() or 0
-    
+
     # Успешные
     success_query = select(func.count(TelegramNotificationLog.id)).where(
         TelegramNotificationLog.user_id == user.id,
-        TelegramNotificationLog.status == "sent"
+        TelegramNotificationLog.status == "sent",
     )
     success_result = await db.execute(success_query)
     successful = success_result.scalar() or 0
-    
+
     # Ошибки
     failed_query = select(func.count(TelegramNotificationLog.id)).where(
         TelegramNotificationLog.user_id == user.id,
-        TelegramNotificationLog.status == "failed"
+        TelegramNotificationLog.status == "failed",
     )
     failed_result = await db.execute(failed_query)
     failed = failed_result.scalar() or 0
-    
+
     return {
         "total_notifications": total_notifications,
         "successful": successful,

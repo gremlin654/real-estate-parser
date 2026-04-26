@@ -244,9 +244,7 @@ class TelegramMessageBuilder:
             and price_drop_percent is not None
             and price_drop_percent > 0
         ):
-            message += (
-                f"\n{TelegramMessageBuilder.format_price_drop(price_drop_percent, price_drop_amount)}\n"
-            )
+            message += f"\n{TelegramMessageBuilder.format_price_drop(price_drop_percent, price_drop_amount)}\n"
         elif deal_percent is not None and deal_percent > 0:
             message += f"\n{TelegramMessageBuilder.format_deal_badge(deal_percent)}\n"
 

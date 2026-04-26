@@ -190,7 +190,9 @@ app.include_router(monitoring_router)  # Monitoring без префикса
 app.include_router(deals_router, prefix=settings.API_PREFIX)  # Deal Finder
 app.include_router(price_drop_router, prefix=settings.API_PREFIX)  # Price Drop Tracker
 app.include_router(favorites_router, prefix=settings.API_PREFIX)  # Favorites
-app.include_router(telegram_webapp_router, prefix=settings.API_PREFIX)  # Telegram Web App
+app.include_router(
+    telegram_webapp_router, prefix=settings.API_PREFIX
+)  # Telegram Web App
 
 
 @app.get("/health")
