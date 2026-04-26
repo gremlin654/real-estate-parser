@@ -27,7 +27,9 @@ export const FavoriteButton = ({ listingId, className, size = 'md' }: FavoriteBu
       // Используем готовый метод из store с optimistic update + rollback
       await toggleFavorite(listingId, addMutation, removeMutation);
     } finally {
-      setTimeout(() => setIsAnimating(false), 300);
+      if (typeof window !== 'undefined') {
+        setTimeout(() => setIsAnimating(false), 300);
+      }
     }
   };
 
