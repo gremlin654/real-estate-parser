@@ -35,7 +35,7 @@ function PageTitle({ title }: { title: string }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL || '/'}>
         <PageTitle title="Панель управления" />
         <AppLayout>
           <Routes>
