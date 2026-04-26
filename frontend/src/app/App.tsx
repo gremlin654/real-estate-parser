@@ -11,7 +11,7 @@ import { PricePerM2AnalyticsPage } from '@/pages/PricePerM2AnalyticsPage';
 import { DealsPage } from '@/pages/Deals';
 import { PriceDropsPage } from '@/pages/PriceDrops';
 import { FavoritesPage } from '@/pages/Favorites';
-import { TelegramWebApp } from '@/pages/TelegramWebApp/ui/TelegramWebApp';
+import TelegramWebApp from '@/pages/TelegramWebApp/ui/TelegramWebApp';
 
 const queryClient = new QueryClient({
   defaultOptions: {
