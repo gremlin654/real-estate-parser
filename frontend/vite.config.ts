@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react'
 import istanbul from 'vite-plugin-istanbul'
 import path from 'path'
 
+// GitHub Pages base - установить через env или по умолчанию
+const base = process.env.VITE_BASE_URL || '/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     istanbul({

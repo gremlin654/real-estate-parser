@@ -19,6 +19,7 @@ from app.api.v1 import (
     deals_router,
     price_drop_router,
     favorites_router,
+    telegram_webapp_router,
 )
 from app.scraper.scheduler import init_scheduler
 from app.core.logging_config import setup_logging, get_logger
@@ -134,6 +135,7 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("Application shutdown initiated")
+    await scheduler.wait_for_running_jobs(timeout=30.0)
     scheduler.stop()
 
     # Остановка Telegram бота
@@ -188,6 +190,7 @@ app.include_router(monitoring_router)  # Monitoring без префикса
 app.include_router(deals_router, prefix=settings.API_PREFIX)  # Deal Finder
 app.include_router(price_drop_router, prefix=settings.API_PREFIX)  # Price Drop Tracker
 app.include_router(favorites_router, prefix=settings.API_PREFIX)  # Favorites
+app.include_router(telegram_webapp_router, prefix=settings.API_PREFIX)  # Telegram Web App
 
 
 @app.get("/health")

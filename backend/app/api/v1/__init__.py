@@ -9,6 +9,7 @@ from app.api.v1.monitoring import router as monitoring_router
 from app.api.v1.deals import router as deals_router
 from app.api.v1.price_drop import router as price_drop_router
 from app.api.v1.favorites import router as favorites_router
+from app.api.v1.telegram_webapp import router as telegram_webapp_router
 
 __all__ = [
     "listings_router",
@@ -22,4 +23,5 @@ __all__ = [
     "deals_router",
     "price_drop_router",
     "favorites_router",
+    "telegram_webapp_router",
 ]

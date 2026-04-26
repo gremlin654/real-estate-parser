@@ -11,6 +11,7 @@ import { PricePerM2AnalyticsPage } from '@/pages/PricePerM2AnalyticsPage';
 import { DealsPage } from '@/pages/Deals';
 import { PriceDropsPage } from '@/pages/PriceDrops';
 import { FavoritesPage } from '@/pages/Favorites';
+import { TelegramWebApp } from '@/pages/TelegramWebApp/ui/TelegramWebApp';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function App() {
             <Route path="/statistics" element={<Statistics />} />
             <Route path="/analytics/price-per-m2" element={<PricePerM2AnalyticsPage />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/telegram-webapp" element={<TelegramWebApp />} />
           </Routes>
         </AppLayout>
       </BrowserRouter>
