@@ -21,7 +21,13 @@ from uuid import uuid4
 from datetime import datetime, timezone
 
 from app.scraper.scheduler import ScraperScheduler
-from app.models.listing import Listing, ListingStatus, ScanHistory
+from app.models.listing import (
+    Listing,
+    ListingStatus,
+    ScanHistory,
+    ListingHistory,
+    EventType,
+)
 from app.config import settings
 
 
@@ -83,6 +89,31 @@ def test_listing_dict():
 
 
 @pytest.fixture
+def test_listing_model():
+    """Создаёт тестовое объявление как ORM-модель Listing."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return Listing(
+        id=uuid4(),
+        kufar_id="12345",
+        url="https://re.kufar.by/vi/minsk/kupit/kvartiru/12345",
+        title="Test Apartment",
+        price=50000,
+        price_usd=15000,
+        currency="BYN",
+        city="minsk",
+        address="Test Street 1",
+        rooms=2,
+        area=50.0,
+        floor=3,
+        total_floors=9,
+        status=ListingStatus.new,
+        first_seen_at=now,
+        last_seen_at=now,
+        images=[],
+    )
+
+
+@pytest.fixture
 def test_scan_record():
     """Создаёт тестовую запись сканирования."""
     return ScanHistory(
@@ -103,7 +134,12 @@ class TestTelegramNotificationsAfterScan:
 
     @pytest.mark.asyncio
     async def test_telegram_notifications_called_after_scan(
-        self, mock_settings, mock_session_maker, test_listing_dict, test_scan_record
+        self,
+        mock_settings,
+        mock_session_maker,
+        test_listing_dict,
+        test_listing_model,
+        test_scan_record,
     ):
         """Telegram уведомления вызываются после успешного сканирования."""
         mock_maker, mock_session = mock_session_maker
@@ -111,10 +147,12 @@ class TestTelegramNotificationsAfterScan:
         # Мокаем получение scan_record
         mock_session.get.return_value = test_scan_record
 
-        # Мокаем запрос к БД для получения новых объявлений
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [test_listing_dict]
-        mock_session.execute.return_value = mock_result
+        # Мокаем запросы к БД: listings + history
+        listings_result = MagicMock()
+        listings_result.scalars.return_value.all.return_value = [test_listing_model]
+        history_result = MagicMock()
+        history_result.scalars.return_value.all.return_value = []
+        mock_session.execute.side_effect = [listings_result, history_result]
 
         with (
             patch("app.scraper.scheduler.async_session_maker", mock_maker),
@@ -131,19 +169,29 @@ class TestTelegramNotificationsAfterScan:
                 "rate_limited": 0,
                 "skipped_no_match": 0,
             }
+            mock_service_instance.send_price_drop_notifications.return_value = {
+                "sent": 0,
+                "failed": 0,
+                "blocked": 0,
+                "rate_limited": 0,
+                "skipped_no_match": 0,
+            }
             mock_service_instance.close = AsyncMock()
             mock_notification_service.return_value = mock_service_instance
 
             scheduler = ScraperScheduler()
 
             # Вызываем метод отправки уведомлений
-            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
+            await scheduler._send_telegram_notifications(
+                [test_listing_dict], city="minsk"
+            )
 
             # Проверяем что сервис был вызван
             mock_notification_service.assert_called_once()
             mock_service_instance.send_new_listings_notifications.assert_called_once_with(
-                [test_listing_dict]
+                [test_listing_model]
             )
+            mock_service_instance.send_price_drop_notifications.assert_not_called()
             mock_service_instance.close.assert_called_once()
 
     @pytest.mark.asyncio
@@ -157,10 +205,77 @@ class TestTelegramNotificationsAfterScan:
             scheduler = ScraperScheduler()
 
             # Вызываем метод при отключённом Telegram
-            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
+            await scheduler._send_telegram_notifications(
+                [test_listing_dict], city="minsk"
+            )
 
             # Сервис уведомлений не должен быть вызван
             mock_notification_service.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_price_drop_notifications_called_for_drop_events(
+        self,
+        mock_settings,
+        mock_session_maker,
+        test_listing_dict,
+        test_listing_model,
+        test_scan_record,
+    ):
+        """Price-drop уведомления отправляются при событии падения цены."""
+        mock_maker, mock_session = mock_session_maker
+        mock_session.get.return_value = test_scan_record
+
+        listings_result = MagicMock()
+        listings_result.scalars.return_value.all.return_value = [test_listing_model]
+
+        drop_event = ListingHistory(
+            listing_id=test_listing_model.id,
+            event_type=EventType.price_changed,
+            price_before=20000,
+            price_after=18000,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        history_result = MagicMock()
+        history_result.scalars.return_value.all.return_value = [drop_event]
+        mock_session.execute.side_effect = [listings_result, history_result]
+
+        with (
+            patch("app.scraper.scheduler.async_session_maker", mock_maker),
+            patch(
+                "app.scraper.scheduler.TelegramNotificationService"
+            ) as mock_notification_service,
+        ):
+            mock_service_instance = AsyncMock()
+            mock_service_instance.send_new_listings_notifications.return_value = {
+                "sent": 1,
+                "failed": 0,
+                "blocked": 0,
+                "rate_limited": 0,
+                "skipped_no_match": 0,
+            }
+            mock_service_instance.send_price_drop_notifications.return_value = {
+                "sent": 1,
+                "failed": 0,
+                "blocked": 0,
+                "rate_limited": 0,
+                "skipped_no_match": 0,
+            }
+            mock_service_instance.close = AsyncMock()
+            mock_notification_service.return_value = mock_service_instance
+
+            scheduler = ScraperScheduler()
+            await scheduler._send_telegram_notifications(
+                [test_listing_dict],
+                city="minsk",
+                scan_started_at=test_scan_record.started_at,
+            )
+
+            mock_service_instance.send_price_drop_notifications.assert_called_once()
+            sent_listing = (
+                mock_service_instance.send_price_drop_notifications.call_args.args[0][0]
+            )
+            assert sent_listing.kufar_id == test_listing_model.kufar_id
+            assert getattr(sent_listing, "drop_percent") == 10.0
 
     @pytest.mark.asyncio
     async def test_telegram_error_does_not_break_scan(
@@ -183,7 +298,9 @@ class TestTelegramNotificationsAfterScan:
             # Метод должен завершиться без выброса исключения
             # (ошибка логируется но не пробрасывается)
             # Сервис может быть вызван но упасть внутри
-            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
+            await scheduler._send_telegram_notifications(
+                [test_listing_dict], city="minsk"
+            )
 
             # Убеждаемся что ошибка не прервала выполнение
             # (если дошли сюда — тест прошёл)
@@ -191,16 +308,24 @@ class TestTelegramNotificationsAfterScan:
 
     @pytest.mark.asyncio
     async def test_telegram_stats_logged(
-        self, mock_settings, mock_session_maker, test_listing_dict, test_scan_record, capsys
+        self,
+        mock_settings,
+        mock_session_maker,
+        test_listing_dict,
+        test_listing_model,
+        test_scan_record,
+        capsys,
     ):
         """Статистика отправки должна логироваться."""
         mock_maker, mock_session = mock_session_maker
 
         mock_session.get.return_value = test_scan_record
 
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [test_listing_dict]
-        mock_session.execute.return_value = mock_result
+        listings_result = MagicMock()
+        listings_result.scalars.return_value.all.return_value = [test_listing_model]
+        history_result = MagicMock()
+        history_result.scalars.return_value.all.return_value = []
+        mock_session.execute.side_effect = [listings_result, history_result]
 
         with (
             patch("app.scraper.scheduler.async_session_maker", mock_maker),
@@ -216,15 +341,24 @@ class TestTelegramNotificationsAfterScan:
                 "rate_limited": 0,
                 "skipped_no_match": 5,
             }
+            mock_service_instance.send_price_drop_notifications.return_value = {
+                "sent": 0,
+                "failed": 0,
+                "blocked": 0,
+                "rate_limited": 0,
+                "skipped_no_match": 0,
+            }
             mock_service_instance.close = AsyncMock()
             mock_notification_service.return_value = mock_service_instance
 
             scheduler = ScraperScheduler()
-            await scheduler._send_telegram_notifications([test_listing_dict], city="minsk")
+            await scheduler._send_telegram_notifications(
+                [test_listing_dict], city="minsk"
+            )
 
             # Проверяем что статистика была залогирована в stdout (loguru)
             captured = capsys.readouterr()
-            assert "Telegram notifications: 3 sent" in captured.out
+            assert "Telegram new_listing notifications: 3 sent" in captured.out
             assert "1 failed" in captured.out
             assert "2 blocked" in captured.out
 

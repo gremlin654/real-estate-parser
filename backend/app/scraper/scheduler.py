@@ -14,7 +14,7 @@ from app.services.scan_stats_service import ScanStatsService
 from app.services.listing_service import ListingService
 from app.services.scan_history_service import ScanHistoryService
 from app.services.telegram_notification_service import TelegramNotificationService
-from app.models.listing import ScanHistory
+from app.models.listing import ScanHistory, Listing, ListingHistory, EventType
 
 
 class ScraperScheduler:
@@ -149,7 +149,12 @@ class ScraperScheduler:
             logger.error(f"Error getting new listings from scan {scan_id}: {e}")
             return []
 
-    async def _send_telegram_notifications(self, listings_data: list, city: str):
+    async def _send_telegram_notifications(
+        self,
+        listings_data: list,
+        city: str,
+        scan_started_at: datetime | None = None,
+    ):
         """
         Отправить уведомления о новых объявлениях через Telegram бота.
         """
@@ -175,29 +180,111 @@ class ScraperScheduler:
 
         try:
             async with async_session_maker() as db:
-                # Находим объявления в БД по kufar_ids
-                from sqlalchemy import select
-                from app.models.listing import Listing
-
                 result = await db.execute(
                     select(Listing).where(Listing.kufar_id.in_(kufar_ids))
                 )
-                new_listings = result.scalars().all()
+                db_listings = result.scalars().all()
                 logger.info(
-                    f"Found {len(new_listings)} listings in DB for notifications"
+                    f"Found {len(db_listings)} listings in DB for notifications"
                 )
+
+                if scan_started_at:
+                    new_listings = [
+                        listing
+                        for listing in db_listings
+                        if listing.first_seen_at
+                        and listing.first_seen_at >= scan_started_at
+                    ]
+                else:
+                    new_listings = db_listings
+
+                price_drop_listings = []
+                if db_listings:
+                    listing_ids = [listing.id for listing in db_listings]
+                    history_query = select(ListingHistory).where(
+                        ListingHistory.listing_id.in_(listing_ids),
+                        ListingHistory.event_type.in_(
+                            [EventType.price_changed, EventType.price_changed_byn]
+                        ),
+                    )
+                    if scan_started_at:
+                        history_query = history_query.where(
+                            ListingHistory.created_at >= scan_started_at
+                        )
+
+                    history_result = await db.execute(
+                        history_query.order_by(ListingHistory.created_at.desc())
+                    )
+                    history_rows = history_result.scalars().all()
+
+                    drop_percent_by_listing_id = {}
+                    price_before_by_listing_id = {}
+                    for item in history_rows:
+                        if item.listing_id in drop_percent_by_listing_id:
+                            continue
+                        if (
+                            item.price_before
+                            and item.price_after is not None
+                            and item.price_before > item.price_after
+                        ):
+                            drop_percent = (
+                                (item.price_before - item.price_after)
+                                / item.price_before
+                            ) * 100
+                            drop_percent_by_listing_id[item.listing_id] = round(
+                                float(drop_percent), 2
+                            )
+                            price_before_by_listing_id[item.listing_id] = item.price_before
+
+                    for listing in db_listings:
+                        drop_percent = drop_percent_by_listing_id.get(listing.id)
+                        if drop_percent is None:
+                            continue
+                        setattr(listing, "drop_percent", drop_percent)
+                        price_before_usd = price_before_by_listing_id.get(listing.id)
+                        if price_before_usd and listing.price_usd:
+                            price_drop_amount_usd = round(
+                                price_before_usd - listing.price_usd
+                            )
+                            setattr(listing, "price_drop_amount", price_drop_amount_usd)
+                        price_drop_listings.append(listing)
+
+                logger.info(
+                    f"Prepared {len(new_listings)} new listings and "
+                    f"{len(price_drop_listings)} price-drop listings for Telegram"
+                )
+
+                if not new_listings and not price_drop_listings:
+                    logger.info("No eligible listings for Telegram notifications")
+                    return
 
                 notification_service = TelegramNotificationService(db)
                 try:
-                    stats = await notification_service.send_new_listings_notifications(
-                        new_listings
-                    )
-                    logger.info(
-                        f"Telegram notifications: {stats['sent']} sent, "
-                        f"{stats['failed']} failed, {stats['blocked']} blocked, "
-                        f"{stats['rate_limited']} rate_limited, "
-                        f"{stats['skipped_no_match']} skipped_no_match"
-                    )
+                    if new_listings:
+                        stats_new = (
+                            await notification_service.send_new_listings_notifications(
+                                new_listings
+                            )
+                        )
+                        logger.info(
+                            f"Telegram new_listing notifications: {stats_new['sent']} sent, "
+                            f"{stats_new['failed']} failed, {stats_new['blocked']} blocked, "
+                            f"{stats_new['rate_limited']} rate_limited, "
+                            f"{stats_new['skipped_no_match']} skipped_no_match"
+                        )
+
+                    if price_drop_listings:
+                        stats_drop = (
+                            await notification_service.send_price_drop_notifications(
+                                price_drop_listings
+                            )
+                        )
+                        logger.info(
+                            f"Telegram price_drop notifications: {stats_drop['sent']} sent, "
+                            f"{stats_drop['failed']} failed, {stats_drop['blocked']} blocked, "
+                            f"{stats_drop['rate_limited']} rate_limited, "
+                            f"{stats_drop['skipped_no_match']} skipped_no_match"
+                        )
                 finally:
                     await notification_service.close()
         except Exception as e:
@@ -215,15 +302,31 @@ class ScraperScheduler:
             self._ws_manager = get_scan_manager()
 
         try:
-            # Обновить список сканируемых городов в ws_manager
             await self._ws_manager.update_scanning_cities(self._get_scanning_cities())
-
-            logger.info(
-                f"Broadcasting progress: stage={self.scan_progress['stage']}, pages={self.scan_progress['pages_scraped']}, listings={self.scan_progress['listings_fetched']}"
-            )
             await self._ws_manager.broadcast_progress(self.scan_progress)
         except Exception as e:
             logger.warning(f"Failed to broadcast WebSocket progress: {e}")
+
+    async def _run_notification_log_cleanup(self):
+        """Ежедневная очистка старых записей TelegramNotificationLog."""
+        from app.services.telegram_notification_service import (
+            TelegramNotificationService,
+        )
+
+        logger.info("Running notification log cleanup")
+        try:
+            async with async_session_maker() as db:
+                service = TelegramNotificationService(db)
+                try:
+                    deleted = await service.cleanup_old_logs()
+                    await db.commit()
+                    logger.info(
+                        f"Notification log cleanup completed: {deleted} records deleted"
+                    )
+                finally:
+                    await service.close()
+        except Exception as e:
+            logger.error(f"Notification log cleanup failed: {e}")
 
     async def start(self) -> None:
         """Запуск scheduler с проверкой включённых городов."""
@@ -258,6 +361,15 @@ class ScraperScheduler:
 
         self.scheduler.start()
         logger.info(f"Scheduled scan started for cities: {enabled_cities}")
+
+        if settings.TELEGRAM_BOT_ENABLED:
+            self.scheduler.add_job(
+                self._run_notification_log_cleanup,
+                trigger=IntervalTrigger(hours=24),
+                id="notification_log_cleanup",
+                replace_existing=True,
+            )
+            logger.info("Scheduled daily notification log cleanup job")
 
     async def _run_scan_scheduled(self, city: str):
         """Запуск планового сканирования по расписанию для конкретного города."""
@@ -562,7 +674,11 @@ class ScraperScheduler:
                     # === ОТПРАВКА TELEGRAM УВЕДОМЛЕНИЙ (НЕ БЛОКИРУЕТ СКРАПИНГ) ===
                     # Отправляем уведомления после коммита транзакции
                     # Передаём listings_data чтобы сервис мог найти новые объявления
-                    await self._send_telegram_notifications(listings_data, city)
+                    await self._send_telegram_notifications(
+                        listings_data,
+                        city,
+                        scan_started_at=scan_record.started_at,
+                    )
 
                 except Exception as e:
                     logger.error(f"[Scan {scan_record.id}] Error in transaction: {e}")
@@ -611,9 +727,24 @@ class ScraperScheduler:
 
     def stop(self):
         if self.scheduler:
-            self.scheduler.shutdown()
+            self.scheduler.shutdown(wait=False)
             self.is_running = False
-            logger.info("Scheduler stopped")
+            logger.info("Scheduler shutdown initiated (non-blocking)")
+
+    async def wait_for_running_jobs(self, timeout: float = 30.0) -> None:
+        """Дождаться завершения всех запущенных job (graceful shutdown)."""
+        deadline = asyncio.get_event_loop().time() + timeout
+        while self.scanning_cities:
+            if asyncio.get_event_loop().time() >= deadline:
+                logger.warning(
+                    f"Graceful shutdown timeout: {len(self.scanning_cities)} jobs still running"
+                )
+                break
+            logger.info(
+                f"Waiting for {len(self.scanning_cities)} scan(s) to finish: {list(self.scanning_cities.keys())}"
+            )
+            await asyncio.sleep(2)
+        logger.info("All scheduled jobs finished (or timeout reached)")
 
     async def restart_with_settings(
         self, city: str, enabled: bool, interval_minutes: int

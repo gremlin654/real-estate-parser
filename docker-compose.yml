@@ -73,6 +73,7 @@ services:
       TELEGRAM_MAX_RETRIES: ${TELEGRAM_MAX_RETRIES:-3}
       TELEGRAM_RETRY_DELAY_SECONDS: ${TELEGRAM_RETRY_DELAY_SECONDS:-5}
       TELEGRAM_RATE_LIMIT_PER_MINUTE: ${TELEGRAM_RATE_LIMIT_PER_MINUTE:-20}
+      TELEGRAM_USER_RATE_LIMIT_PER_HOUR: 300
     volumes:
       - ./backend:/app  # Монтирование кода для hot reload
     ports:

@@ -26,6 +26,8 @@ Telegram Notification Service — сервис отправки уведомле
 
 import asyncio
 from typing import Any
+from datetime import datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from aiogram import Bot
@@ -38,14 +40,17 @@ from aiogram.exceptions import (
 )
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, select
 
 from app.config import settings
+from app.core.redis_client import get_redis
 from app.models.listing import Listing
 from app.models.telegram_user import (
     TelegramUser,
     TelegramSubscription,
     TelegramNotificationLog,
     TelegramNotificationStatus,
+    TelegramNotificationEventType,
 )
 from app.services.telegram_subscription_service import TelegramSubscriptionService
 from app.services.telegram_message_builder import TelegramMessageBuilder
@@ -123,11 +128,48 @@ class TelegramNotificationService:
         """
         Отправляет уведомления о новых объявлениях всем подходящим подписчикам.
 
-        Для каждого нового объявления находит matching subscriptions
+        Args:
+            new_listings: Список новых объявлений
+
+        Returns:
+            Словарь со статистикой отправки
+        """
+        return await self._send_listings_notifications(
+            listings=new_listings,
+            event_type="new_listing",
+        )
+
+    async def send_price_drop_notifications(
+        self, price_drop_listings: list[Listing]
+    ) -> dict[str, int]:
+        """
+        Отправляет уведомления о падении цены всем подходящим подписчикам.
+
+        Args:
+            price_drop_listings: Список объявлений с падением цены
+
+        Returns:
+            Словарь со статистикой отправки
+        """
+        return await self._send_listings_notifications(
+            listings=price_drop_listings,
+            event_type="price_drop",
+        )
+
+    async def _send_listings_notifications(
+        self,
+        listings: list[Listing],
+        event_type: str,
+    ) -> dict[str, int]:
+        """
+        Отправляет уведомления о объявлениях всем подходящим подписчикам.
+
+        Для каждого объявления находит matching subscriptions
         и отправляет уведомления соответствующим пользователям.
 
         Args:
-            new_listings: Список новых объявлений для отправки уведомлений
+            listings: Список объявлений для отправки уведомлений
+            event_type: Тип события уведомления (new_listing | price_drop)
 
         Returns:
             Словарь со статистикой отправки:
@@ -149,11 +191,14 @@ class TelegramNotificationService:
                 "failed": 0,
                 "blocked": 0,
                 "rate_limited": 0,
-                "skipped_no_match": len(new_listings),
+                "skipped_no_match": len(listings),
+                "duplicate": 0,
+                "ratelimited_user": 0,
             }
 
         logger.info(
-            f"Processing {len(new_listings)} listings for Telegram notifications"
+            f"Processing {len(listings)} listings for Telegram notifications "
+            f"(event_type={event_type})"
         )
 
         stats = {
@@ -162,13 +207,18 @@ class TelegramNotificationService:
             "blocked": 0,
             "rate_limited": 0,
             "skipped_no_match": 0,
+            "duplicate": 0,
+            "ratelimited_user": 0,
         }
 
-        for listing in new_listings:
+        for listing in listings:
             try:
                 # Находим подходящие подписки
                 subscriptions = (
-                    await self.subscription_service.get_matching_subscriptions(listing)
+                    await self.subscription_service.get_matching_subscriptions(
+                        listing,
+                        event_type=event_type,
+                    )
                 )
 
                 if not subscriptions:
@@ -203,7 +253,7 @@ class TelegramNotificationService:
                             continue
 
                         status = await self.send_listing_to_user(
-                            user, listing, subscription
+                            user, listing, subscription, event_type
                         )
                         stats[status] += 1
 
@@ -220,6 +270,7 @@ class TelegramNotificationService:
         logger.info(
             f"Notification stats: sent={stats['sent']}, failed={stats['failed']}, "
             f"blocked={stats['blocked']}, rate_limited={stats['rate_limited']}, "
+            f"duplicate={stats['duplicate']}, ratelimited_user={stats['ratelimited_user']}, "
             f"skipped={stats['skipped_no_match']}"
         )
         return stats
@@ -229,6 +280,7 @@ class TelegramNotificationService:
         user: TelegramUser,
         listing: Listing,
         subscription: TelegramSubscription,
+        event_type: str = "new_listing",
     ) -> str:
         """
         Отправляет одно объявление пользователю.
@@ -237,9 +289,10 @@ class TelegramNotificationService:
             user: Объект пользователя Telegram
             listing: Объект объявления
             subscription: Объект подписки (для форматирования)
+            event_type: Тип события (new_listing | price_drop)
 
         Returns:
-            Статус отправки: 'sent' | 'failed' | 'blocked' | 'rate_limited'
+            Статус отправки: 'sent' | 'failed' | 'blocked' | 'rate_limited' | 'duplicate' | 'ratelimited_user'
 
         Raises:
             Exception: При непредвиденных ошибках (логируется и возвращает 'failed')
@@ -248,8 +301,26 @@ class TelegramNotificationService:
             logger.error("Telegram bot not configured")
             return "failed"
 
+        already_sent = await self._is_duplicate_notification(
+            user.id, listing.id, subscription.id, event_type
+        )
+        if already_sent:
+            logger.info(
+                f"Skipping duplicate notification for user={user.id}, "
+                f"listing={listing.kufar_id}, event_type={event_type}"
+            )
+            return "duplicate"
+
+        is_rate_limited = await self._check_user_rate_limit(user)
+        if is_rate_limited:
+            logger.info(
+                f"Skipping rate-limited notification for user={user.id}, "
+                f"listing={listing.kufar_id}"
+            )
+            return "ratelimited_user"
+
         # Форматируем сообщение
-        message = self._format_listing_message(listing, subscription)
+        message = self._format_listing_message(listing, subscription, event_type)
         keyboard = self._build_listing_keyboard(listing)
 
         # Определяем есть ли фото
@@ -274,6 +345,7 @@ class TelegramNotificationService:
                 subscription_id=subscription.id,
                 status="sent",
                 message_id=message_id,
+                event_type=event_type,
             )
 
             logger.info(
@@ -294,6 +366,7 @@ class TelegramNotificationService:
                 subscription_id=subscription.id,
                 status="blocked",
                 error_message=str(e),
+                event_type=event_type,
             )
             return "blocked"
 
@@ -308,6 +381,7 @@ class TelegramNotificationService:
                 subscription_id=subscription.id,
                 status="rate_limited",
                 error_message=str(e),
+                event_type=event_type,
             )
             return "rate_limited"
 
@@ -320,6 +394,7 @@ class TelegramNotificationService:
                 subscription_id=subscription.id,
                 status="failed",
                 error_message=str(e),
+                event_type=event_type,
             )
             return "failed"
 
@@ -332,6 +407,7 @@ class TelegramNotificationService:
                 subscription_id=subscription.id,
                 status="failed",
                 error_message=str(e),
+                event_type=event_type,
             )
             return "failed"
 
@@ -486,6 +562,7 @@ class TelegramNotificationService:
         error_message: str | None = None,
         retry_count: int = 0,
         message_id: int | None = None,
+        event_type: str | None = None,
     ):
         """
         Записывает попытку отправки уведомления в лог.
@@ -498,12 +575,21 @@ class TelegramNotificationService:
             error_message: Текст ошибки (если была)
             retry_count: Количество повторных попыток
             message_id: ID сообщения в Telegram (при успешной отправке)
+            event_type: Тип события (new_listing | price_drop) для дедупликации
         """
+        event_type_enum = None
+        if event_type:
+            try:
+                event_type_enum = TelegramNotificationEventType(event_type)
+            except ValueError:
+                logger.warning(f"Unknown event_type '{event_type}', storing NULL")
+
         log_entry = TelegramNotificationLog(
             user_id=user_id,
             listing_id=listing_id,
             subscription_id=subscription_id,
             status=TelegramNotificationStatus(status),
+            event_type=event_type_enum,
             error_message=error_message,
             retry_count=retry_count,
             response_message_id=message_id,
@@ -520,8 +606,122 @@ class TelegramNotificationService:
             await self.db.rollback()
             logger.error(f"Error logging notification: {e}")
 
+    async def _is_duplicate_notification(
+        self,
+        user_id: UUID,
+        listing_id: UUID,
+        subscription_id: UUID,
+        event_type: str,
+    ) -> bool:
+        """
+        Проверяет, было ли уже отправлено уведомление для данной комбинации.
+
+        Проверяет наличие записи в TelegramNotificationLog с теми же
+        user_id, listing_id, subscription_id и event_type.
+
+        Args:
+            user_id: UUID пользователя
+            listing_id: UUID объявления
+            subscription_id: UUID подписки
+            event_type: Тип события (new_listing | price_drop)
+
+        Returns:
+            True если уведомление уже было отправлено
+        """
+        if not event_type:
+            return False
+
+        try:
+            event_type_enum = TelegramNotificationEventType(event_type)
+        except ValueError:
+            return False
+
+        result = await self.db.execute(
+            select(TelegramNotificationLog)
+            .where(
+                TelegramNotificationLog.user_id == user_id,
+                TelegramNotificationLog.listing_id == listing_id,
+                TelegramNotificationLog.subscription_id == subscription_id,
+                TelegramNotificationLog.event_type == event_type_enum,
+            )
+            .limit(1)
+        )
+        existing = result.scalar_one_or_none()
+        return existing is not None
+
+    async def _check_user_rate_limit(self, user: TelegramUser) -> bool:
+        """
+        Проверяет, не превысил ли пользователь лимит уведомлений за час.
+
+        Сначала пытается использовать Redis (fast path), если Redis недоступен —
+        использует PostgreSQL как fallback (считает уведомления за последний час).
+
+        Args:
+            user: Объект пользователя Telegram
+
+        Returns:
+            True если лимит превышен (нужно пропустить отправку), False если можно отправлять
+        """
+        limit = settings.TELEGRAM_USER_RATE_LIMIT_PER_HOUR
+        if limit <= 0:
+            return False
+
+        if user.telegram_id is None:
+            return False
+
+        try:
+            redis = await get_redis()
+            hour_key = datetime.utcnow().strftime("%Y%m%d%H")
+            redis_key = f"telegram:ratelimit:user:{user.id}:{hour_key}"
+
+            count = await redis.get(redis_key)
+            if count is not None and int(count) >= limit:
+                logger.info(
+                    f"User {user.id} rate limited (Redis): {count}/{limit} in current hour"
+                )
+                return True
+
+            pipe = redis.pipeline()
+            pipe.incr(redis_key)
+            pipe.expire(redis_key, 3900)
+            await pipe.execute()
+
+        except Exception as redis_err:
+            logger.warning(
+                f"Redis rate limit check failed, falling back to DB: {redis_err}"
+            )
+            try:
+                from datetime import timedelta
+                from sqlalchemy import func, and_
+                from app.models.telegram_user import TelegramNotificationLog
+
+                one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+                result = await self.db.execute(
+                    select(func.count(TelegramNotificationLog.id)).where(
+                        and_(
+                            TelegramNotificationLog.user_id == user.id,
+                            TelegramNotificationLog.sent_at >= one_hour_ago,
+                            TelegramNotificationLog.status
+                            == TelegramNotificationStatus.sent,
+                        )
+                    )
+                )
+                count = result.scalar() or 0
+                if count >= limit:
+                    logger.info(
+                        f"User {user.id} rate limited (DB): {count}/{limit} in last hour"
+                    )
+                    return True
+            except Exception as db_err:
+                logger.error(f"DB fallback rate limit check also failed: {db_err}")
+
+        return False
+
     def _format_listing_message(
-        self, listing: Listing, subscription: TelegramSubscription
+        self,
+        listing: Listing,
+        subscription: TelegramSubscription,
+        event_type: str = "new_listing",
     ) -> str:
         """
         Форматирует сообщение для Telegram из данных объявления.
@@ -529,6 +729,7 @@ class TelegramNotificationService:
         Args:
             listing: Объект объявления
             subscription: Объект подписки (для определения валюты и фильтров)
+            event_type: Тип события (new_listing | price_drop)
 
         Returns:
             Отформатированное сообщение для Telegram
@@ -536,6 +737,7 @@ class TelegramNotificationService:
         # Определяем deal_percent и price_drop_percent если доступны
         deal_percent = getattr(listing, "deal_percent", None)
         price_drop_percent = getattr(listing, "drop_percent", None)
+        price_drop_amount = getattr(listing, "price_drop_amount", None)
 
         # Цена за м² в USD
         price_per_m2_usd = 0.0
@@ -555,6 +757,8 @@ class TelegramNotificationService:
             listing_url=listing.url,
             deal_percent=deal_percent,
             price_drop_percent=price_drop_percent,
+            price_drop_amount=price_drop_amount,
+            event_type=event_type,
         )
 
     def _build_listing_keyboard(self, listing: Listing) -> InlineKeyboardMarkup:
@@ -588,3 +792,29 @@ class TelegramNotificationService:
             ]
         )
         return keyboard
+
+    async def cleanup_old_logs(self, retention_days: int | None = None) -> int:
+        """
+        Удалить старые записи лога уведомлений.
+
+        Args:
+            retention_days: Количество дней хранения. Если None — из settings.
+
+        Returns:
+            Количество удалённых записей.
+        """
+        if retention_days is None:
+            retention_days = settings.TELEGRAM_NOTIFICATION_LOG_RETENTION_DAYS
+
+        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+
+        result = await self.db.execute(
+            delete(TelegramNotificationLog).where(
+                TelegramNotificationLog.sent_at < cutoff
+            )
+        )
+        deleted = result.rowcount
+        logger.info(
+            f"Cleanup: deleted {deleted} TelegramNotificationLog records older than {retention_days} days"
+        )
+        return deleted

@@ -534,7 +534,9 @@ class TelegramSubscriptionService:
     # === Matching Logic ===
 
     async def get_matching_subscriptions(
-        self, listing: Listing
+        self,
+        listing: Listing,
+        event_type: str = "new_listing",
     ) -> List[TelegramSubscription]:
         """
         Найти все активные подписки которые соответствуют объявлению.
@@ -545,9 +547,12 @@ class TelegramSubscriptionService:
         - price_min <= listing.price <= price_max (если указаны)
         - floor_min <= listing.floor <= floor_max (если указаны)
         - price_per_m2_max >= listing.price_per_m2 (если указан)
+        - notify_only_price_drop (если включен — только событие price_drop)
+        - exclude_deal_below_percent (если указан — нужен deal_score >= порога)
 
         Args:
             listing: Объект Listing для проверки соответствия
+            event_type: Тип события уведомления: new_listing | price_drop
 
         Returns:
             Список подписок которые соответствуют объявлению
@@ -566,6 +571,10 @@ class TelegramSubscriptionService:
         matching = []
 
         for sub in all_subscriptions:
+            # Проверяем тип события
+            if not self._matches_event_type(sub, event_type):
+                continue
+
             # Проверяем комнаты
             if not self._matches_rooms(sub.rooms, listing.rooms):
                 continue
@@ -580,6 +589,10 @@ class TelegramSubscriptionService:
 
             # Проверяем цену за м²
             if not self._matches_price_per_m2(sub, listing):
+                continue
+
+            # Проверяем минимальный deal score
+            if not self._matches_deal_score(sub, listing):
                 continue
 
             matching.append(sub)
@@ -665,7 +678,11 @@ class TelegramSubscriptionService:
         Returns:
             True если этаж соответствует
         """
-        # Если этаж в объявлении None — не можем сравнить, считаем что не соответствует
+        # Если в подписке нет фильтра по этажу — этаж объявления не важен
+        if subscription.floor_min is None and subscription.floor_max is None:
+            return True
+
+        # Если фильтр по этажу задан, но в объявлении этаж неизвестен — не подходит
         if listing.floor is None:
             return False
 
@@ -718,6 +735,35 @@ class TelegramSubscriptionService:
             sub_max = float(sub_max)
 
         return listing_price_per_m2 <= sub_max
+
+    def _matches_event_type(
+        self,
+        subscription: TelegramSubscription,
+        event_type: str,
+    ) -> bool:
+        """Проверяет соответствие типа события настройкам подписки."""
+        notify_only_price_drop = (
+            getattr(subscription, "notify_only_price_drop", False) is True
+        )
+        if notify_only_price_drop and event_type != "price_drop":
+            return False
+        return True
+
+    def _matches_deal_score(
+        self,
+        subscription: TelegramSubscription,
+        listing: Listing,
+    ) -> bool:
+        """Проверяет минимальный порог выгодности (deal score) из подписки."""
+        threshold = getattr(subscription, "exclude_deal_below_percent", None)
+        if not isinstance(threshold, (int, float)):
+            return True
+
+        deal_score = listing.deal_score
+        if deal_score is None:
+            return False
+
+        return float(deal_score) >= float(threshold)
 
     # === Stats ===
 

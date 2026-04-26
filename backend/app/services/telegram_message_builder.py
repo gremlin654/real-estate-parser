@@ -141,21 +141,25 @@ class TelegramMessageBuilder:
         return f"🔥 Выгода: {deal_percent:.1f}%"
 
     @staticmethod
-    def format_price_drop(drop_percent: float) -> str:
+    def format_price_drop(drop_percent: float, amount_usd: int | None = None) -> str:
         """
-        Форматирует процент падения цены.
+        Форматирует текст о падении цены.
 
         Args:
             drop_percent: Процент падения (положительное число)
+            amount_usd: Абсолютная сумма падения в USD (опционально)
 
         Returns:
-            Строка с эмодзи и процентом, например "📉 Цена упала: 10.2%"
+            Строка с эмодзи, процентом и суммой, например "📉 Цена упала: 10.2%\n   💵 Снижение: $1,000"
 
         Example:
-            >>> TelegramMessageBuilder.format_price_drop(10.2)
-            "📉 Цена упала: 10.2%"
+            >>> TelegramMessageBuilder.format_price_drop(10.2, 1000)
+            "📉 Цена упала: 10.2%\n   💵 Снижение: $1,000"
         """
-        return f"📉 Цена упала: {drop_percent:.1f}%"
+        lines = [f"📉 Цена упала: {drop_percent:.1f}%"]
+        if amount_usd and amount_usd > 0:
+            lines.append(f"   💵 Снижение: ${amount_usd:,}")
+        return "\n".join(lines)
 
     @staticmethod
     def build_listing_message(
@@ -171,6 +175,8 @@ class TelegramMessageBuilder:
         listing_url: str = "",
         deal_percent: float | None = None,
         price_drop_percent: float | None = None,
+        price_drop_amount: int | None = None,
+        event_type: str = "new_listing",
     ) -> str:
         """
         Собирает полное сообщение об объявлении для Telegram.
@@ -191,6 +197,8 @@ class TelegramMessageBuilder:
             listing_url: URL объявления на Kufar
             deal_percent: Процент выгоды (None если нет)
             price_drop_percent: Процент падения цены (None если нет)
+            price_drop_amount: Абсолютная сумма снижения в USD (None если нет)
+            event_type: Тип события — 'new_listing' или 'price_drop'
 
         Returns:
             Полностью отформатированное сообщение
@@ -210,14 +218,15 @@ class TelegramMessageBuilder:
             ...     deal_percent=16.5,
             ... )
         """
-        # Заголовок с городом
         city_formatted = TelegramMessageBuilder.format_city(city)
-        message = f"🏠 Новая квартира в {city_formatted}!\n\n"
 
-        # Адрес или "Не указан"
+        if event_type == "price_drop":
+            message = f"📉 Цена снизилась — {city_formatted}!\n\n"
+        else:
+            message = f"🏠 Новая квартира в {city_formatted}!\n\n"
+
         address_display = address if address and address.strip() else "Не указан"
 
-        # Основные характеристики
         message += f"📍 Адрес: {address_display}\n"
         message += f"🚪 Комнат: {TelegramMessageBuilder.format_rooms(rooms)}\n"
         message += f"📐 Площадь: {area} м²\n"
@@ -225,23 +234,22 @@ class TelegramMessageBuilder:
             f"🏢 Этаж: {TelegramMessageBuilder.format_floor(floor, total_floors)}\n"
         )
 
-        # Цена
         message += (
             f"💰 Цена: {TelegramMessageBuilder.format_price(price_byn, price_usd)}\n"
         )
         message += f"📊 Цена за м²: ${price_per_m2_usd:,.1f}\n"
 
-        # Deal badge (опционально)
-        if deal_percent is not None and deal_percent > 0:
+        if (
+            event_type == "price_drop"
+            and price_drop_percent is not None
+            and price_drop_percent > 0
+        ):
+            message += (
+                f"\n{TelegramMessageBuilder.format_price_drop(price_drop_percent, price_drop_amount)}\n"
+            )
+        elif deal_percent is not None and deal_percent > 0:
             message += f"\n{TelegramMessageBuilder.format_deal_badge(deal_percent)}\n"
 
-        # Price drop (опционально)
-        if price_drop_percent is not None and price_drop_percent > 0:
-            message += (
-                f"\n{TelegramMessageBuilder.format_price_drop(price_drop_percent)}\n"
-            )
-
-        # Ссылка на объявление
         message += f"\n🔗 {listing_url}"
 
         return message

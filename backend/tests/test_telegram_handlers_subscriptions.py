@@ -21,6 +21,7 @@ from app.telegram.handlers.subscriptions import (
     cmd_subscribe,
     process_city_selection,
     process_rooms_selection,
+    process_currency_selection,
     process_price_min,
     process_price_max,
     confirm_subscription,
@@ -35,6 +36,7 @@ from app.telegram.handlers.subscriptions import (
 from app.telegram.keyboards.inline import (
     CityCallback,
     RoomsCallback,
+    CurrencyCallback,
     SubscriptionActionCallback,
     EditSubscriptionCallback,
     DeleteSubscriptionCallback,
@@ -103,11 +105,11 @@ class TestRoomsSelection:
     @pytest.mark.asyncio
     async def test_process_rooms_selection(self, mock_callback_query, mock_state):
         """
-        Тест: Выбор комнат сохраняет rooms и переходит к price_min.
+        Тест: Выбор комнат сохраняет rooms и переходит к выбору валюты.
 
         Ожидание:
         - rooms=[2] сохраняется в state
-        - Устанавливается состояние waiting_for_price_min
+        - Устанавливается состояние waiting_for_currency
         - Сообщение редактируется с запросом цены
         """
         # Arrange
@@ -120,7 +122,7 @@ class TestRoomsSelection:
         # Assert
         mock_state.update_data.assert_called_once_with(rooms=[2])
         mock_state.set_state.assert_called_once_with(
-            SubscriptionStates.waiting_for_price_min
+            SubscriptionStates.waiting_for_currency
         )
 
         assert mock_callback_query.message.edit_text.called
@@ -153,7 +155,7 @@ class TestPriceMinInput:
 
         Ожидание:
         - price_min сохраняется
-        - Переход к waiting_for_confirmation (показывается подтверждение)
+        - Переход к waiting_for_price_max
         """
         # Arrange
         mock_message.text = "50000"
@@ -170,7 +172,7 @@ class TestPriceMinInput:
         # Assert
         mock_state.update_data.assert_called_once_with(price_min=50000)
         mock_state.set_state.assert_called_once_with(
-            SubscriptionStates.waiting_for_confirmation
+            SubscriptionStates.waiting_for_price_max
         )
 
     @pytest.mark.asyncio
@@ -244,7 +246,7 @@ class TestPriceMaxInput:
 
         Ожидание:
         - price_max сохраняется
-        - Показывается подтверждение
+        - Переход к следующему шагу (price_per_m2)
         """
         # Arrange
         mock_message.text = "150000"
@@ -262,7 +264,7 @@ class TestPriceMaxInput:
         # Assert
         mock_state.update_data.assert_called_once_with(price_max=150000)
         mock_state.set_state.assert_called_once_with(
-            SubscriptionStates.waiting_for_confirmation
+            SubscriptionStates.waiting_for_price_per_m2_max
         )
 
     @pytest.mark.asyncio
@@ -349,6 +351,11 @@ class TestConfirmSubscription:
                 price_min=50000,
                 price_max=150000,
                 currency="usd",
+                price_per_m2_max=None,
+                floor_min=None,
+                floor_max=None,
+                notify_only_price_drop=False,
+                exclude_deal_below_percent=None,
             )
 
             mock_state.clear.assert_called_once()
@@ -403,6 +410,25 @@ class TestConfirmSubscription:
             assert mock_callback_query.message.edit_text.called
             call_args = mock_callback_query.message.edit_text.call_args
             assert "Превышен лимит" in call_args[0][0]
+
+
+class TestCurrencySelection:
+    """Тесты для выбора валюты."""
+
+    @pytest.mark.asyncio
+    async def test_process_currency_selection(self, mock_callback_query, mock_state):
+        """Тест: выбор валюты сохраняет currency и переводит к price_min."""
+        callback_data = CurrencyCallback(currency="byn")
+        mock_state.get_data = AsyncMock(return_value={"city": "minsk", "rooms": [2]})
+
+        await process_currency_selection(mock_callback_query, callback_data, mock_state)
+
+        mock_state.update_data.assert_called_once_with(currency="byn")
+        mock_state.set_state.assert_called_once_with(
+            SubscriptionStates.waiting_for_price_min
+        )
+        assert mock_callback_query.message.edit_text.called
+        mock_callback_query.answer.assert_called_once()
 
 
 class TestCancelSubscription:
@@ -527,7 +553,9 @@ class TestEditSubscription:
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
-        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
+        mock_service.get_user_by_telegram_id = AsyncMock(
+            return_value=mock_telegram_user
+        )
 
         with patch(
             "app.telegram.handlers.subscriptions.TelegramSubscriptionService",
@@ -572,7 +600,9 @@ class TestDeleteSubscription:
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
-        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
+        mock_service.get_user_by_telegram_id = AsyncMock(
+            return_value=mock_telegram_user
+        )
         mock_service.delete_subscription = AsyncMock(return_value=True)
 
         with patch(
@@ -686,7 +716,9 @@ class TestOwnerChecks:
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
-        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
+        mock_service.get_user_by_telegram_id = AsyncMock(
+            return_value=mock_telegram_user
+        )
         mock_service.delete_subscription = AsyncMock(return_value=True)
 
         with patch(
@@ -694,9 +726,7 @@ class TestOwnerChecks:
             return_value=mock_service,
         ):
             # Act
-            await delete_subscription(
-                mock_callback_query, callback_data, mock_session
-            )
+            await delete_subscription(mock_callback_query, callback_data, mock_session)
 
             # Assert — доступ заблокирован
             mock_service.delete_subscription.assert_not_called()
@@ -727,7 +757,9 @@ class TestOwnerChecks:
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=mock_subscription)
-        mock_service.get_user_by_telegram_id = AsyncMock(return_value=mock_telegram_user)
+        mock_service.get_user_by_telegram_id = AsyncMock(
+            return_value=mock_telegram_user
+        )
 
         with patch(
             "app.telegram.handlers.subscriptions.TelegramSubscriptionService",
@@ -755,9 +787,7 @@ class TestOwnerChecks:
         - callback.answer вызывается с ошибкой "Подписка не найдена"
         """
         # Arrange
-        callback_data = DeleteSubscriptionCallback(
-            subscription_id=str(uuid4())
-        )
+        callback_data = DeleteSubscriptionCallback(subscription_id=str(uuid4()))
 
         mock_service = AsyncMock()
         mock_service.get_subscription_by_id = AsyncMock(return_value=None)
@@ -767,9 +797,7 @@ class TestOwnerChecks:
             return_value=mock_service,
         ):
             # Act
-            await delete_subscription(
-                mock_callback_query, callback_data, mock_session
-            )
+            await delete_subscription(mock_callback_query, callback_data, mock_session)
 
             # Assert
             mock_callback_query.answer.assert_called_once()
@@ -788,9 +816,7 @@ class TestOwnerChecks:
         - callback.answer вызывается с ошибкой "Подписка не найдена"
         """
         # Arrange
-        callback_data = EditSubscriptionCallback(
-            subscription_id=str(uuid4())
-        )
+        callback_data = EditSubscriptionCallback(subscription_id=str(uuid4()))
         mock_state = AsyncMock()
 
         mock_service = AsyncMock()

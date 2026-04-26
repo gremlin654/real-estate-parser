@@ -717,12 +717,105 @@ async def _run_manual_scan(
                                     new_listings
                                 )
                                 logger.info(
-                                    f"Telegram notifications: {telegram_stats['sent']} sent, "
+                                    f"Telegram new_listing notifications: {telegram_stats['sent']} sent, "
                                     f"{telegram_stats['failed']} failed, "
-                                    f"{telegram_stats['blocked']} blocked"
+                                    f"{telegram_stats['blocked']} blocked, "
+                                    f"{telegram_stats['rate_limited']} rate_limited, "
+                                    f"{telegram_stats['skipped_no_match']} skipped_no_match"
                                 )
                             finally:
                                 await notification_service.close()
+
+                    # === ОТПРАВКА PRICE_DROP УВЕДОМЛЕНИЙ ===
+                    if settings.TELEGRAM_BOT_ENABLED:
+                        from sqlalchemy import select, and_
+                        from app.models.listing import Listing, ListingHistory, EventType
+
+                        scan_started_at = datetime.now() - timedelta(minutes=2)
+                        listing_ids_result = await db.execute(
+                            select(Listing.id)
+                            .where(Listing.city == city)
+                            .where(Listing.last_seen_at >= scan_started_at)
+                        )
+                        listing_ids = [r for r in listing_ids_result.scalars().all()]
+
+                        if listing_ids:
+                            history_result = await db.execute(
+                                select(ListingHistory)
+                                .where(
+                                    and_(
+                                        ListingHistory.listing_id.in_(listing_ids),
+                                        ListingHistory.event_type.in_(
+                                            [EventType.price_changed, EventType.price_changed_byn]
+                                        ),
+                                        ListingHistory.created_at >= scan_started_at,
+                                    ),
+                                )
+                                .order_by(ListingHistory.created_at.desc())
+                            )
+                            history_rows = list(history_result.scalars().all())
+
+                            drop_percent_by_listing_id = {}
+                            price_before_by_listing_id = {}
+                            for item in history_rows:
+                                if item.listing_id in drop_percent_by_listing_id:
+                                    continue
+                                if (
+                                    item.price_before
+                                    and item.price_after is not None
+                                    and item.price_before > item.price_after
+                                ):
+                                    drop_percent = (
+                                        (item.price_before - item.price_after)
+                                        / item.price_before
+                                    ) * 100
+                                    drop_percent_by_listing_id[item.listing_id] = round(
+                                        float(drop_percent), 2
+                                    )
+                                    price_before_by_listing_id[item.listing_id] = item.price_before
+
+                            listings_result = await db.execute(
+                                select(Listing)
+                                .where(Listing.id.in_(listing_ids))
+                            )
+                            db_listings = list(listings_result.scalars().all())
+
+                            price_drop_listings = []
+                            for listing in db_listings:
+                                drop_percent = drop_percent_by_listing_id.get(listing.id)
+                                if drop_percent is None:
+                                    continue
+                                listing.drop_percent = drop_percent
+                                price_before_usd = price_before_by_listing_id.get(listing.id)
+                                if price_before_usd and listing.price_usd:
+                                    price_drop_amount_usd = round(
+                                        price_before_usd - listing.price_usd
+                                    )
+                                    listing.price_drop_amount = price_drop_amount_usd
+                                price_drop_listings.append(listing)
+
+                            logger.info(
+                                f"Found {len(price_drop_listings)} price-drop listings for notifications"
+                            )
+
+                            if price_drop_listings:
+                                async with async_session_maker() as notify_db:
+                                    notification_service = TelegramNotificationService(
+                                        notify_db
+                                    )
+                                    try:
+                                        telegram_stats_drop = await notification_service.send_price_drop_notifications(
+                                            price_drop_listings
+                                        )
+                                        logger.info(
+                                            f"Telegram price_drop notifications: {telegram_stats_drop['sent']} sent, "
+                                            f"{telegram_stats_drop['failed']} failed, "
+                                            f"{telegram_stats_drop['blocked']} blocked, "
+                                            f"{telegram_stats_drop['rate_limited']} rate_limited, "
+                                            f"{telegram_stats_drop['skipped_no_match']} skipped_no_match"
+                                        )
+                                    finally:
+                                        await notification_service.close()
 
             except Exception as e:
                 logger.error(f"[Scan {scan_id}] Error in transaction: {e}")

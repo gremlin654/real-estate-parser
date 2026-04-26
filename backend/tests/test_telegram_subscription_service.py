@@ -207,7 +207,9 @@ class TestTelegramSubscriptionService:
 
         # Настраиваем side_effect: get_user_by_id, get_user_subscription_count
         db_mock.execute.side_effect = [
-            MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user)),  # get_user_by_id
+            MagicMock(
+                scalar_one_or_none=MagicMock(return_value=mock_user)
+            ),  # get_user_by_id
             MagicMock(scalar=MagicMock(return_value=0)),  # get_user_subscription_count
         ]
 
@@ -591,7 +593,9 @@ class TestTelegramSubscriptionService:
 
         assert len(matching) == 1  # 50000 в диапазоне [40000, 60000]
 
-    async def test_get_matching_subscriptions_price_out_of_range(self, service, db_mock):
+    async def test_get_matching_subscriptions_price_out_of_range(
+        self, service, db_mock
+    ):
         """Тест matching: цена вне диапазона."""
         listing = MagicMock(spec=Listing)
         listing.kufar_id = "123456"
@@ -655,7 +659,9 @@ class TestTelegramSubscriptionService:
 
         assert len(matching) == 1  # 5 в диапазоне [3, 7]
 
-    async def test_get_matching_subscriptions_floor_out_of_range(self, service, db_mock):
+    async def test_get_matching_subscriptions_floor_out_of_range(
+        self, service, db_mock
+    ):
         """Тест matching: этаж вне диапазона."""
         listing = MagicMock(spec=Listing)
         listing.kufar_id = "123456"
@@ -686,6 +692,183 @@ class TestTelegramSubscriptionService:
         matching = await service.get_matching_subscriptions(listing)
 
         assert len(matching) == 0  # 10 > 7
+
+    async def test_get_matching_subscriptions_floor_unknown_without_filter(
+        self, service, db_mock
+    ):
+        """Если фильтр этажа не задан, listing.floor=None не должен отсеиваться."""
+        listing = MagicMock(spec=Listing)
+        listing.kufar_id = "123456"
+        listing.city = "minsk"
+        listing.rooms = 2
+        listing.price_usd = 50000
+        listing.price = 150000
+        listing.floor = None
+        listing.price_per_m2_usd = 1000
+        listing.price_per_m2_byn = 3000
+
+        mock_sub = MagicMock(spec=TelegramSubscription)
+        mock_sub.is_active = True
+        mock_sub.city = "minsk"
+        mock_sub.rooms = None
+        mock_sub.price_min = None
+        mock_sub.price_max = None
+        mock_sub.floor_min = None
+        mock_sub.floor_max = None
+        mock_sub.price_per_m2_max = None
+        mock_sub.currency = "usd"
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_sub]
+        db_mock.execute.return_value = mock_result
+
+        matching = await service.get_matching_subscriptions(listing)
+
+        assert len(matching) == 1
+
+    async def test_get_matching_subscriptions_price_drop_only_filters_new_listing(
+        self, service, db_mock
+    ):
+        """Подписка notify_only_price_drop=True не должна матчиться на new_listing."""
+        listing = MagicMock(spec=Listing)
+        listing.kufar_id = "123456"
+        listing.city = "minsk"
+        listing.rooms = 2
+        listing.price_usd = 50000
+        listing.price = 150000
+        listing.floor = 3
+        listing.price_per_m2_usd = 1000
+        listing.price_per_m2_byn = 3000
+
+        mock_sub = MagicMock(spec=TelegramSubscription)
+        mock_sub.is_active = True
+        mock_sub.city = "minsk"
+        mock_sub.rooms = None
+        mock_sub.price_min = None
+        mock_sub.price_max = None
+        mock_sub.floor_min = None
+        mock_sub.floor_max = None
+        mock_sub.price_per_m2_max = None
+        mock_sub.currency = "usd"
+        mock_sub.notify_only_price_drop = True
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_sub]
+        db_mock.execute.return_value = mock_result
+
+        matching = await service.get_matching_subscriptions(
+            listing,
+            event_type="new_listing",
+        )
+
+        assert len(matching) == 0
+
+    async def test_get_matching_subscriptions_price_drop_only_matches_price_drop(
+        self, service, db_mock
+    ):
+        """Подписка notify_only_price_drop=True должна матчиться на price_drop."""
+        listing = MagicMock(spec=Listing)
+        listing.kufar_id = "123456"
+        listing.city = "minsk"
+        listing.rooms = 2
+        listing.price_usd = 50000
+        listing.price = 150000
+        listing.floor = 3
+        listing.price_per_m2_usd = 1000
+        listing.price_per_m2_byn = 3000
+
+        mock_sub = MagicMock(spec=TelegramSubscription)
+        mock_sub.is_active = True
+        mock_sub.city = "minsk"
+        mock_sub.rooms = None
+        mock_sub.price_min = None
+        mock_sub.price_max = None
+        mock_sub.floor_min = None
+        mock_sub.floor_max = None
+        mock_sub.price_per_m2_max = None
+        mock_sub.currency = "usd"
+        mock_sub.notify_only_price_drop = True
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_sub]
+        db_mock.execute.return_value = mock_result
+
+        matching = await service.get_matching_subscriptions(
+            listing,
+            event_type="price_drop",
+        )
+
+        assert len(matching) == 1
+
+    async def test_get_matching_subscriptions_exclude_deal_below_percent(
+        self, service, db_mock
+    ):
+        """Подписка с порогом deal score должна отсеивать слабые объявления."""
+        listing = MagicMock(spec=Listing)
+        listing.kufar_id = "123456"
+        listing.city = "minsk"
+        listing.rooms = 2
+        listing.price_usd = 50000
+        listing.price = 150000
+        listing.floor = 3
+        listing.price_per_m2_usd = 1000
+        listing.price_per_m2_byn = 3000
+        listing.deal_score = 34.5
+
+        mock_sub = MagicMock(spec=TelegramSubscription)
+        mock_sub.is_active = True
+        mock_sub.city = "minsk"
+        mock_sub.rooms = None
+        mock_sub.price_min = None
+        mock_sub.price_max = None
+        mock_sub.floor_min = None
+        mock_sub.floor_max = None
+        mock_sub.price_per_m2_max = None
+        mock_sub.currency = "usd"
+        mock_sub.exclude_deal_below_percent = 35
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_sub]
+        db_mock.execute.return_value = mock_result
+
+        matching = await service.get_matching_subscriptions(listing)
+
+        assert len(matching) == 0
+
+    async def test_get_matching_subscriptions_exclude_deal_below_percent_pass(
+        self, service, db_mock
+    ):
+        """Объявление с достаточным deal score должно матчиться."""
+        listing = MagicMock(spec=Listing)
+        listing.kufar_id = "123456"
+        listing.city = "minsk"
+        listing.rooms = 2
+        listing.price_usd = 50000
+        listing.price = 150000
+        listing.floor = 3
+        listing.price_per_m2_usd = 1000
+        listing.price_per_m2_byn = 3000
+        listing.deal_score = 42.0
+
+        mock_sub = MagicMock(spec=TelegramSubscription)
+        mock_sub.is_active = True
+        mock_sub.city = "minsk"
+        mock_sub.rooms = None
+        mock_sub.price_min = None
+        mock_sub.price_max = None
+        mock_sub.floor_min = None
+        mock_sub.floor_max = None
+        mock_sub.price_per_m2_max = None
+        mock_sub.currency = "usd"
+        mock_sub.exclude_deal_below_percent = 35
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_sub]
+        db_mock.execute.return_value = mock_result
+
+        matching = await service.get_matching_subscriptions(listing)
+
+        assert len(matching) == 1
 
     async def test_get_matching_subscriptions_price_per_m2(self, service, db_mock):
         """Тест matching: цена за м² в лимите."""

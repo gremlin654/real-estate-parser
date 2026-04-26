@@ -1,6 +1,7 @@
 """
 Тесты для ScraperScheduler
 """
+
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -101,11 +102,14 @@ class TestScraperSchedulerCityManagement:
 
         await scheduler._add_scanning_city("minsk", "manual", "scan-123")
 
-        await scheduler._update_city_progress("minsk", {
-            "is_scanning": True,
-            "stage": "fetching",
-            "pages_scraped": 5,
-        })
+        await scheduler._update_city_progress(
+            "minsk",
+            {
+                "is_scanning": True,
+                "stage": "fetching",
+                "pages_scraped": 5,
+            },
+        )
 
         progress = scheduler.scanning_cities["minsk"]["progress"]
         assert progress["stage"] == "fetching"
@@ -200,11 +204,14 @@ class TestScraperSchedulerStart:
         mock_settings_service.get_settings = AsyncMock(return_value=mock_settings)
         mock_settings_service.get_enabled_cities = AsyncMock(return_value=[])
 
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
+        with patch("app.scraper.scheduler.async_session_maker") as mock_session:
             mock_session.return_value.__aenter__.return_value = mock_db
 
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+            with patch(
+                "app.scraper.scheduler.ScanSettingsService",
+                return_value=mock_settings_service,
+            ):
+                with patch("app.scraper.scheduler.AsyncIOScheduler") as MockScheduler:
                     mock_sched_instance = MagicMock()
                     MockScheduler.return_value = mock_sched_instance
 
@@ -226,28 +233,37 @@ class TestScraperSchedulerStart:
 
         mock_db = AsyncMock()
         mock_settings_service = MagicMock()
-        mock_settings_service.get_settings = AsyncMock(side_effect=[
-            mock_settings_minsk,
-            mock_settings_brest,
-        ])
-        mock_settings_service.get_enabled_cities = AsyncMock(return_value=["minsk", "brest"])
-        mock_settings_service.get_city_settings = AsyncMock(side_effect=[
-            mock_settings_minsk,
-            mock_settings_brest,
-        ])
+        mock_settings_service.get_settings = AsyncMock(
+            side_effect=[
+                mock_settings_minsk,
+                mock_settings_brest,
+            ]
+        )
+        mock_settings_service.get_enabled_cities = AsyncMock(
+            return_value=["minsk", "brest"]
+        )
+        mock_settings_service.get_city_settings = AsyncMock(
+            side_effect=[
+                mock_settings_minsk,
+                mock_settings_brest,
+            ]
+        )
 
-        with patch('app.scraper.scheduler.async_session_maker') as mock_session:
+        with patch("app.scraper.scheduler.async_session_maker") as mock_session:
             mock_session.return_value.__aenter__.return_value = mock_db
 
-            with patch('app.scraper.scheduler.ScanSettingsService', return_value=mock_settings_service):
-                with patch('app.scraper.scheduler.AsyncIOScheduler') as MockScheduler:
+            with patch(
+                "app.scraper.scheduler.ScanSettingsService",
+                return_value=mock_settings_service,
+            ):
+                with patch("app.scraper.scheduler.AsyncIOScheduler") as MockScheduler:
                     mock_sched_instance = MagicMock()
                     MockScheduler.return_value = mock_sched_instance
 
                     await scheduler.start()
 
-                    # Job добавлен для каждого города
-                    assert mock_sched_instance.add_job.call_count == 2
+                    # Job добавлен для каждого города + cleanup
+                    assert mock_sched_instance.add_job.call_count == 3
 
 
 @pytest.mark.asyncio
@@ -291,7 +307,9 @@ class TestScraperSchedulerRestart:
         scheduler.scheduler.running = True
         scheduler.scheduler.get_job.return_value = MagicMock()
 
-        await scheduler.restart_with_settings("minsk", enabled=True, interval_minutes=60)
+        await scheduler.restart_with_settings(
+            "minsk", enabled=True, interval_minutes=60
+        )
 
         scheduler.scheduler.remove_job.assert_called()
         scheduler.scheduler.add_job.assert_called()
@@ -303,7 +321,9 @@ class TestScraperSchedulerRestart:
         scheduler.scheduler.running = True
         scheduler.scheduler.get_job.return_value = MagicMock()
 
-        await scheduler.restart_with_settings("minsk", enabled=False, interval_minutes=60)
+        await scheduler.restart_with_settings(
+            "minsk", enabled=False, interval_minutes=60
+        )
 
         scheduler.scheduler.remove_job.assert_called()
         scheduler.scheduler.add_job.assert_not_called()
@@ -317,6 +337,7 @@ class TestSchedulerGlobalFunctions:
         """Проверка что get_scheduler создаёт экземпляр."""
         # Сбрасываем глобальный экземпляр
         import app.scraper.scheduler as scheduler_module
+
         original = scheduler_module._scheduler_instance
         scheduler_module._scheduler_instance = None
 
@@ -383,7 +404,7 @@ class TestScraperSchedulerRunScanScheduled:
         scheduler = ScraperScheduler()
 
         # Проверяем что метод существует
-        assert hasattr(scheduler, '_run_scan_scheduled')
+        assert hasattr(scheduler, "_run_scan_scheduled")
         assert asyncio.iscoroutinefunction(scheduler._run_scan_scheduled)
 
     async def test_run_scan_scheduled_city_progress(self):

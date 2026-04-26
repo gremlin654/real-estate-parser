@@ -159,6 +159,13 @@ class TelegramSubscription(Base):
         )
 
 
+class TelegramNotificationEventType(str, Enum):
+    """Тип события уведомления."""
+
+    new_listing = "new_listing"
+    price_drop = "price_drop"
+
+
 class TelegramNotificationStatus(str, Enum):
     """Статус отправки уведомления."""
 
@@ -181,6 +188,7 @@ class TelegramNotificationLog(Base):
         listing_id: UUID объявления (FK → listings.id, может быть NULL)
         subscription_id: UUID подписки (FK → telegram_subscriptions.id)
         sent_at: Дата и время отправки
+        event_type: Тип события (new_listing | price_drop) для дедупликации
         status: Статус отправки (sent/failed/retry/blocked)
         error_message: Текст ошибки при неудачной отправке
         retry_count: Количество повторных попыток
@@ -208,6 +216,10 @@ class TelegramNotificationLog(Base):
         nullable=True,
     )
     sent_at = Column(DateTime, default=utc_now, index=True)
+    event_type = Column(
+        SQLEnum(TelegramNotificationEventType, create_type=False),
+        nullable=True,
+    )
     status = Column(
         SQLEnum(TelegramNotificationStatus, create_type=False),
         nullable=False,
@@ -231,6 +243,22 @@ class TelegramNotificationLog(Base):
             "user_id",
             "sent_at",
             unique=False,
+        ),
+        # Уникальный индекс для дедупликации: один listing+subscription+event_type
+        # на пользователя. allowed_violations=1 — PostgreSQL skip'ает уже существующие.
+        Index(
+            "idx_telegram_notification_log_dedup",
+            "user_id",
+            "listing_id",
+            "subscription_id",
+            "event_type",
+            unique=True,
+            postgresql_where=(
+                user_id.isnot(None)
+                & listing_id.isnot(None)
+                & subscription_id.isnot(None)
+                & event_type.isnot(None)
+            ),
         ),
     )
 

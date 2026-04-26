@@ -12,6 +12,26 @@
   `docker-compose exec backend black app/...` и проверку `docker-compose exec backend black --check app/...`.
 - Для `DealScoreBadge` в UI и тестах актуальные пороги: `>=50` → `🔥` (зелёный), `35-49.9` → `👍` (жёлто-оранжевый), `<35` → не рендерится.
 - Для `DealScoreService.calculate_label()` и backend-тестов действуют те же пороги: `>=50` → `🔥 HOT`, `35-49.99` → `👍 GOOD`, `<35` → `😐 NORMAL`.
+- Telegram `/subscribe` расширен: после выбора комнат добавлен шаг валюты, затем `price_min`/`price_max`, `price_per_m2_max`, `floor_min`/`floor_max`, режим `price_drop`, порог `deal score`.
+- В `EditSubscriptionFieldCallback.field` используются короткие коды (`curr`, `ppm2`, `floor`, `drop`, `deal`) — это нужно из-за лимита Telegram callback data (64 байта).
+- Для редактирования через `editing_subscription` пропуск делается текстом `⏭️ Пропустить (любая цена)` в message-handler; inline callback `skip_price` в этом состоянии не обновляет БД (нет DB session в callback handler).
+- `TelegramSubscriptionService.get_matching_subscriptions()` теперь принимает `event_type` (`new_listing` по умолчанию, `price_drop` для событий падения цены).
+- В matching-логике: `notify_only_price_drop=True` отсекает `new_listing`; `exclude_deal_below_percent` требует `listing.deal_score >= threshold`.
+- Edge-case по этажу исправлен: если фильтр `floor_min/floor_max` не задан, `listing.floor=None` больше не отбрасывает объявление.
+- Целевые Telegram-тесты для этапа проходят: `tests/test_telegram_subscription_service.py` и `tests/test_telegram_handlers_subscriptions.py` (оба `-q` в Docker).
+- Проверка форматирования Telegram-файлов проходит: `docker-compose exec backend black --check app/services/telegram_subscription_service.py tests/test_telegram_subscription_service.py app/telegram/handlers/subscriptions.py app/telegram/keyboards/inline.py tests/test_telegram_handlers_subscriptions.py`.
+- `TelegramNotificationService` стал event-aware: добавлен общий приватный поток `_send_listings_notifications(...)` и публичный `send_price_drop_notifications(...)`; в matching передаётся `event_type`.
+- `ScraperScheduler._send_telegram_notifications(...)` теперь разделяет отправку на `new_listing` и `price_drop`: новые объявления берутся по `first_seen_at >= scan_started_at`, события падения цены — по `ListingHistory` (`price_before > price_after`) за текущее сканирование.
+- Для price-drop уведомлений `drop_percent` прокидывается в объект `Listing` динамически из истории (используется в message builder).
+- Целевые тесты этапа: `tests/test_telegram_notification_service.py` и `tests/test_telegram_scheduler_integration.py` проходят (`-q` в Docker); в интеграционных тестах есть известные warning про `AsyncMock ... was never awaited` в старых lifespan-ветках.
+- `TelegramMessageBuilder.build_listing_message()` получил параметр `event_type` (`new_listing` | `price_drop`): для `price_drop` — заголовок "📉 Цена снизилась", показывается `price_drop_percent` вместо `deal_percent`; для `new_listing` — заголовок "🏠 Новая квартира", показывается `deal_percent`.
+- `TelegramNotificationService.send_listing_to_user()` и `_format_listing_message()` теперь принимают `event_type` и пробрасывают его в message builder.
+- Тесты `tests/test_telegram_message_builder.py` обновлены: добавлены тесты `event_type=price_drop` и `event_type=new_listing`, `test_build_listing_message_full` больше не ожидает `📉 Цена упала` (т.к. по умолчанию `event_type=new_listing`), `test_build_listing_message_with_price_drop_only` использует `event_type="price_drop"`.
+- **Дедупликация уведомлений**: добавлен `event_type` в `TelegramNotificationLog` + partial unique index `idx_telegram_notification_log_dedup` на (user_id, listing_id, subscription_id, event_type); новый метод `_is_duplicate_notification()` проверяет перед отправкой; `send_listing_to_user()` возвращает `duplicate` если уже отправлено; stats включают `duplicate` count. Миграция: `019_add_event_type_to_notification_log.py`.
+- **Per-user rate limiting**: добавлен `_check_user_rate_limit()` — Redis как primary storage (`telegram:ratelimit:user:{user_id}:{YYYYMMDDHH}`, INCR + TTL 3900s), PostgreSQL fallback (COUNT за последний час); `TELEGRAM_USER_RATE_LIMIT_PER_HOUR=20` в config; stats включают `ratelimited_user`.
+- **Phase 7: Graceful shutdown scheduler**: `scheduler.stop()` теперь `shutdown(wait=False)` (не блокирует shutdown event loop); добавлен `wait_for_running_jobs(timeout=30.0)` который ждёт завершения active jobs перед остановкой; main.py lifespan вызывает `await scheduler.wait_for_running_jobs()` перед `scheduler.stop()`.
+- **Phase 8: Cleanup старых TelegramNotificationLog**: добавлен `TELEGRAM_NOTIFICATION_LOG_RETENTION_DAYS=30` в config; `cleanup_old_logs(retention_days)` в notification service (DELETE по cutoff date); ежедневный scheduled job `_run_notification_log_cleanup()` в APScheduler; миграция не нужна — cleanup по sent_at без схемы.
+- **Phase 9: Docker/Env фикс**: исправлен `.env` для контейнера — лишние env vars (`CONTEXT7_API_KEY`, `GITHUB_PERSONAL_ACCESS_TOKEN`) вызывали ошибку `Extra inputs are not permitted`; создан отдельный `backend/.env` с корректными переменными; убран root-level volume mount `./.env:/app/.env:ro` который перезаписывал env vars; `TELEGRAM_USER_RATE_LIMIT_PER_HOUR=300` подтверждён.
 
 ## Политика изменений в базе данных
 
@@ -1050,6 +1070,52 @@ TELEGRAM_RATE_LIMIT_PER_MINUTE=20
 - 🔴 Миграция не идемпотентна → CREATE TYPE IF NOT EXISTS
 
 **PR:** #15 (feature/telegram-bot → develop)
+
+### v4.1 (текущая — в разработке)
+
+**Telegram Web App (Mini App) — управление подписками через UI:**
+
+- **✅ Frontend страница** `/telegram-webapp` — React компонент с полным CRUD подписок
+- **✅ UI дизайн** — Dark Industrial / Tech Noir стиль (тёмный фон, оранжевые акценты, monospace шрифты)
+- **✅ Tab навигация** — Подписки / Статистика
+- **✅ API хуки** — `useTelegramSubscriptions`, `useCreateTelegramSubscription`, `useUpdateTelegramSubscription`, `useDeleteTelegramSubscription`, `useTelegramNotificationStats`
+- **✅ Backend endpoints:**
+  - `GET /api/v1/telegram/subscriptions` — список подписок
+  - `POST /api/v1/telegram/subscriptions` — создать подписку
+  - `PUT /api/v1/telegram/subscriptions/{id}` — обновить подписку
+  - `DELETE /api/v1/telegram/subscriptions/{id}` — удалить подписку
+  - `GET /api/v1/telegram/webapp/config` — конфиг для Web App
+  - `GET /api/v1/telegram/stats` — статистика уведомлений
+- **✅ Telegram WebApp утилиты** — определение окружения, инициализация, форматирование цен/комнат, Haptic Feedback
+- **✅ Кнопка Web App в боте** — добавлена в reply keyboard (через `TELEGRAM_WEB_APP_URL` в config)
+- **✅ Config параметр** — `TELEGRAM_WEB_APP_URL` для URL Mini App
+
+**Frontend изменения:**
+- `frontend/src/pages/TelegramWebApp/ui/TelegramWebApp.tsx` — основной компонент с tab навигацией
+- `frontend/src/pages/TelegramWebApp/styles.css` — улучшенные стили (Dark Industrial aesthetic)
+- `frontend/src/api/telegram.ts` — API хуки (TanStack Query)
+- `frontend/src/shared/types/telegram.ts` — TypeScript типы
+- `frontend/src/shared/lib/telegram-webapp.ts` — утилиты для Telegram WebApp
+
+**Backend изменения:**
+- `backend/app/api/v1/telegram_webapp.py` — API endpoints с аутентификацией через X-Telegram-User-Id header
+- `backend/app/telegram/keyboards/reply.py` — кнопка Web App в main keyboard
+- `backend/app/config.py` — добавлен `TELEGRAM_WEB_APP_URL`
+
+**Дизайн:**
+- Тёмный фон (#0a0a0b) с оранжевыми неоновыми акцентами (#ff6b35)
+- Monospace шрифты (JetBrains Mono, SF Mono, Fira Code)
+- Анимации при загрузке (stagger effects)
+- Tab навигация (Подписки / Статистика)
+- Статистические карточки с визуальными индикаторами
+- Адаптивный дизайн для мобильных устройств
+- Bottom sheet для форм редактирования
+
+**Следующие шаги:**
+1. Развертывание на публичном URL (ngrok для dev)
+2. Настройка TELEGRAM_WEB_APP_URL в .env
+3. Аутентификация через Telegram initData (production)
+4. Синхронизация с web избранным
 
 ### v4.0.1 (текущая — в разработке)
 
