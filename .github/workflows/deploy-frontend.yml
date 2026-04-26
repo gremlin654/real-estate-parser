@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: |
           cd frontend
-          npm run build
+          VITE_BASE_URL=/real-estate-parser/ npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
