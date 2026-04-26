@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     TELEGRAM_MAX_RETRIES: int = 3
     TELEGRAM_RETRY_DELAY_SECONDS: int = 5
     TELEGRAM_RATE_LIMIT_PER_MINUTE: int = 20
+    TELEGRAM_USER_RATE_LIMIT_PER_HOUR: int = 20
+    TELEGRAM_NOTIFICATION_LOG_RETENTION_DAYS: int = 30
+    TELEGRAM_WEB_APP_URL: str = ""  # URL Telegram Mini App
 
     # Курс обмена валют (1 USD = X BYN)
     # Обновляется вручную или из API Нацбанка РБ

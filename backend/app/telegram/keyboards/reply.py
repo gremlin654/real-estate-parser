@@ -10,8 +10,10 @@ Reply клавиатуры для Telegram бота.
     await message.answer("Выберите действие:", reply_markup=get_main_keyboard())
 """
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+
+from app.config import settings
 
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
@@ -28,10 +30,20 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     builder.button(text="/help")
     builder.button(text="/stop")
 
-    builder.adjust(2)  # 2 кнопки в ряд
+    # Кнопка запуска Web App (если настроен URL)
+    web_app_url = getattr(settings, 'TELEGRAM_WEB_APP_URL', None)
+    if web_app_url:
+        builder.button(
+            text="⚙️ Расширенные настройки",
+            web_app=WebAppInfo(url=web_app_url)
+        )
+        builder.adjust(2, 2, 1)
+    else:
+        builder.adjust(2, 2)
+
     return builder.as_markup(
-        resize_keyboard=True,  # Уменьшить размер клавиатуры
-        one_time_keyboard=False,  # Не скрывать после нажатия
+        resize_keyboard=True,
+        one_time_keyboard=False,
         input_field_placeholder="Выберите команду:",
     )
 

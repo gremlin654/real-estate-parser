@@ -1,0 +1,727 @@
+.telegram-webapp {
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #141417;
+  --bg-tertiary: #1c1c21;
+  --accent: #ff6b35;
+  --accent-dim: #ff8c5a;
+  --accent-glow: rgba(255, 107, 53, 0.15);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1a6;
+  --text-dim: #6b6b70;
+  --border: #2a2a30;
+  --border-accent: #ff6b35;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+.telegram-webapp * {
+  box-sizing: border-box;
+}
+
+.telegram-webapp .app-container {
+  max-width: 100%;
+  padding: 16px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 100px);
+}
+
+/* Header */
+.telegram-webapp .app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  padding: 24px 0;
+  margin-bottom: 20px;
+}
+
+.telegram-webapp .app-header::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  left: -50%;
+  right: -50%;
+  height: 200px;
+  background: radial-gradient(
+    ellipse 80% 50% at 50% -20%,
+    var(--accent-glow),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.telegram-webapp .header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.telegram-webapp .app-title {
+  font-family: 'Unbounded', 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+}
+
+.telegram-webapp .app-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  letter-spacing: 0.05em;
+}
+
+.telegram-webapp .telegram-badge {
+  background: linear-gradient(135deg, #0088cc, #00aaff);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Tab Navigation */
+.telegram-webapp .tab-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.telegram-webapp .tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.telegram-webapp .tab-btn.active {
+  background: var(--accent);
+  color: #000;
+}
+
+.telegram-webapp .tab-btn:not(.active):hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Stats Grid */
+.telegram-webapp .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.telegram-webapp .stat-card-large {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.telegram-webapp .stat-card-large::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle at top right, var(--accent-glow), transparent 70%);
+}
+
+.telegram-webapp .stat-icon {
+  font-size: 28px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+}
+
+.telegram-webapp .stat-content {
+  flex: 1;
+}
+
+.telegram-webapp .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.telegram-webapp .stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Section */
+.telegram-webapp .section {
+  margin-bottom: 32px;
+}
+
+.telegram-webapp .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.telegram-webapp .section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+/* Subscription Card */
+.telegram-webapp .subscription-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.telegram-webapp .subscription-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.telegram-webapp .subscription-card:active {
+  transform: scale(0.99);
+}
+
+.telegram-webapp .subscription-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+.telegram-webapp .subscription-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.telegram-webapp .city-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.telegram-webapp .city-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.telegram-webapp .subscription-city {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.telegram-webapp .subscription-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.telegram-webapp .subscription-status.active {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+}
+
+.telegram-webapp .subscription-status.inactive {
+  background: rgba(107, 107, 112, 0.15);
+  color: var(--text-dim);
+}
+
+.telegram-webapp .subscription-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.telegram-webapp .subscription-params {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.telegram-webapp .subscription-param {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.telegram-webapp .subscription-param.accent {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border: 1px solid rgba(255, 107, 53, 0.3);
+}
+
+.telegram-webapp .subscription-param-icon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.telegram-webapp .subscription-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Buttons */
+.telegram-webapp .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.telegram-webapp .btn:active {
+  transform: scale(0.96);
+}
+
+.telegram-webapp .btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.telegram-webapp .btn-primary:hover {
+  background: var(--accent-dim);
+}
+
+.telegram-webapp .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.telegram-webapp .btn-secondary:hover {
+  background: var(--border);
+}
+
+.telegram-webapp .btn-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.telegram-webapp .btn-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.telegram-webapp .btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 14px;
+}
+
+.telegram-webapp .btn-icon {
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.telegram-webapp .btn-full {
+  width: 100%;
+  margin-top: 24px;
+  padding: 16px;
+  font-size: 14px;
+}
+
+/* Empty State */
+.telegram-webapp .empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+}
+
+.telegram-webapp .empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.telegram-webapp .empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.telegram-webapp .empty-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Modal */
+.telegram-webapp .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.telegram-webapp .modal-content {
+  width: 100%;
+  max-height: 90vh;
+  background: var(--bg-primary);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 24px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
+  animation: slideUp 0.3s ease;
+  overflow-y: auto;
+}
+
+.telegram-webapp .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.telegram-webapp .modal-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.telegram-webapp .modal-close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 18px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.telegram-webapp .modal-close:active {
+  transform: scale(0.95);
+}
+
+/* Form Elements */
+.telegram-webapp .form-group {
+  margin-bottom: 20px;
+}
+
+.telegram-webapp .form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+
+.telegram-webapp .form-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.telegram-webapp .form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.telegram-webapp .form-input::placeholder {
+  color: var(--text-dim);
+}
+
+.telegram-webapp .form-select {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b6b70' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  transition: all 0.15s ease;
+}
+
+.telegram-webapp .form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background-color: var(--bg-tertiary);
+}
+
+.telegram-webapp .form-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.telegram-webapp .form-checkbox {
+  display: none;
+}
+
+.telegram-webapp .form-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 48px;
+}
+
+.telegram-webapp .form-checkbox:checked + .form-checkbox-label {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.telegram-webapp .form-checkbox-label:active {
+  transform: scale(0.96);
+}
+
+/* Toggle Switch */
+.telegram-webapp .toggle-group {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+
+.telegram-webapp .toggle-option {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.telegram-webapp .toggle-option.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+
+/* Price Inputs */
+.telegram-webapp .price-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.telegram-webapp .price-inputs .form-input {
+  flex: 1;
+}
+
+.telegram-webapp .price-separator {
+  color: var(--text-dim);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Loading */
+.telegram-webapp .loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.telegram-webapp .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.telegram-webapp .animate-in {
+  animation: fadeIn 0.3s ease, slideUp 0.4s ease;
+  animation-fill-mode: both;
+}
+
+.telegram-webapp .stagger-1 { animation-delay: 0.05s; }
+.telegram-webapp .stagger-2 { animation-delay: 0.1s; }
+.telegram-webapp .stagger-3 { animation-delay: 0.15s; }
+.telegram-webapp .stagger-4 { animation-delay: 0.2s; }
+.telegram-webapp .stagger-5 { animation-delay: 0.25s; }
+
+/* Add Button FAB */
+.telegram-webapp .fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  border: none;
+  border-radius: 18px;
+  font-size: 32px;
+  font-weight: 300;
+  color: #000;
+  cursor: pointer;
+  box-shadow: 0 8px 32px var(--accent-glow);
+  transition: all 0.2s ease;
+  z-index: 50;
+}
+
+.telegram-webapp .fab:active {
+  transform: scale(0.92) rotate(90deg);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+/* Responsive */
+@media (min-width: 480px) {
+  .telegram-webapp .subscription-card {
+    padding: 24px;
+  }
+  
+  .telegram-webapp .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Scrollbar */
+.telegram-webapp ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.telegram-webapp ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.telegram-webapp ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.telegram-webapp ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
