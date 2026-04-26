@@ -24,22 +24,20 @@ jobs:
         run: |
           cd frontend
           VITE_BASE_URL=/real-estate-parser/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
-
-      - name: Save main site
-        run: |
-          cp -r frontend/dist out
+          cp -r dist out
 
       - name: Build Telegram WebApp
         run: |
           cd frontend
-          VITE_BASE_URL=/telegram-webapp/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
+          VITE_BASE_URL=/real-estate-parser/telegram-webapp/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
+          cp -r dist out-telegram
 
-      - name: Copy Telegram to subfolder
+      - name: Merge Telegram into main
         run: |
           mkdir -p out/telegram-webapp
-          cp frontend/dist/index.html out/telegram-webapp/
-          cp frontend/dist/vite.svg out/telegram-webapp/
-          cp -r frontend/dist/assets out/telegram-webapp/assets
+          cp out-telegram/index.html out/telegram-webapp/
+          cp out-telegram/vite.svg out/telegram-webapp/
+          cp -r out-telegram/assets out/telegram-webapp/assets
 
       - uses: actions/upload-pages-artifact@v3
         with:
