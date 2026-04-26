@@ -24,25 +24,22 @@ jobs:
         run: |
           cd frontend
           VITE_BASE_URL=/real-estate-parser/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
-          cp -r dist out
+          mkdir -p ../out/main
+          cp -r dist/* ../out/main/
 
       - name: Build Telegram WebApp
         run: |
           cd frontend
+          rm -rf dist
           VITE_BASE_URL=/real-estate-parser/telegram-webapp/ VITE_API_URL=https://real-estate-parser.onrender.com npm run build
-          cp -r dist out-telegram
+          mkdir -p ../out/telegram-webapp
+          cp -r dist/* ../out/telegram-webapp/
 
-      - name: Add Telegram SDK to index.html
+      - name: Add Telegram SDK to WebApp
         run: |
-          sed -i 's|<meta name="viewport" content="width=device-width, initial-scale=1.0" />|<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />|' out-telegram/index.html
-          sed -i 's|<title>|<script src="https://telegram.org/js/telegram-web-app.js"></script>\n    <title>|' out-telegram/index.html
-
-      - name: Merge Telegram into main
-        run: |
-          mkdir -p out/telegram-webapp
-          cp out-telegram/index.html out/telegram-webapp/
-          cp out-telegram/vite.svg out/telegram-webapp/
-          cp -r out-telegram/assets out/telegram-webapp/assets
+          cd ../out/telegram-webapp
+          sed -i 's|<meta name="viewport" content="width=device-width, initial-scale=1.0" />|<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />|' index.html
+          sed -i 's|<title>|<script src="https://telegram.org/js/telegram-web-app.js"></script>\n    <title>|' index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
