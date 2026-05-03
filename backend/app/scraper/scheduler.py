@@ -242,6 +242,11 @@ class ScraperScheduler:
                         drop_percent = drop_percent_by_listing_id.get(listing.id)
                         if drop_percent is None:
                             continue
+                        # Пропускаем дубликаты — уже добавлено
+                        if any(
+                            l.id == listing.id for l in price_drop_listings
+                        ):
+                            continue
                         setattr(listing, "drop_percent", drop_percent)
                         price_before_usd = price_before_by_listing_id.get(listing.id)
                         if price_before_usd and listing.price_usd:

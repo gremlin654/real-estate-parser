@@ -791,6 +791,11 @@ async def _run_manual_scan(
                                 )
                                 if drop_percent is None:
                                     continue
+                                # Пропускаем дубликаты
+                                if any(
+                                    l.id == listing.id for l in price_drop_listings
+                                ):
+                                    continue
                                 listing.drop_percent = drop_percent
                                 price_before_usd = price_before_by_listing_id.get(
                                     listing.id
