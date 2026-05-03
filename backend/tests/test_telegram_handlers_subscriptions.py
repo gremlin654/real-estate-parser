@@ -411,6 +411,44 @@ class TestConfirmSubscription:
             call_args = mock_callback_query.message.edit_text.call_args
             assert "Превышен лимит" in call_args[0][0]
 
+    @pytest.mark.asyncio
+    async def test_confirm_subscription_duplicate(
+        self, mock_callback_query, mock_state, mock_session, mock_telegram_user
+    ):
+        """Тест: при дубликате бот сообщает и не создаёт новую подписку."""
+        from app.services.telegram_exceptions import DuplicateSubscriptionError
+
+        callback_data = SubscriptionActionCallback(action="confirm")
+        mock_state.get_data = AsyncMock(
+            return_value={
+                "city": "minsk",
+                "rooms": [2],
+            }
+        )
+
+        mock_service = AsyncMock()
+        mock_service.get_user_by_telegram_id = AsyncMock(
+            return_value=mock_telegram_user
+        )
+        mock_service.create_subscription = AsyncMock(
+            side_effect=DuplicateSubscriptionError(
+                user_id=mock_telegram_user.id,
+            )
+        )
+
+        with patch(
+            "app.telegram.handlers.subscriptions.TelegramSubscriptionService",
+            return_value=mock_service,
+        ):
+            await confirm_subscription(
+                mock_callback_query, callback_data, mock_state, mock_session
+            )
+
+            mock_state.clear.assert_called_once()
+            assert mock_callback_query.message.edit_text.called
+            call_args = mock_callback_query.message.edit_text.call_args
+            assert "уже существует" in call_args[0][0]
+
 
 class TestCurrencySelection:
     """Тесты для выбора валюты."""

@@ -14,6 +14,7 @@ import json
 
 from app.db.database import get_db
 from app.services.telegram_subscription_service import TelegramSubscriptionService
+from app.services.telegram_exceptions import DuplicateSubscriptionError
 from app.models.telegram_user import (
     TelegramUser,
     TelegramSubscription,
@@ -166,19 +167,29 @@ async def create_subscription(
         )
 
     # Создаём подписку
-    subscription = await service.create_subscription(
-        user_id=user.id,
-        city=subscription_data.get("city", "minsk"),
-        rooms=subscription_data.get("rooms"),
-        price_min=subscription_data.get("price_min"),
-        price_max=subscription_data.get("price_max"),
-        currency=subscription_data.get("currency", "usd"),
-        price_per_m2_max=subscription_data.get("price_per_m2_max"),
-        floor_min=subscription_data.get("floor_min"),
-        floor_max=subscription_data.get("floor_max"),
-        notify_only_price_drop=subscription_data.get("notify_only_price_drop", False),
-        exclude_deal_below_percent=subscription_data.get("exclude_deal_below_percent"),
-    )
+    try:
+        subscription = await service.create_subscription(
+            user_id=user.id,
+            city=subscription_data.get("city", "minsk"),
+            rooms=subscription_data.get("rooms"),
+            price_min=subscription_data.get("price_min"),
+            price_max=subscription_data.get("price_max"),
+            currency=subscription_data.get("currency", "usd"),
+            price_per_m2_max=subscription_data.get("price_per_m2_max"),
+            floor_min=subscription_data.get("floor_min"),
+            floor_max=subscription_data.get("floor_max"),
+            notify_only_price_drop=subscription_data.get(
+                "notify_only_price_drop", False
+            ),
+            exclude_deal_below_percent=subscription_data.get(
+                "exclude_deal_below_percent"
+            ),
+        )
+    except DuplicateSubscriptionError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Subscription with same filters already exists",
+        )
 
     logger.info(f"Created subscription {subscription.id} for user {user.id}")
 

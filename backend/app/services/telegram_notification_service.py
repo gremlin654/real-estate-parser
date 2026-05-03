@@ -301,15 +301,19 @@ class TelegramNotificationService:
             logger.error("Telegram bot not configured")
             return "failed"
 
-        already_sent = await self._is_duplicate_notification(
-            user.id, listing.id, subscription.id, event_type
-        )
-        if already_sent:
-            logger.info(
-                f"Skipping duplicate notification for user={user.id}, "
-                f"listing={listing.kufar_id}, event_type={event_type}"
+        # Для new_listing дедупликация обязательна, чтобы не слать один и тот же лот повторно.
+        # Для price_drop НЕ применяем "вечную" дедупликацию по listing_id: цена может
+        # снижаться несколько раз в разные сканы и каждое снижение нужно отправлять.
+        if event_type == "new_listing":
+            already_sent = await self._is_duplicate_notification(
+                user.id, listing.id, subscription.id, event_type
             )
-            return "duplicate"
+            if already_sent:
+                logger.info(
+                    f"Skipping duplicate notification for user={user.id}, "
+                    f"listing={listing.kufar_id}, event_type={event_type}"
+                )
+                return "duplicate"
 
         is_rate_limited = await self._check_user_rate_limit(user)
         if is_rate_limited:

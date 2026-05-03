@@ -150,15 +150,15 @@ class TelegramMessageBuilder:
             amount_usd: Абсолютная сумма падения в USD (опционально)
 
         Returns:
-            Строка с эмодзи, процентом и суммой, например "📉 Цена упала: 10.2%\n   💵 Снижение: $1,000"
+            Строка с эмодзи, процентом и суммой, например "📉 Цена упала: 10.2%\n💵 Снижение: $1,000"
 
         Example:
             >>> TelegramMessageBuilder.format_price_drop(10.2, 1000)
-            "📉 Цена упала: 10.2%\n   💵 Снижение: $1,000"
+            "📉 Цена упала: 10.2%\n💵 Снижение: $1,000"
         """
         lines = [f"📉 Цена упала: {drop_percent:.1f}%"]
         if amount_usd and amount_usd > 0:
-            lines.append(f"   💵 Снижение: ${amount_usd:,}")
+            lines.append(f"💵 Снижение: ${amount_usd:,}")
         return "\n".join(lines)
 
     @staticmethod
@@ -247,7 +247,5 @@ class TelegramMessageBuilder:
             message += f"\n{TelegramMessageBuilder.format_price_drop(price_drop_percent, price_drop_amount)}\n"
         elif deal_percent is not None and deal_percent > 0:
             message += f"\n{TelegramMessageBuilder.format_deal_badge(deal_percent)}\n"
-
-        message += f"\n🔗 {listing_url}"
 
         return message

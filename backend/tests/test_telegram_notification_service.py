@@ -717,7 +717,7 @@ class TestFormatListingMessage:
         assert "🏢 Этаж: 5/9" in message
         assert "💰 Цена:" in message
         assert "📊 Цена за м²:" in message
-        assert "🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123" in message
+        assert "🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123" not in message
 
 
 class TestBuildListingKeyboard:

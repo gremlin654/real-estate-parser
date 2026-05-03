@@ -18,6 +18,7 @@ from uuid import UUID
 from app.config import CITY_NAMES
 from app.services.telegram_subscription_service import TelegramSubscriptionService
 from app.services.telegram_exceptions import (
+    DuplicateSubscriptionError,
     SubscriptionLimitExceeded,
 )
 from app.telegram.keyboards.inline import (
@@ -43,6 +44,13 @@ from app.telegram.keyboards.reply import (
 )
 
 router = Router()
+
+
+def _is_skip_text(text: str | None) -> bool:
+    """Проверка, что пользователь нажал кнопку пропуска."""
+    if not text:
+        return False
+    return text.strip().startswith("⏭️ Пропустить")
 
 
 # === FSM States ===
@@ -196,8 +204,8 @@ async def process_currency_selection(
         f"🏙️ Город: {city_name}\n"
         f"🚪 Комнаты: {rooms_text}\n"
         f"💱 Валюта: {currency_text}\n\n"
-        f"Отправьте число или нажмите 'Пропустить'",
-        reply_markup=get_price_input_keyboard(),
+        f"Отправьте число или нажмите 'Пропустить'.",
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без минимума)"),
     )
     await callback.answer()
 
@@ -230,7 +238,7 @@ async def skip_price(callback: types.CallbackQuery, state: FSMContext):
         await _show_confirmation(callback.message, state)
     elif current_state == SubscriptionStates.editing_subscription.state:
         await callback.answer(
-            "Для редактирования отправьте текст '⏭️ Пропустить (любая цена)'",
+            "Для редактирования используйте кнопку '⏭️ Пропустить'.",
             show_alert=True,
         )
         return
@@ -274,7 +282,7 @@ async def process_price_min(message: types.Message, state: FSMContext):
             "❌ <b>Неверный формат цены.</b>\n\n"
             "Отправьте целое число, например: <code>50000</code>\n\n"
             f"Или нажмите 'Пропустить' для любой цены.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без минимума)"),
         )
         return
 
@@ -309,8 +317,8 @@ async def _proceed_to_price_max(message: types.Message, state: FSMContext):
         f"🚪 Комнаты: {rooms_text}\n"
         f"💱 Валюта: {currency_text}\n"
         f"💵 Мин. цена: {price_min_text}\n\n"
-        f"Отправьте число или нажмите 'Пропустить'",
-        reply_markup=get_price_input_keyboard(),
+        f"Отправьте число или нажмите 'Пропустить'.",
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без максимума)"),
     )
 
 
@@ -330,7 +338,7 @@ async def process_price_max(message: types.Message, state: FSMContext):
         return
 
     # Проверяем кнопку пропуска
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await state.update_data(price_max=None)
         await _proceed_to_price_per_m2_max(message, state)
         return
@@ -345,7 +353,7 @@ async def process_price_max(message: types.Message, state: FSMContext):
             "❌ <b>Неверный формат цены.</b>\n\n"
             "Отправьте целое число, например: <code>150000</code>\n\n"
             f"Или нажмите 'Пропустить' для любой цены.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без максимума)"),
         )
         return
 
@@ -358,7 +366,7 @@ async def process_price_max(message: types.Message, state: FSMContext):
             f"❌ <b>Максимальная цена должна быть больше минимальной.</b>\n\n"
             f"Мин. цена: {_format_price_with_currency(price_min, currency)}\n"
             f"Введите число больше {_format_price_with_currency(price_min, currency)}",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без максимума)"),
         )
         return
 
@@ -380,7 +388,7 @@ async def _proceed_to_price_per_m2_max(message: types.Message, state: FSMContext
     await message.answer(
         f"📏 <b>Введите максимальную цену за м² ({currency_text}):</b>\n\n"
         f"Опционально: отправьте число или нажмите 'Пропустить'.",
-        reply_markup=get_price_input_keyboard(),
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без фильтра за м²)"),
     )
 
 
@@ -391,7 +399,7 @@ async def process_price_per_m2_max(message: types.Message, state: FSMContext):
         await cancel_flow(message, state)
         return
 
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await state.update_data(price_per_m2_max=None)
         await _proceed_to_floor_min(message, state)
         return
@@ -405,7 +413,7 @@ async def process_price_per_m2_max(message: types.Message, state: FSMContext):
             "❌ <b>Неверный формат.</b>\n\n"
             "Отправьте число, например: <code>1800</code>\n"
             "Или нажмите 'Пропустить'.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без фильтра за м²)"),
         )
         return
 
@@ -419,7 +427,7 @@ async def _proceed_to_floor_min(message: types.Message, state: FSMContext):
     await message.answer(
         "🏢 <b>Введите минимальный этаж:</b>\n\n"
         "Опционально: отправьте целое число или нажмите 'Пропустить'.",
-        reply_markup=get_price_input_keyboard(),
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без мин. этажа)"),
     )
 
 
@@ -430,7 +438,7 @@ async def process_floor_min(message: types.Message, state: FSMContext):
         await cancel_flow(message, state)
         return
 
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await state.update_data(floor_min=None)
         await _proceed_to_floor_max(message, state)
         return
@@ -443,7 +451,7 @@ async def process_floor_min(message: types.Message, state: FSMContext):
         await message.answer(
             "❌ <b>Неверный формат.</b>\n\n"
             "Отправьте целое число больше 0 или нажмите 'Пропустить'.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без мин. этажа)"),
         )
         return
 
@@ -457,7 +465,7 @@ async def _proceed_to_floor_max(message: types.Message, state: FSMContext):
     await message.answer(
         "🏢 <b>Введите максимальный этаж:</b>\n\n"
         "Опционально: отправьте целое число или нажмите 'Пропустить'.",
-        reply_markup=get_price_input_keyboard(),
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без макс. этажа)"),
     )
 
 
@@ -468,7 +476,7 @@ async def process_floor_max(message: types.Message, state: FSMContext):
         await cancel_flow(message, state)
         return
 
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await state.update_data(floor_max=None)
         await _proceed_to_price_drop_toggle(message, state)
         return
@@ -481,7 +489,7 @@ async def process_floor_max(message: types.Message, state: FSMContext):
         await message.answer(
             "❌ <b>Неверный формат.</b>\n\n"
             "Отправьте целое число больше 0 или нажмите 'Пропустить'.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без макс. этажа)"),
         )
         return
 
@@ -490,7 +498,7 @@ async def process_floor_max(message: types.Message, state: FSMContext):
     if floor_min is not None and floor_max <= floor_min:
         await message.answer(
             "❌ <b>Максимальный этаж должен быть больше минимального.</b>",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без макс. этажа)"),
         )
         return
 
@@ -525,7 +533,7 @@ async def process_notify_only_price_drop(
     await callback.message.edit_text(
         "🎯 <b>Минимальный Deal Score (в %):</b>\n\n"
         "Опционально: отправьте число от 1 до 100 или нажмите 'Пропустить'.",
-        reply_markup=get_price_input_keyboard(),
+        reply_markup=get_price_input_keyboard("⏭️ Пропустить (без фильтра Deal Score)"),
     )
     await callback.answer()
 
@@ -537,7 +545,7 @@ async def process_exclude_deal_below_percent(message: types.Message, state: FSMC
         await cancel_flow(message, state)
         return
 
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await state.update_data(exclude_deal_below_percent=None)
         await _show_confirmation(message, state)
         return
@@ -550,7 +558,7 @@ async def process_exclude_deal_below_percent(message: types.Message, state: FSMC
         await message.answer(
             "❌ <b>Неверный формат.</b>\n\n"
             "Отправьте число от 1 до 100 или нажмите 'Пропустить'.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (без фильтра Deal Score)"),
         )
         return
 
@@ -759,6 +767,14 @@ async def confirm_subscription(
             f"Максимум 5 активных подписок на пользователя.\n"
             f"У вас уже {e.current_count} подписок.\n\n"
             f"Используйте /settings для удаления старых подписок."
+        )
+        await state.clear()
+
+    except DuplicateSubscriptionError:
+        await callback.message.edit_text(
+            "⚠️ <b>Такая подписка уже существует.</b>\n\n"
+            "Мы не создали дубликат.\n"
+            "Используйте /settings для управления текущими подписками."
         )
         await state.clear()
 
@@ -1075,9 +1091,9 @@ async def _edit_subscription_field(
         )
     elif field == "price":
         await callback.message.edit_text(
-            "💰 <b>Введите минимальную цену (USD):</b>\n\n"
-            "Отправьте число или 'Пропустить'",
-            reply_markup=get_price_input_keyboard(),
+            f"💰 <b>Введите минимальную цену ({subscription.currency.upper()}):</b>\n\n"
+            "Отправьте число или нажмите 'Пропустить'.",
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр цены)"),
         )
     elif field == "curr":
         await callback.message.edit_text(
@@ -1087,15 +1103,15 @@ async def _edit_subscription_field(
     elif field == "ppm2":
         await callback.message.edit_text(
             "📏 <b>Введите максимальную цену за м²:</b>\n\n"
-            "Отправьте число или 'Пропустить'.",
-            reply_markup=get_price_input_keyboard(),
+            "Отправьте число или нажмите 'Пропустить'.",
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр за м²)"),
         )
     elif field == "floor":
         await callback.message.edit_text(
             "🏢 <b>Введите диапазон этажей:</b>\n\n"
             "Формат: <code>3-12</code> или одно число."
             "\nНажмите 'Пропустить' чтобы убрать фильтр.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр этажей)"),
         )
     elif field == "drop":
         await callback.message.edit_text(
@@ -1106,7 +1122,7 @@ async def _edit_subscription_field(
         await callback.message.edit_text(
             "🎯 <b>Введите минимальный Deal Score (1-100):</b>\n\n"
             "Нажмите 'Пропустить' чтобы отключить фильтр.",
-            reply_markup=get_price_input_keyboard(),
+            reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять Deal Score)"),
         )
     else:
         await callback.answer("❌ Неизвестное поле для редактирования", show_alert=True)
@@ -1384,7 +1400,7 @@ async def process_edit_price(
 
     service = TelegramSubscriptionService(session)
 
-    if message.text == "⏭️ Пропустить (любая цена)":
+    if _is_skip_text(message.text):
         await _handle_edit_skip(message, state, data, service)
         return
 
@@ -1406,7 +1422,7 @@ async def process_edit_price(
         except (ValueError, AttributeError):
             await message.answer(
                 "❌ Неверный формат. Отправьте целое число.",
-                reply_markup=get_price_input_keyboard(),
+                reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр цены)"),
             )
             return
 
@@ -1423,7 +1439,7 @@ async def process_edit_price(
         except (ValueError, AttributeError):
             await message.answer(
                 "❌ Неверный формат. Отправьте положительное число.",
-                reply_markup=get_price_input_keyboard(),
+                reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр за м²)"),
             )
             return
 
@@ -1450,7 +1466,7 @@ async def process_edit_price(
         except (ValueError, AttributeError):
             await message.answer(
                 "❌ Неверный формат. Используйте `3-12` или одно число `3`.",
-                reply_markup=get_price_input_keyboard(),
+                reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять фильтр этажей)"),
             )
             return
 
@@ -1471,7 +1487,7 @@ async def process_edit_price(
         except (ValueError, AttributeError):
             await message.answer(
                 "❌ Неверный формат. Отправьте число от 1 до 100.",
-                reply_markup=get_price_input_keyboard(),
+                reply_markup=get_price_input_keyboard("⏭️ Пропустить (снять Deal Score)"),
             )
             return
 

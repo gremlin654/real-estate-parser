@@ -181,7 +181,7 @@ class TestBuildListingMessage:
         assert "📊 Цена за м²: $883.5" in result
         assert "🔥 Выгода: 16.5%" in result
         assert "📉 Цена упала" not in result
-        assert "🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123456" in result
+        assert "🔗 https://re.kufar.by/vi/minsk/kupit/kvartiru/123456" not in result
 
     def test_build_listing_message_minimal(self):
         result = TelegramMessageBuilder.build_listing_message(
@@ -207,7 +207,7 @@ class TestBuildListingMessage:
         assert "🏢 Этаж: 2/5" in result
         assert "💰 Цена: $15,000 (50,000 BYN)" in result
         assert "📊 Цена за м²: $428.6" in result
-        assert "🔗 https://re.kufar.by/vi/mogilev/kupit/kvartiru/789" in result
+        assert "🔗 https://re.kufar.by/vi/mogilev/kupit/kvartiru/789" not in result
 
         # Проверяем что deal и price drop отсутствуют
         assert "🔥 Выгода" not in result

@@ -128,7 +128,9 @@ def get_rooms_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_price_input_keyboard() -> InlineKeyboardMarkup:
+def get_price_input_keyboard(
+    skip_text: str = "⏭️ Пропустить",
+) -> InlineKeyboardMarkup:
     """
     Inline клавиатура для ввода цены.
 
@@ -136,7 +138,7 @@ def get_price_input_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardMarkup с кнопками отмены и пропуска
     """
     builder = InlineKeyboardBuilder()
-    builder.button(text="⏭️ Пропустить (любая цена)", callback_data="skip_price")
+    builder.button(text=skip_text, callback_data="skip_price")
     builder.button(text="❌ Отменить", callback_data="cancel_subscription")
     builder.adjust(1)
     return builder.as_markup()
@@ -249,7 +251,7 @@ def get_listing_keyboard(url: str) -> InlineKeyboardMarkup:
         web_app=WebAppInfo(url=url),
     )
     builder.button(
-        text="⚙️ Настройки уведомомлений",
+        text="⚙️ Настройки уведомлений",
         callback_data=ListingActionCallback(action="settings"),
     )
 

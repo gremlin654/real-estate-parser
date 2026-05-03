@@ -690,13 +690,13 @@ async def _run_manual_scan(
 
                 created_count = stats.get("created", 0)
                 if settings.TELEGRAM_BOT_ENABLED and created_count > 0:
-                    # Находим только что созданные объявления — у которых first_seen_at в пределах последних 2 минут
-                    two_minutes_ago = datetime.now() - timedelta(minutes=2)
+                    # Находим объявления, созданные в рамках текущего скана
+                    scan_started_at_window = start_time
                     result = await db.execute(
                         select(Listing)
                         .where(
                             Listing.city == city,
-                            Listing.first_seen_at >= two_minutes_ago,
+                            Listing.first_seen_at >= scan_started_at_window,
                         )
                         .order_by(Listing.first_seen_at.desc())
                         .limit(created_count * 2)
@@ -735,7 +735,7 @@ async def _run_manual_scan(
                             EventType,
                         )
 
-                        scan_started_at = datetime.now() - timedelta(minutes=2)
+                        scan_started_at = start_time
                         listing_ids_result = await db.execute(
                             select(Listing.id)
                             .where(Listing.city == city)

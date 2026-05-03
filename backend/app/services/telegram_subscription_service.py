@@ -19,6 +19,7 @@ Service layer для управления подписками Telegram бота
         )
 """
 
+from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 from uuid import UUID
 
@@ -34,6 +35,7 @@ from app.services.telegram_validators import (
     MAX_SUBSCRIPTIONS_PER_USER,
 )
 from app.services.telegram_exceptions import (
+    DuplicateSubscriptionError,
     SubscriptionNotFoundError,
     UserNotFoundError,
 )
@@ -227,6 +229,61 @@ class TelegramSubscriptionService:
 
     # === Subscription Management ===
 
+    @staticmethod
+    def _normalize_rooms(rooms: Optional[List[int]]) -> Optional[List[int]]:
+        if rooms is None:
+            return None
+        return sorted(rooms)
+
+    @staticmethod
+    def _normalize_price_per_m2(value: Optional[float]) -> Optional[Decimal]:
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value)).quantize(Decimal("0.01"))
+        except (InvalidOperation, ValueError):
+            return None
+
+    async def find_duplicate_active_subscription(
+        self,
+        user_id: UUID,
+        city: str,
+        rooms: Optional[List[int]] = None,
+        price_min: Optional[int] = None,
+        price_max: Optional[int] = None,
+        price_per_m2_max: Optional[float] = None,
+        floor_min: Optional[int] = None,
+        floor_max: Optional[int] = None,
+        currency: str = "usd",
+        notify_only_price_drop: bool = False,
+        exclude_deal_below_percent: Optional[int] = None,
+    ) -> Optional[TelegramSubscription]:
+        """Найти 100% идентичную активную подписку пользователя."""
+        normalized_rooms = self._normalize_rooms(rooms)
+        normalized_ppm2 = self._normalize_price_per_m2(price_per_m2_max)
+
+        subscriptions = await self.get_active_subscriptions(user_id)
+        for sub in subscriptions:
+            if sub.city != city:
+                continue
+            if self._normalize_rooms(sub.rooms) != normalized_rooms:
+                continue
+            if sub.price_min != price_min or sub.price_max != price_max:
+                continue
+            if self._normalize_price_per_m2(sub.price_per_m2_max) != normalized_ppm2:
+                continue
+            if sub.floor_min != floor_min or sub.floor_max != floor_max:
+                continue
+            if sub.currency != currency:
+                continue
+            if sub.notify_only_price_drop != notify_only_price_drop:
+                continue
+            if sub.exclude_deal_below_percent != exclude_deal_below_percent:
+                continue
+            return sub
+
+        return None
+
     async def create_subscription(
         self,
         user_id: UUID,
@@ -285,11 +342,32 @@ class TelegramSubscriptionService:
         self.validator.validate_floor_range(floor_min, floor_max)
         self.validator.validate_currency(currency)
         self.validator.validate_price_per_m2_max(price_per_m2_max)
+        normalized_rooms = self._normalize_rooms(rooms)
 
         # Проверяем что пользователь существует
         user = await self.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundError(user_id=user_id)
+
+        # Проверяем, что такой подписки ещё нет
+        duplicate = await self.find_duplicate_active_subscription(
+            user_id=user_id,
+            city=city,
+            rooms=normalized_rooms,
+            price_min=price_min,
+            price_max=price_max,
+            price_per_m2_max=price_per_m2_max,
+            floor_min=floor_min,
+            floor_max=floor_max,
+            currency=currency,
+            notify_only_price_drop=notify_only_price_drop,
+            exclude_deal_below_percent=exclude_deal_below_percent,
+        )
+        if duplicate:
+            raise DuplicateSubscriptionError(
+                user_id=user_id,
+                subscription_id=duplicate.id,
+            )
 
         # Проверяем лимит подписок
         current_count = await self.get_user_subscription_count(user_id)
@@ -301,7 +379,7 @@ class TelegramSubscriptionService:
         subscription = TelegramSubscription(
             user_id=user_id,
             city=city,
-            rooms=rooms,
+            rooms=normalized_rooms,
             price_min=price_min,
             price_max=price_max,
             price_per_m2_max=price_per_m2_max,

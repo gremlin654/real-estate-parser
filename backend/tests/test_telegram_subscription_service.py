@@ -19,6 +19,7 @@ from app.services.telegram_subscription_service import TelegramSubscriptionServi
 from app.models.telegram_user import TelegramUser, TelegramSubscription
 from app.models.listing import Listing
 from app.services.telegram_exceptions import (
+    DuplicateSubscriptionError,
     SubscriptionLimitExceeded,
     InvalidCityError,
     InvalidPriceRangeError,
@@ -205,11 +206,14 @@ class TestTelegramSubscriptionService:
         mock_count = MagicMock()
         mock_count.scalar.return_value = 0
 
-        # Настраиваем side_effect: get_user_by_id, get_user_subscription_count
+        # Настраиваем side_effect: get_user_by_id, get_active_subscriptions, count
+        mock_active_result = MagicMock()
+        mock_active_result.scalars.return_value.all.return_value = []
         db_mock.execute.side_effect = [
             MagicMock(
                 scalar_one_or_none=MagicMock(return_value=mock_user)
             ),  # get_user_by_id
+            mock_active_result,  # get_active_subscriptions
             MagicMock(scalar=MagicMock(return_value=0)),  # get_user_subscription_count
         ]
 
@@ -249,6 +253,54 @@ class TestTelegramSubscriptionService:
         db_mock.add.assert_not_called()
         db_mock.commit.assert_not_called()
 
+    async def test_create_subscription_duplicate_raises(self, service, db_mock):
+        """Тест: дублирующая активная подписка не создаётся."""
+        user_id = uuid4()
+        existing_id = uuid4()
+
+        mock_user = MagicMock(spec=TelegramUser)
+        mock_user.id = user_id
+
+        duplicate = MagicMock(spec=TelegramSubscription)
+        duplicate.id = existing_id
+        duplicate.city = "minsk"
+        duplicate.rooms = [1, 2]
+        duplicate.price_min = 30000
+        duplicate.price_max = 60000
+        duplicate.price_per_m2_max = Decimal("1500.00")
+        duplicate.floor_min = 2
+        duplicate.floor_max = 10
+        duplicate.currency = "usd"
+        duplicate.notify_only_price_drop = False
+        duplicate.exclude_deal_below_percent = 50
+
+        db_mock.execute.side_effect = [
+            MagicMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+        ]
+
+        with patch.object(
+            service,
+            "get_active_subscriptions",
+            AsyncMock(return_value=[duplicate]),
+        ):
+            with pytest.raises(DuplicateSubscriptionError):
+                await service.create_subscription(
+                    user_id=user_id,
+                    city="minsk",
+                    rooms=[2, 1],
+                    price_min=30000,
+                    price_max=60000,
+                    price_per_m2_max=1500.0,
+                    floor_min=2,
+                    floor_max=10,
+                    currency="usd",
+                    notify_only_price_drop=False,
+                    exclude_deal_below_percent=50,
+                )
+
+        db_mock.add.assert_not_called()
+        db_mock.commit.assert_not_called()
+
     async def test_create_subscription_invalid_price_range(self, service, db_mock):
         """Тест создания подписки с невалидным диапазоном цен."""
         user_id = uuid4()
@@ -276,8 +328,12 @@ class TestTelegramSubscriptionService:
         mock_count_result = MagicMock()
         mock_count_result.scalar.return_value = 5
 
+        mock_active_result = MagicMock()
+        mock_active_result.scalars.return_value.all.return_value = []
+
         db_mock.execute.side_effect = [
             mock_user_result,  # get_user_by_id
+            mock_active_result,  # get_active_subscriptions
             mock_count_result,  # count
         ]
 

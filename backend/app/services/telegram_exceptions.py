@@ -31,6 +31,20 @@ class SubscriptionLimitExceeded(TelegramSubscriptionError):
         )
 
 
+class DuplicateSubscriptionError(TelegramSubscriptionError):
+    """Подписка с такими параметрами уже существует."""
+
+    def __init__(self, user_id, subscription_id=None):
+        self.user_id = user_id
+        self.subscription_id = subscription_id
+        if subscription_id:
+            super().__init__(
+                f"Duplicate active subscription for user {user_id}: {subscription_id}"
+            )
+        else:
+            super().__init__(f"Duplicate active subscription for user {user_id}")
+
+
 class InvalidCityError(TelegramSubscriptionError):
     """Недопустимый город."""
 
