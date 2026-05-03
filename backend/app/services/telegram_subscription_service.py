@@ -745,9 +745,11 @@ class TelegramSubscriptionService:
         notify_only_price_drop = (
             getattr(subscription, "notify_only_price_drop", False) is True
         )
-        if notify_only_price_drop and event_type != "price_drop":
-            return False
-        return True
+        # Подписка only price_drop → только price_drop события
+        if notify_only_price_drop:
+            return event_type == "price_drop"
+        # Подписка all (new) → только new_listing события
+        return event_type == "new_listing"
 
     def _matches_deal_score(
         self,
