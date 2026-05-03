@@ -591,6 +591,10 @@ class TelegramSubscriptionService:
             if not self._matches_price_per_m2(sub, listing):
                 continue
 
+            # Проверяем тип события (new_listing vs price_drop)
+            if not self._matches_event_type(sub, event_type):
+                continue
+
             # Проверяем минимальный deal score
             if not self._matches_deal_score(sub, listing):
                 continue
