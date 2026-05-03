@@ -749,12 +749,7 @@ async def _run_manual_scan(
                                 .where(
                                     and_(
                                         ListingHistory.listing_id.in_(listing_ids),
-                                        ListingHistory.event_type.in_(
-                                            [
-                                                EventType.price_changed,
-                                                EventType.price_changed_byn,
-                                            ]
-                                        ),
+                                        ListingHistory.event_type == EventType.price_changed,
                                         ListingHistory.created_at >= scan_started_at,
                                     ),
                                 )
@@ -776,9 +771,10 @@ async def _run_manual_scan(
                                         (item.price_before - item.price_after)
                                         / item.price_before
                                     ) * 100
-                                    drop_percent_by_listing_id[item.listing_id] = round(
-                                        float(drop_percent), 2
-                                    )
+                                    drop_percent = round(float(drop_percent), 2)
+                                    if drop_percent < settings.PRICE_CHANGE_MIN_PERCENT:
+                                        continue
+                                    drop_percent_by_listing_id[item.listing_id] = drop_percent
                                     price_before_by_listing_id[item.listing_id] = (
                                         item.price_before
                                     )

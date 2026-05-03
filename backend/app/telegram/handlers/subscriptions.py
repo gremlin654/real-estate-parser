@@ -890,7 +890,8 @@ async def cmd_settings(message: types.Message, session: AsyncSession):
             else "не ограничена"
         )
         floor_text = _format_floor_range(sub.floor_min, sub.floor_max)
-        mode_text = "price-drop" if sub.notify_only_price_drop else "all"
+        # "price-drop" = только изменение цены, "all" = все новые квартиры
+        mode_text = "Изменение цены 💰" if sub.notify_only_price_drop else "Новые квартиры 🏠"
         deal_text = (
             f">={sub.exclude_deal_below_percent}%"
             if sub.exclude_deal_below_percent is not None

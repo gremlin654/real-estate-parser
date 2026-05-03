@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     TELEGRAM_NOTIFICATION_LOG_RETENTION_DAYS: int = 30
     TELEGRAM_WEB_APP_URL: str = ""  # URL Telegram Mini App
 
+    # Минимальный процент изменения цены для отправки уведомления (0.5%)
+    PRICE_CHANGE_MIN_PERCENT: float = 0.5
+
     # Курс обмена валют (1 USD = X BYN)
     # Обновляется вручную или из API Нацбанка РБ
     EXCHANGE_RATE_USD_BYN: float = 3.27

@@ -4,7 +4,7 @@
 
 **Всегда отвечайте на русском языке** при взаимодействии с пользователями по этому проекту.
 
-## Операционные заметки (2026-04-24)
+## Операционные заметки (2026-05-03)
 
 - В локальном окружении может отсутствовать `gh` CLI (`zsh: command not found: gh`).
 - MCP-интеграция GitHub может возвращать `401 Bad credentials`; в таком случае PR/MR создаётся вручную по URL из `git push`.
@@ -36,6 +36,14 @@
 - **Telegram Web App**: https://gremlin654.github.io/real-estate-parser/telegram-webapp/ + бэкенд на Render (API: https://real-estate-parser.onrender.com/api/v1).
   - ⚠️ **Важно:** Использует HashRouter — URL должен включать `#/telegram-webapp`
   - Пример: `https://gremlin654.github.io/real-estate-parser/telegram-webapp/#/telegram-webapp`
+- **Fix дублей и порога изменений цены (2026-05-03):**
+  - Добавлен `PRICE_CHANGE_MIN_PERCENT=0.5` в `config.py` — порог минимального изменения цены для отправки уведомлений (0.5%)
+  - Фильтрация изменений менее порога в `scheduler.py` и `scan.py` перед добавлением в `price_drop_listings`
+  - Убран `price_changed_byn` из event_type для price_drop уведомлений — теперь только `price_changed` (USD) отслеживается для предотвращения дублей
+  - Изменения: `app/config.py:58`, `app/scraper/scheduler.py:206-237`, `app/api/v1/scan.py:752-786`
+- **Fix отображения режима подписки (2026-05-03):**
+  - Исправлен текст режима подписки в `/settings`: вместо "price-drop"/"all" теперь показывается "Изменение цены 💰"/"Новые квартиры 🏠"
+  - Файл: `app/telegram/handlers/subscriptions.py:893`
 
 ## Запуск Telegram бота
 
